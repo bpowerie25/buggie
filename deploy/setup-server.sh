@@ -3,7 +3,7 @@ set -euo pipefail
 
 # ──────────────────────────────────────────────────────────
 # Buggie — Server Setup
-# Target: Ubuntu 24.04 LTS (Hetzner CX22 or better: 2 vCPU / 4 GB)
+# Target: Ubuntu 24.04 or 26.04 LTS (Hetzner CX22 or better: 2 vCPU / 4 GB)
 # Run as root, once:  bash setup-server.sh
 # ──────────────────────────────────────────────────────────
 
@@ -76,13 +76,47 @@ fi
 usermod -aG docker "$DEPLOY_USER"
 
 # ── 5. SSH ──
-# Moved off 22 and password login disabled. Do not close this session until you have
-# opened a second one on the new port and confirmed it works.
-sed -i "s/^#\?Port .*/Port $SSH_PORT/" /etc/ssh/sshd_config
-sed -i 's/^#\?PasswordAuthentication .*/PasswordAuthentication no/' /etc/ssh/sshd_config
-sed -i 's/^#\?PermitRootLogin .*/PermitRootLogin prohibit-password/' /etc/ssh/sshd_config
+#
+# Two things about modern Ubuntu make the obvious approach silently wrong.
+#
+# Editing sshd_config directly does not work for anything cloud-init already set.
+# Drop-ins are Included at the TOP of sshd_config and OpenSSH takes the FIRST value
+# it sees for a keyword, so /etc/ssh/sshd_config.d/50-cloud-init.conf wins over
+# anything written into the main file. A drop-in sorting before it is the only way
+# to override it — hence 10-.
+cat > /etc/ssh/sshd_config.d/10-buggie-hardening.conf <<EOF
+# Managed by deploy/setup-server.sh. Sorts before 50-cloud-init.conf, which sets
+# PasswordAuthentication yes; first match wins, so this one does.
+PasswordAuthentication no
+KbdInteractiveAuthentication no
+PermitRootLogin prohibit-password
+EOF
+
+# And ssh is socket-activated, so the listening port comes from the systemd socket
+# unit, not from `Port` in sshd_config. Setting Port there changes nothing at all:
+# sshd keeps listening on 22, and a firewall that only opens the new port locks you
+# out of a server you can no longer reach.
+if systemctl is-enabled ssh.socket &>/dev/null; then
+    mkdir -p /etc/systemd/system/ssh.socket.d
+    cat > /etc/systemd/system/ssh.socket.d/port.conf <<EOF
+[Socket]
+# The empty assignment clears the inherited ListenStream=22 before adding ours.
+ListenStream=
+ListenStream=$SSH_PORT
+EOF
+    systemctl daemon-reload
+    systemctl restart ssh.socket
+else
+    sed -i "s/^#\?Port .*/Port $SSH_PORT/" /etc/ssh/sshd_config
+    systemctl restart ssh
+fi
 
 # ── 6. Firewall ──
+#
+# Port 22 stays open here on purpose. Closing it in the same unattended run that
+# moves the port means one mistake costs a trip to the rescue console. Verify the new
+# port works, then close 22 yourself — the closing command is printed at the end.
+ufw allow 22/tcp
 ufw allow "$SSH_PORT"/tcp
 ufw allow 80/tcp
 ufw allow 443/tcp
@@ -93,7 +127,6 @@ ufw --force enable
 # anything, and it is meant to be public — but the gap is worth knowing about.
 
 systemctl enable --now fail2ban
-systemctl restart ssh
 
 # ── 7. Application directory ──
 mkdir -p "$APP_DIR"
@@ -113,6 +146,14 @@ Next, as $DEPLOY_USER (ssh -p $SSH_PORT $DEPLOY_USER@this-host):
       --entrypoint php app artisan key:generate --show   # paste into .env
   bash deploy/deploy.sh --first-run
 
-⚠ Open a second SSH session on port $SSH_PORT and confirm it works BEFORE closing
-  this one. Getting this wrong means a trip to the Hetzner web console.
+⚠ Port 22 is still open, deliberately. Open a second session on $SSH_PORT:
+
+      ssh -p $SSH_PORT $DEPLOY_USER@\$(hostname -I | awk '{print \$1}')
+
+  Once that works, close the old port from it:
+
+      sudo ufw delete allow 22/tcp
+
+  Doing that automatically here would mean one mistake costs a trip to the rescue
+  console.
 EOF
