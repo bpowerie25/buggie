@@ -34,10 +34,13 @@ echo
 echo "==> Compiling for iOS"
 # The only check the UIKit layer ever gets. Without this it is not merely untested,
 # it is unseen by a compiler: `canImport(UIKit)` is false everywhere else.
+#
+# Deliberately not piped through anything that could swallow the exit status. An
+# earlier version ended in `|| true` and cheerfully printed "OK" over a build that
+# had failed, which is worse than having no check at all.
 xcodebuild build \
     -scheme Buggie \
     -destination 'generic/platform=iOS' \
-    -quiet \
-    | grep -v '^$' || true
+    -quiet
 
 echo "==> iOS build OK"
