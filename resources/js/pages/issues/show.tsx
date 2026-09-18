@@ -702,7 +702,7 @@ export default function ShowIssue({
                         </span>
                     </SidebarRow>
 
-                    {diagnostics && <Diagnostics data={diagnostics} />}
+                    {diagnostics && <Diagnostics data={diagnostics} heading="Diagnostics" />}
                 </aside>
             </div>
         </AppLayout>

@@ -1,4 +1,5 @@
 import { Button } from '@/components/button';
+import { Diagnostics } from '@/components/diagnostics';
 import { Avatar, relativeTime } from '@/components/issue-bits';
 import { Popover, PopoverItem } from '@/components/popover';
 import { useHotkeys } from '@/hooks/use-hotkeys';
@@ -7,16 +8,13 @@ import type { Person, ReportRow, SharedProps } from '@/types';
 import { Head, router, usePage } from '@inertiajs/react';
 import {
     Check,
-    ChevronRight,
-    Globe,
     Inbox,
     Merge,
     Monitor,
     ShieldAlert,
     Trash2,
-    User as UserIcon,
 } from 'lucide-react';
-import { useMemo, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 
 type Priority = { value: number; label: string; color: string };
 type Type = { value: string; label: string };
@@ -94,11 +92,6 @@ export default function ReportsIndex({
             setExpanded(false);
         },
     });
-
-    const environment = useMemo(
-        () => (report?.environment ?? {}) as Record<string, string>,
-        [report],
-    );
 
     return (
         <AppLayout
@@ -240,74 +233,14 @@ export default function ReportsIndex({
                                 />
                             )}
 
-                            {report.error?.message && (
-                                <pre className="mt-3 overflow-x-auto rounded-lg bg-surface p-2.5 font-mono text-[11px] text-danger">
-                                    {report.error.message}
-                                </pre>
-                            )}
-
-                            <dl className="mt-3 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 text-[11px]">
-                                <Fact icon={Globe} label="Page" value={environment.url} />
-                                <Fact icon={Monitor} label="Browser" value={environment.user_agent} />
-                                <Fact
-                                    icon={UserIcon}
-                                    label="Reporter"
-                                    value={report.reporter.email ?? report.reporter.name ?? 'Anonymous'}
-                                />
-                            </dl>
-
-                            <button
-                                type="button"
-                                onClick={() => setExpanded((e) => !e)}
-                                aria-expanded={expanded}
-                                className="mt-3 flex items-center gap-1 text-[11px] text-ink-muted hover:text-ink"
-                            >
-                                <ChevronRight
-                                    className={`size-3 transition-transform ${expanded ? 'rotate-90' : ''}`}
-                                />
-                                Console ({report.console.length}) and network (
-                                {report.network.length})
-                            </button>
-
-                            {expanded && (
-                                <div className="mt-2 space-y-3">
-                                    {report.console.length > 0 && (
-                                        <pre className="max-h-40 overflow-auto rounded-lg bg-surface p-2.5 font-mono text-[10px] text-ink-muted">
-                                            {report.console
-                                                .map((entry) => `[${entry.level}] ${entry.message}`)
-                                                .join('\n')}
-                                        </pre>
-                                    )}
-
-                                    {report.network.length > 0 && (
-                                        <table className="w-full font-mono text-[10px]">
-                                            <tbody className="text-ink-muted">
-                                                {report.network.map((call, i) => (
-                                                    <tr key={i}>
-                                                        <td className="py-0.5 pr-2">{call.method}</td>
-                                                        <td
-                                                            className={`py-0.5 pr-2 ${
-                                                                Number(call.status) >= 400 ||
-                                                                call.status === 'failed'
-                                                                    ? 'text-danger'
-                                                                    : ''
-                                                            }`}
-                                                        >
-                                                            {call.status}
-                                                        </td>
-                                                        <td className="max-w-0 truncate py-0.5">
-                                                            {call.url}
-                                                        </td>
-                                                        <td className="py-0.5 pl-2 text-right">
-                                                            {call.duration}ms
-                                                        </td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    )}
-                                </div>
-                            )}
+                            <Diagnostics
+                                data={report}
+                                reporter={
+                                    report.reporter.email ?? report.reporter.name ?? 'Anonymous'
+                                }
+                                expanded={expanded}
+                                onExpandedChange={setExpanded}
+                            />
 
                             <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-border pt-4">
                                 <Button size="sm" onClick={() => act('accept')}>
@@ -432,29 +365,6 @@ export default function ReportsIndex({
     );
 }
 
-function Fact({
-    icon: Icon,
-    label,
-    value,
-}: {
-    icon: typeof Globe;
-    label: string;
-    value?: string;
-}) {
-    if (!value) return null;
-
-    return (
-        <>
-            <dt className="flex items-center gap-1 text-ink-subtle">
-                <Icon className="size-3" />
-                {label}
-            </dt>
-            <dd className="truncate text-ink-muted" title={value}>
-                {value}
-            </dd>
-        </>
-    );
-}
 
 function Key({ children }: { children: string }) {
     return (

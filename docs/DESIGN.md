@@ -1339,6 +1339,44 @@ is not the path being recommended.
 
 ---
 
+## 24c. One diagnostics card, and a column that was never there
+
+Writing the help guide turned up that the issue page showed none of what the widget
+collects. There was no `reports()` relation on `Issue` at all, so the console, the
+network table, the browser and the occurrence count lived only in the triage inbox and
+vanished the moment somebody accepted a report — which is precisely when they start
+mattering.
+
+The card is now shared between the inbox and the issue page rather than written twice,
+since two copies drifting apart is how the gap opened. Two things the sharing forced
+into the open:
+
+- **Expansion has to be controllable.** The inbox toggles console/network with `Enter`
+  and collapses it when you move to the next report, so that state belongs to the
+  page. The component is uncontrolled by default and controlled when the host passes
+  `expanded`.
+- **`environment` is arbitrary JSON, not `Record<string, string>`.** A browser sends
+  `pixel_ratio` as a number and a native SDK sends a nested identity object. Typing it
+  honestly and reading scalars through a helper is what makes the card work for iOS
+  and Android payloads rather than rendering a half-empty browser card.
+
+### The network table never showed a URL
+
+Opening the inbox to check the refactor showed every request with its method, status
+and duration and **no URL** — since M4, in the screen built for reading requests.
+
+`<table className="w-full">` is `table-auto`, and the URL cell carried `max-w-0
+truncate`. Under auto layout the cell collapses to nothing and `truncate` hides what
+is inside it. The fix is `table-fixed` with the widths in a `colgroup`.
+
+Worth recording because of how it was found. It is invisible to TypeScript, invisible
+to every test — the data was there, the element rendered, the DOM was correct — and
+obvious within two seconds of looking at the page. That is now three separate defects
+this project has shipped in things that "should" work: the sign-out redirect, the
+screenshot redaction, and a column that has never once displayed.
+
+---
+
 ## 25. The iOS SDK
 
 `packages/swift` is a Swift package that posts to the same ingest endpoint as the web
