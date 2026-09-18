@@ -8,7 +8,6 @@ set -euo pipefail
 # ──────────────────────────────────────────────────────────
 
 DEPLOY_USER="deploy"
-SSH_PORT=2222
 SWAP_SIZE="2G"
 APP_DIR="/srv/buggie"
 # buggie.eu deploys the private platform repository, which carries the public one as
@@ -77,13 +76,18 @@ usermod -aG docker "$DEPLOY_USER"
 
 # ── 5. SSH ──
 #
-# Two things about modern Ubuntu make the obvious approach silently wrong.
+# Key-only, and NOT moved off port 22. Moving it is mild security theatre — it stops
+# nothing that fail2ban and key-only authentication do not already stop — and on this
+# distribution it is genuinely dangerous to automate. `ListenStream=2222` on a
+# socket-activated sshd binds IPv6 ONLY, so IPv4 clients have nowhere to go while the
+# override has already cleared port 22. That locked the author out of a fresh box and
+# needed the rescue console to undo. The shipped unit lists 0.0.0.0 and [::]
+# separately for exactly this reason.
 #
-# Editing sshd_config directly does not work for anything cloud-init already set.
-# Drop-ins are Included at the TOP of sshd_config and OpenSSH takes the FIRST value
-# it sees for a keyword, so /etc/ssh/sshd_config.d/50-cloud-init.conf wins over
-# anything written into the main file. A drop-in sorting before it is the only way
-# to override it — hence 10-.
+# Editing sshd_config directly does not work either, for anything cloud-init already
+# set: drop-ins are Included at the TOP of sshd_config and OpenSSH takes the FIRST
+# value it sees, so /etc/ssh/sshd_config.d/50-cloud-init.conf beats the main file.
+# A drop-in sorting before it is the only way to win, hence 10-.
 cat > /etc/ssh/sshd_config.d/10-buggie-hardening.conf <<EOF
 # Managed by deploy/setup-server.sh. Sorts before 50-cloud-init.conf, which sets
 # PasswordAuthentication yes; first match wins, so this one does.
@@ -92,32 +96,13 @@ KbdInteractiveAuthentication no
 PermitRootLogin prohibit-password
 EOF
 
-# And ssh is socket-activated, so the listening port comes from the systemd socket
-# unit, not from `Port` in sshd_config. Setting Port there changes nothing at all:
-# sshd keeps listening on 22, and a firewall that only opens the new port locks you
-# out of a server you can no longer reach.
-if systemctl is-enabled ssh.socket &>/dev/null; then
-    mkdir -p /etc/systemd/system/ssh.socket.d
-    cat > /etc/systemd/system/ssh.socket.d/port.conf <<EOF
-[Socket]
-# The empty assignment clears the inherited ListenStream=22 before adding ours.
-ListenStream=
-ListenStream=$SSH_PORT
-EOF
-    systemctl daemon-reload
-    systemctl restart ssh.socket
-else
-    sed -i "s/^#\?Port .*/Port $SSH_PORT/" /etc/ssh/sshd_config
-    systemctl restart ssh
-fi
+sshd -t || { echo "❌ sshd config is invalid; refusing to restart it."; exit 1; }
+
+systemctl restart ssh.socket 2>/dev/null || systemctl restart ssh
 
 # ── 6. Firewall ──
-#
-# Port 22 stays open here on purpose. Closing it in the same unattended run that
-# moves the port means one mistake costs a trip to the rescue console. Verify the new
-# port works, then close 22 yourself — the closing command is printed at the end.
+
 ufw allow 22/tcp
-ufw allow "$SSH_PORT"/tcp
 ufw allow 80/tcp
 ufw allow 443/tcp
 ufw --force enable
@@ -136,7 +121,7 @@ cat <<EOF
 
 ✅ Server ready.
 
-Next, as $DEPLOY_USER (ssh -p $SSH_PORT $DEPLOY_USER@this-host):
+Next, as $DEPLOY_USER (ssh $DEPLOY_USER@this-host):
 
   git clone $REPO $APP_DIR
   cd $APP_DIR
@@ -146,14 +131,8 @@ Next, as $DEPLOY_USER (ssh -p $SSH_PORT $DEPLOY_USER@this-host):
       --entrypoint php app artisan key:generate --show   # paste into .env
   bash deploy/deploy.sh --first-run
 
-⚠ Port 22 is still open, deliberately. Open a second session on $SSH_PORT:
+⚠ Password authentication is now off. Confirm you can still get in with a key from
+  a second terminal before closing this session:
 
-      ssh -p $SSH_PORT $DEPLOY_USER@\$(hostname -I | awk '{print \$1}')
-
-  Once that works, close the old port from it:
-
-      sudo ufw delete allow 22/tcp
-
-  Doing that automatically here would mean one mistake costs a trip to the rescue
-  console.
+      ssh $DEPLOY_USER@\$(hostname -I | awk '{print \$1}')
 EOF

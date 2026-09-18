@@ -21,7 +21,7 @@ It asks for the root password once. Confirm it worked before going further:
 ssh -i ~/.ssh/id_ed25519_hetzner root@188.245.198.86 'echo in'
 ```
 
-§2 disables password authentication. If the key is not on the box when that happens,
+§3 disables password authentication. If the key is not on the box when that happens,
 you are locked out and the only way back is the Hetzner web console. The setup script
 refuses to run rather than let that happen, but check anyway.
 
@@ -73,13 +73,18 @@ less setup-server.sh        # read it before running it as root
 bash setup-server.sh
 ```
 
-It creates a `deploy` user, adds swap, installs Docker, moves SSH to **port 2222**,
-disables password authentication, and opens 2222, 80 and 443.
+It creates a `deploy` user, adds swap, installs Docker, disables password
+authentication, and opens 22, 80 and 443.
 
-**Open a second terminal and confirm the new port works before closing this one:**
+SSH stays on port 22. Moving it stops nothing that key-only authentication and
+fail2ban do not already stop, and automating it on a socket-activated sshd locked the
+author out of this very box — `ListenStream=2222` binds IPv6 only.
+
+**Open a second terminal and confirm key access still works before closing this one**,
+since password authentication is now off:
 
 ```sh
-ssh -p 2222 -i ~/.ssh/id_ed25519_hetzner deploy@188.245.198.86 'echo in'
+ssh -i ~/.ssh/id_ed25519_hetzner deploy@188.245.198.86 'echo in'
 ```
 
 ---
@@ -89,7 +94,7 @@ ssh -p 2222 -i ~/.ssh/id_ed25519_hetzner deploy@188.245.198.86 'echo in'
 As the `deploy` user:
 
 ```sh
-ssh -p 2222 -i ~/.ssh/id_ed25519_hetzner deploy@188.245.198.86
+ssh -i ~/.ssh/id_ed25519_hetzner deploy@188.245.198.86
 
 ssh-keygen -t ed25519 -C "buggie.eu deploy" -f ~/.ssh/id_ed25519 -N ""
 cat ~/.ssh/id_ed25519.pub
