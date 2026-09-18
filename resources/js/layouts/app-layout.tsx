@@ -1,0 +1,145 @@
+import { Flash } from '@/components/flash';
+import type { SharedProps } from '@/types';
+import { Link, router, usePage } from '@inertiajs/react';
+import {
+    Bug,
+    ChevronsUpDown,
+    CircleDot,
+    FolderKanban,
+    LayoutDashboard,
+    LogOut,
+    Tag,
+} from 'lucide-react';
+import { useState, type ReactNode } from 'react';
+
+function NavLink({
+    href,
+    icon: Icon,
+    children,
+    active,
+}: {
+    href: string;
+    icon: typeof Bug;
+    children: ReactNode;
+    active: boolean;
+}) {
+    return (
+        <Link
+            href={href}
+            className={`flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-sm transition ${
+                active
+                    ? 'bg-accent-soft font-medium text-accent'
+                    : 'text-ink-muted hover:bg-surface hover:text-ink'
+            }`}
+        >
+            <Icon className="size-4" />
+            {children}
+        </Link>
+    );
+}
+
+export function AppLayout({
+    title,
+    actions,
+    children,
+}: {
+    title: string;
+    actions?: ReactNode;
+    children: ReactNode;
+}) {
+    const { auth, workspace, workspaces, ziggy } = usePage<
+        SharedProps & { ziggy: { location: string } }
+    >().props;
+    const [switcherOpen, setSwitcherOpen] = useState(false);
+
+    const path = new URL(ziggy.location).pathname;
+
+    return (
+        <div className="flex min-h-screen">
+            <aside className="flex w-60 shrink-0 flex-col border-r border-border bg-surface">
+                <div className="relative p-3">
+                    <button
+                        onClick={() => setSwitcherOpen((o) => !o)}
+                        className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left transition hover:bg-raised"
+                    >
+                        <Bug className="size-5 shrink-0 text-accent" />
+                        <span className="min-w-0 flex-1 truncate text-sm font-semibold text-ink">
+                            {workspace?.name ?? 'Buggy'}
+                        </span>
+                        <ChevronsUpDown className="size-3.5 shrink-0 text-ink-subtle" />
+                    </button>
+
+                    {switcherOpen && workspaces.length > 0 && (
+                        <div className="absolute inset-x-3 top-full z-10 rounded-lg border border-border bg-raised p-1 shadow-lg">
+                            {workspaces.map((w) => (
+                                <a
+                                    key={w.slug}
+                                    href={w.url}
+                                    className="block truncate rounded-md px-2 py-1.5 text-sm text-ink-muted hover:bg-surface hover:text-ink"
+                                >
+                                    {w.name}
+                                </a>
+                            ))}
+                        </div>
+                    )}
+                </div>
+
+                <nav className="flex-1 space-y-0.5 px-3">
+                    <NavLink href="/" icon={LayoutDashboard} active={path === '/'}>
+                        Dashboard
+                    </NavLink>
+                    <NavLink
+                        href="/issues"
+                        icon={CircleDot}
+                        active={path.startsWith('/issues')}
+                    >
+                        Issues
+                    </NavLink>
+                    <NavLink
+                        href="/projects"
+                        icon={FolderKanban}
+                        active={path.startsWith('/projects')}
+                    >
+                        Projects
+                    </NavLink>
+                    <NavLink href="/labels" icon={Tag} active={path.startsWith('/labels')}>
+                        Labels
+                    </NavLink>
+                </nav>
+
+                <div className="border-t border-border p-3">
+                    <div className="flex items-center gap-2.5 px-1">
+                        <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-accent text-[11px] font-semibold text-accent-ink">
+                            {auth.user?.initials}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm text-ink">{auth.user?.name}</p>
+                            <p className="truncate text-xs text-ink-subtle capitalize">
+                                {auth.role}
+                            </p>
+                        </div>
+                        <button
+                            onClick={() => router.post('/logout')}
+                            aria-label="Sign out"
+                            className="rounded-md p-1.5 text-ink-subtle transition hover:bg-raised hover:text-ink"
+                        >
+                            <LogOut className="size-4" />
+                        </button>
+                    </div>
+                </div>
+            </aside>
+
+            <main className="min-w-0 flex-1">
+                <header className="flex h-14 items-center justify-between gap-4 border-b border-border px-6">
+                    <h1 className="truncate text-sm font-semibold text-ink">{title}</h1>
+                    <div className="flex shrink-0 items-center gap-2">{actions}</div>
+                </header>
+
+                <div className="p-6">
+                    <Flash />
+                    {children}
+                </div>
+            </main>
+        </div>
+    );
+}

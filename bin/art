@@ -1,0 +1,3 @@
+#!/usr/bin/env sh
+# Run artisan inside the app container: bin/art migrate
+exec docker compose exec -T app php artisan "$@"

@@ -1,0 +1,3 @@
+#!/usr/bin/env sh
+# Run composer inside the app container: bin/composer require vendor/pkg
+exec docker compose exec -T app composer "$@"

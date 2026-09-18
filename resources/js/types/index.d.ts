@@ -1,0 +1,112 @@
+export type WorkspaceRole = 'owner' | 'admin' | 'member' | 'client';
+
+export type StatusCategory =
+    | 'backlog'
+    | 'unstarted'
+    | 'started'
+    | 'done'
+    | 'canceled';
+
+export interface AuthUser {
+    id: number;
+    name: string;
+    email: string;
+    initials: string;
+    avatar_url: string | null;
+}
+
+export interface WorkspaceSummary {
+    id: number;
+    name: string;
+    slug: string;
+}
+
+export interface WorkspaceListing {
+    name: string;
+    slug: string;
+    url: string;
+    role: WorkspaceRole;
+}
+
+export interface ProjectSummary {
+    name: string;
+    key: string;
+    slug: string;
+    description: string | null;
+    is_archived?: boolean;
+}
+
+export interface Status {
+    id: number;
+    name: string;
+    category: StatusCategory;
+    color: string;
+    position: number;
+    is_default: boolean;
+    open: boolean;
+}
+
+export interface SharedProps {
+    auth: { user: AuthUser | null; role: WorkspaceRole | null };
+    workspace: WorkspaceSummary | null;
+    workspaces: WorkspaceListing[];
+    flash: { success: string | null; error: string | null };
+    [key: string]: unknown;
+}
+
+export type IssueTypeValue = 'bug' | 'feature' | 'task' | 'question';
+export type VisibilityValue = 'internal' | 'client';
+export type RelationTypeValue = 'blocks' | 'blocked_by' | 'relates_to' | 'duplicates';
+
+export interface Person {
+    id: number;
+    name: string;
+}
+
+export interface LabelChip {
+    id: number;
+    name: string;
+    color: string;
+}
+
+export interface IssueStatus {
+    id: number;
+    name: string;
+    category: StatusCategory;
+    color: string;
+    open: boolean;
+}
+
+export interface IssueRow {
+    id: number;
+    key: string;
+    title: string;
+    type: IssueTypeValue;
+    priority: number;
+    priority_label: string;
+    priority_color: string;
+    status: IssueStatus;
+    assignee: Person | null;
+    labels: LabelChip[];
+    project: { id: number; key: string; name: string; slug: string };
+    updated_at: string;
+}
+
+export interface IssueFilters {
+    q: string | null;
+    project: string | null;
+    state: 'open' | 'closed' | 'all';
+    assignee: string | null;
+    label: number | null;
+    type: string | null;
+    priority: number | null;
+}
+
+export interface Facets {
+    projects: { id: number; name: string; key: string; slug: string }[];
+    labels: LabelChip[];
+    members: Person[];
+    priorities: { value: number; label: string; color: string }[];
+    types: { value: string; label: string }[];
+    statuses_by_project: Record<number, IssueStatus[]>;
+}

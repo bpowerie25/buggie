@@ -1,0 +1,74 @@
+<?php
+
+namespace App\Models;
+
+use App\Enums\WorkspaceRole;
+use Database\Factories\UserFactory;
+use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Hidden;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Notifications\Notifiable;
+
+/**
+ * Users are global, not workspace-owned: one account can belong to several
+ * workspaces (your own, plus every client workspace you were invited to).
+ */
+#[Fillable(['name', 'email', 'password', 'avatar_path', 'timezone', 'last_workspace_id'])]
+#[Hidden(['password', 'remember_token'])]
+class User extends Authenticatable
+{
+    /** @use HasFactory<UserFactory> */
+    use HasFactory, Notifiable;
+
+    protected function casts(): array
+    {
+        return [
+            'email_verified_at' => 'datetime',
+            'password' => 'hashed',
+        ];
+    }
+
+    public function workspaces(): BelongsToMany
+    {
+        return $this->belongsToMany(Workspace::class, 'workspace_user')
+            ->withPivot(['role', 'invited_by_id', 'invited_at', 'joined_at'])
+            ->withTimestamps();
+    }
+
+    public function ownedWorkspaces(): HasMany
+    {
+        return $this->hasMany(Workspace::class, 'owner_id');
+    }
+
+    /** Projects a client has been granted access to. Empty for staff. */
+    public function projects(): BelongsToMany
+    {
+        return $this->belongsToMany(Project::class)->withPivot('role')->withTimestamps();
+    }
+
+    public function membershipIn(Workspace $workspace): ?WorkspaceRole
+    {
+        $role = $this->workspaces()
+            ->where('workspaces.id', $workspace->id)
+            ->value('workspace_user.role');
+
+        return $role ? WorkspaceRole::from($role) : null;
+    }
+
+    public function belongsToWorkspace(Workspace $workspace): bool
+    {
+        return $this->membershipIn($workspace) !== null;
+    }
+
+    public function initials(): string
+    {
+        $parts = preg_split('/\s+/', trim($this->name)) ?: [];
+
+        return strtoupper(collect($parts)->take(2)->map(
+            fn (string $p) => mb_substr($p, 0, 1)
+        )->implode(''));
+    }
+}
