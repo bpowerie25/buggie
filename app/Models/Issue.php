@@ -74,6 +74,19 @@ class Issue extends Model
         return $this->belongsToMany(Label::class)->orderBy('name');
     }
 
+    /**
+     * The widget reports this issue was raised from, newest first.
+     *
+     * An issue accepted from triage keeps its screenshot as an attachment, but the
+     * console, the network table, the browser and the route lived only on the report
+     * — so everything the widget went to the trouble of collecting disappeared at
+     * exactly the moment somebody decided the bug was worth fixing.
+     */
+    public function reports(): HasMany
+    {
+        return $this->hasMany(Report::class)->latest();
+    }
+
     public function comments(): HasMany
     {
         return $this->hasMany(Comment::class)->oldest();

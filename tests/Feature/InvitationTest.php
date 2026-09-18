@@ -216,4 +216,92 @@ class InvitationTest extends TestCase
         $this->assertFalse($client->fresh()->belongsToWorkspace($workspace));
         $this->assertSame(0, $client->fresh()->projects()->count());
     }
+
+    #[Test]
+    public function a_new_client_who_registers_lands_back_on_the_invitation(): void
+    {
+        // The whole journey as a real invited client walks it. Before this, they were
+        // dropped on "create a workspace" — most would make a stray workspace of their
+        // own and never find the one they were invited to.
+        [$workspace, $owner] = $this->workspaceWithMember(slug: 'acme');
+
+        $invitation = $this->inviteTo($workspace, $owner, 'client@shopper.test');
+
+        // 1. They follow the link from the email while signed out.
+        $this->get($this->workspaceUrl($workspace, '/invitations/'.$invitation->token))
+            ->assertRedirect(central_url('register'));
+
+        // 2. They sign up.
+        $this->post($this->centralUrl('/register'), [
+            'name' => 'Ana Power',
+            'email' => 'client@shopper.test',
+            'password' => 'correct-horse-battery',
+            'password_confirmation' => 'correct-horse-battery',
+        ])->assertRedirect($this->workspaceUrl($workspace, '/invitations/'.$invitation->token));
+
+        // 3. And accepting now works, because they are back where they started.
+        $this->post($this->workspaceUrl($workspace, '/invitations/'.$invitation->token))
+            ->assertRedirect(workspace_url($workspace->slug));
+
+        $this->assertTrue(
+            User::where('email', 'client@shopper.test')->firstOrFail()->belongsToWorkspace($workspace),
+        );
+    }
+
+    #[Test]
+    public function someone_who_already_has_an_account_is_sent_to_sign_in(): void
+    {
+        // Registration would reject their email as taken, which reads as the
+        // invitation being broken rather than as them already being known.
+        [$workspace, $owner] = $this->workspaceWithMember(slug: 'acme');
+
+        $existing = User::factory()->create(['email' => 'known@shopper.test']);
+
+        $invitation = $this->inviteTo($workspace, $owner, $existing->email);
+
+        $this->get($this->workspaceUrl($workspace, '/invitations/'.$invitation->token))
+            ->assertRedirect(central_url('login'));
+
+        $this->post($this->centralUrl('/login'), [
+            'email' => $existing->email,
+            'password' => 'password',
+        ])->assertRedirect($this->workspaceUrl($workspace, '/invitations/'.$invitation->token));
+    }
+
+    #[Test]
+    public function a_revoked_invitation_does_not_strand_a_new_user(): void
+    {
+        // The invitation can be withdrawn between them leaving and coming back. That
+        // should drop them somewhere sensible, not 404 them on their first page.
+        [$workspace, $owner] = $this->workspaceWithMember(slug: 'acme');
+
+        $invitation = $this->inviteTo($workspace, $owner, 'client@shopper.test');
+
+        $this->get($this->workspaceUrl($workspace, '/invitations/'.$invitation->token));
+
+        $invitation->delete();
+
+        $this->post($this->centralUrl('/register'), [
+            'name' => 'Ana Power',
+            'email' => 'client@shopper.test',
+            'password' => 'correct-horse-battery',
+            'password_confirmation' => 'correct-horse-battery',
+        ])->assertRedirect(route('workspaces.create'));
+    }
+
+    /**
+     * Invited through the action, so tenancy and the deliberately not-fillable
+     * workspace_id behave, and with a project granted, because a client invitation
+     * without one is refused — building the journey on a state that cannot exist
+     * would be testing nothing.
+     */
+    private function inviteTo(\App\Models\Workspace $workspace, User $owner, string $email): Invitation
+    {
+        return app(Tenancy::class)->run($workspace, function () use ($email, $owner) {
+            $project = app(\App\Actions\CreateProject::class)->handle(['name' => 'Marketing Site']);
+
+            return app(\App\Actions\InviteToWorkspace::class)
+                ->handle($email, WorkspaceRole::Client, [$project->id], $owner);
+        });
+    }
 }

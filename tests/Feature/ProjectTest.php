@@ -250,4 +250,23 @@ class ProjectTest extends TestCase
             ])
             ->assertSessionHasErrors('site_url');
     }
+
+    #[Test]
+    public function project_settings_shows_the_address_to_email_issues_to(): void
+    {
+        // Generated since M5 and never displayed, which made filing by email
+        // impossible without reaching into the database.
+        [$workspace, $user] = $this->workspaceWithMember(slug: 'acme');
+
+        $project = app(Tenancy::class)->run(
+            $workspace,
+            fn () => app(\App\Actions\CreateProject::class)->handle(['name' => 'Marketing Site']),
+        );
+
+        $this->actingAs($user)
+            ->get($this->workspaceUrl($workspace, "/projects/{$project->slug}/edit"))
+            ->assertInertia(fn ($page) => $page
+                ->where('inboundAddress', $project->inboundAddress())
+                ->where('inboundAddress', fn (string $a) => str_starts_with($a, 'bugs+')));
+    }
 }

@@ -151,6 +151,12 @@ class IssueController extends Controller
                     ],
                 ]),
             ],
+            // Staff only, and not because the browser and route are sensitive: the
+            // console and network tables are whatever the customer's application
+            // happened to log, and a client should not be reading that about their
+            // own users. Clients never see the triage inbox either.
+            'diagnostics' => $staff ? $this->diagnostics($issue) : null,
+
             // The one place the client visibility plane is enforced for reading.
             'comments' => $issue->comments()
                 ->with('author:id,name')
@@ -311,6 +317,34 @@ class IssueController extends Controller
     }
 
     /** @return array<string, mixed> */
+    /**
+     * What the reporter's browser saw, and how often this has happened.
+     *
+     * Taken from the most recent report rather than the first: a bug that is still
+     * happening is best described by the last person it happened to, on whatever
+     * they are running now.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function diagnostics(Issue $issue): ?array
+    {
+        $report = $issue->reports()->first();
+
+        if ($report === null && $issue->occurrence_count <= 1) {
+            return null;
+        }
+
+        return [
+            'occurrence_count' => $issue->occurrence_count,
+            'first_seen_at' => $issue->first_seen_at?->toIso8601String(),
+            'last_seen_at' => $issue->last_seen_at?->toIso8601String(),
+            'environment' => $report?->environment,
+            'console' => $report?->console,
+            'network' => $report?->network,
+            'error' => $report?->error,
+        ];
+    }
+
     private function summary(Issue $issue): array
     {
         return [

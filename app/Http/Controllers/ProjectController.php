@@ -88,6 +88,9 @@ class ProjectController extends Controller
                     'issues_count' => $status->issues_count,
                 ]),
             'categories' => StatusCategory::options(),
+            // Generated since M5 and never once displayed, which made filing by email
+            // impossible without database access.
+            'inboundAddress' => $project->inboundAddress(),
             'widgetKeys' => $project->widgetKeys()->latest()->get()->map(fn ($key) => [
                 'id' => $key->id,
                 'public_key' => $key->public_key,

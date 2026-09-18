@@ -10,6 +10,7 @@ import {
 } from '@/components/issue-bits';
 import { Popover, PopoverItem } from '@/components/popover';
 import { RichTextEditor, RichTextView } from '@/components/rich-text';
+import { Diagnostics, type DiagnosticsData } from '@/components/diagnostics';
 import { AppLayout } from '@/layouts/app-layout';
 import type {
     Facets,
@@ -128,6 +129,7 @@ export default function ShowIssue({
     statuses,
     facets,
     can,
+    diagnostics,
 }: {
     issue: Issue;
     comments: Comment[];
@@ -135,6 +137,8 @@ export default function ShowIssue({
     attachments: AttachmentRow[];
     statuses: IssueStatus[];
     facets: Facets;
+    /** Null for clients, and for issues with no captured context. */
+    diagnostics: DiagnosticsData | null;
     can: {
         update: boolean;
         comment_internally: boolean;
@@ -697,6 +701,8 @@ export default function ShowIssue({
                             {issue.reporter?.name ?? 'Unknown'}
                         </span>
                     </SidebarRow>
+
+                    {diagnostics && <Diagnostics data={diagnostics} />}
                 </aside>
             </div>
         </AppLayout>

@@ -35,11 +35,13 @@ export default function EditProject({
     widgetKeys,
     statuses,
     categories,
+    inboundAddress,
 }: {
     project: ProjectSummary;
     widgetKeys: WidgetKeyRow[];
     statuses: StatusRow[];
     categories: { value: StatusRow['category']; label: string; open: boolean }[];
+    inboundAddress: string;
 }) {
     const { data, setData, put, processing, errors } = useForm({
         name: project.name,
@@ -146,6 +148,22 @@ export default function EditProject({
                 )}
             </section>
 
+            <section className="mt-12 max-w-2xl">
+                <h2 className="text-sm font-semibold text-ink">File issues by email</h2>
+                <p className="mt-1 text-sm text-ink-muted">
+                    Anything sent here becomes an issue in this project. The subject is the
+                    title, the body is the description, and attachments come across. Give it
+                    to a client who would rather email than sign in.
+                </p>
+
+                <CopyRow value={inboundAddress} label="Copy email address" />
+
+                <p className="mt-2 text-xs text-ink-subtle">
+                    Treat it as unlisted. Anyone who has it can file into this project, so it
+                    is random rather than derived from the project name.
+                </p>
+            </section>
+
             <section className="mt-12 max-w-lg rounded-xl border border-danger/30 bg-danger-soft p-4">
                 <h2 className="text-sm font-semibold text-ink">Delete project</h2>
                 <p className="mt-1 text-sm text-ink-muted">
@@ -185,8 +203,32 @@ export default function EditProject({
     );
 }
 
-function WidgetKeyCard({ widgetKey }: { widgetKey: WidgetKeyRow }) {
+/** A value with a copy button. Used for the widget snippet and the inbound address. */
+function CopyRow({ value, label }: { value: string; label: string }) {
     const [copied, setCopied] = useState(false);
+
+    return (
+        <div className="mt-3 flex items-start gap-2">
+            <pre className="min-w-0 flex-1 overflow-x-auto rounded-lg bg-surface p-2.5 font-mono text-[11px] text-ink-muted">
+                {value}
+            </pre>
+            <button
+                type="button"
+                aria-label={label}
+                onClick={() => {
+                    navigator.clipboard?.writeText(value);
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 1500);
+                }}
+                className="rounded-lg border border-border p-2 text-ink-subtle transition hover:text-ink"
+            >
+                {copied ? <Check className="size-3.5 text-success" /> : <Copy className="size-3.5" />}
+            </button>
+        </div>
+    );
+}
+
+function WidgetKeyCard({ widgetKey }: { widgetKey: WidgetKeyRow }) {
     const [origins, setOrigins] = useState(widgetKey.allowed_origins.join('\n'));
 
     function save(changes: Record<string, unknown>) {
@@ -225,23 +267,7 @@ function WidgetKeyCard({ widgetKey }: { widgetKey: WidgetKeyRow }) {
                 </button>
             </div>
 
-            <div className="mt-3 flex items-start gap-2">
-                <pre className="min-w-0 flex-1 overflow-x-auto rounded-lg bg-surface p-2.5 font-mono text-[11px] text-ink-muted">
-                    {widgetKey.snippet}
-                </pre>
-                <button
-                    type="button"
-                    aria-label="Copy snippet"
-                    onClick={() => {
-                        navigator.clipboard?.writeText(widgetKey.snippet);
-                        setCopied(true);
-                        setTimeout(() => setCopied(false), 1500);
-                    }}
-                    className="rounded-lg border border-border p-2 text-ink-subtle transition hover:text-ink"
-                >
-                    {copied ? <Check className="size-3.5 text-success" /> : <Copy className="size-3.5" />}
-                </button>
-            </div>
+            <CopyRow value={widgetKey.snippet} label="Copy snippet" />
 
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
                 <Field

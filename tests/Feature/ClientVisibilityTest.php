@@ -220,4 +220,38 @@ class ClientVisibilityTest extends TestCase
             ]],
         ];
     }
+
+    #[Test]
+    public function a_client_never_receives_the_diagnostics(): void
+    {
+        // The console and network tables are whatever the client's own application
+        // logged about their own users. Staff see it; the client does not.
+        [$workspace, $staff, $client, $project, $issue] = $this->scenario();
+
+        app(Tenancy::class)->run($workspace, function () use ($issue, $project) {
+            \App\Models\Report::withoutGlobalScopes()->where('id', '>', 0)->delete();
+
+            $report = \App\Models\Report::factory()->create([
+                'project_id' => $project->id,
+                'issue_id' => $issue->id,
+            ]);
+
+            $report->forceFill([
+                'console' => [['level' => 'error', 'message' => 'Dave broke it again']],
+                'network' => [['method' => 'POST', 'url' => 'https://acme.test/pay', 'status' => 500]],
+                'environment' => ['url' => 'https://acme.test/checkout', 'user_agent' => 'Firefox'],
+            ])->save();
+        });
+
+        $this->actingAs($staff)
+            ->get($this->workspaceUrl($workspace, "/issues/{$issue->key}"))
+            ->assertInertia(fn ($page) => $page->where(
+                'diagnostics.console.0.message',
+                'Dave broke it again',
+            ));
+
+        $this->actingAs($client)
+            ->get($this->workspaceUrl($workspace, "/issues/{$issue->key}"))
+            ->assertInertia(fn ($page) => $page->where('diagnostics', null));
+    }
 }

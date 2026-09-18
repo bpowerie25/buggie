@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\Workspace;
+use App\Support\Invitations\PendingInvitation;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -35,6 +36,14 @@ class AuthenticatedSessionController extends Controller
         }
 
         $request->session()->regenerate();
+
+        // An invitation outranks `intended`: the invitation is what they were doing,
+        // and `intended` is usually just wherever the guest middleware bounced them.
+        if ($invitation = PendingInvitation::destinationFor($request)) {
+            $request->session()->forget('url.intended');
+
+            return redirect_across_domains($invitation);
+        }
 
         // intended() may hold a URL on any workspace subdomain.
         return redirect_across_domains(

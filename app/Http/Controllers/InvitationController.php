@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Actions\InviteToWorkspace;
 use App\Models\Invitation;
+use App\Models\User;
+use App\Support\Invitations\PendingInvitation;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -28,10 +30,18 @@ class InvitationController extends Controller
         }
 
         if ($request->user() === null) {
-            // Come back here once they have an account or a session.
-            $request->session()->put('invitation_token', $token);
+            // Remembered so that signing up or signing in comes back here, rather
+            // than dropping them on "create a workspace" with no idea why.
+            PendingInvitation::remember($request, $token);
 
-            return redirect_across_domains(central_url('register').'?invitation='.$token);
+            // Sent to sign in if they already have an account: registration would
+            // only reject their email as taken, which reads as the invitation being
+            // broken rather than as them already being known.
+            $destination = User::where('email', $invitation->email)->exists()
+                ? 'login'
+                : 'register';
+
+            return redirect_across_domains(central_url($destination));
         }
 
         return Inertia::render('invitations/show', [
@@ -54,7 +64,7 @@ class InvitationController extends Controller
 
         $action->accept($invitation, $request->user());
 
-        $request->session()->forget('invitation_token');
+        PendingInvitation::forget($request);
 
         // Flashed rather than chained: Inertia::location returns a plain response,
         // which has no ->with().
