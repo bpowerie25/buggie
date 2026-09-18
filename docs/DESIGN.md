@@ -1383,6 +1383,28 @@ Swift Package Manager insists on `Package.swift` at a repository root, so this c
 be consumed from `packages/swift` in the monorepo. It needs a `buggie-swift` mirror
 repository before anyone can add it as a dependency.
 
+### The web widget had the same gap
+
+Porting the redaction to Swift made something obvious: the web widget's redaction had
+**no client-side test at all**. It had been fixed once, by hand, after the masks were
+found landing on the labels while the password stayed readable — and then left resting
+on the argument that restyling the DOM cannot be misaligned. That argument is correct
+and it is not a test.
+
+`vitest` with jsdom now covers `redact.ts` and, more importantly, the ordering: a stub
+`html2canvas` records which elements carried the mask attribute *at the moment it was
+called*. Whether the masks exist is not the interesting question; whether they are
+there when the page is rasterised is. Get that wrong and every other redaction test
+still passes while the password goes out in the image — which is precisely how the
+native SDK failed.
+
+The ordering test was checked by deleting the masking and confirming it fails. A test
+never seen to fail is a decoration.
+
+The credential parameter list is deliberately identical to `Redactor.swift`'s, and
+tested against the same twelve names on both sides. A name stripped on one platform
+and not the other is a leak that only shows up on half the reports.
+
 ### Android
 
 Not built. There is no JDK and no Kotlin compiler on this machine, so any Android SDK
