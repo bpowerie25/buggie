@@ -45,7 +45,11 @@ services:
       BUGGIE_DOMAIN: ${BUGGIE_DOMAIN:?set BUGGIE_DOMAIN in .env}
       ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL in .env}
     volumes:
-      - ./deploy/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      # The DIRECTORY, not the file. Bind-mounting a single file binds its inode,
+      # and `git reset --hard` replaces files rather than editing them — so after a
+      # deploy the container goes on serving the old content forever, with the mount
+      # still pointing at an inode nothing else references. Cost an afternoon.
+      - ./deploy/caddy/conf:/etc/caddy:ro
       - caddy-data:/data
       - caddy-config:/config
     depends_on:

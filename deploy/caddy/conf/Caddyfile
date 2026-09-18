@@ -26,10 +26,7 @@ www.{$BUGGIE_DOMAIN} {
 
 	# The widget is embedded cross-origin in customers' applications by design; the
 	# application sets its own CORS headers per route, so nothing is added here.
-	reverse_proxy app:80 {
-		header_up X-Forwarded-Proto {scheme}
-		header_up X-Forwarded-For {remote_host}
-	}
+	reverse_proxy app:80
 
 	log {
 		output file /data/access.log {
