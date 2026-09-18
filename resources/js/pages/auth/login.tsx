@@ -34,7 +34,10 @@ export default function Login({ status }: { status?: string }) {
                     />
                 </Field>
 
-                <Field label="Password" error={errors.password}>
+                <Field
+                    label="Password"
+                    error={errors.password}
+                >
                     <Input
                         type="password"
                         value={data.password}
@@ -44,15 +47,24 @@ export default function Login({ status }: { status?: string }) {
                     />
                 </Field>
 
-                <label className="flex items-center gap-2 text-sm text-ink-muted">
-                    <input
-                        type="checkbox"
-                        checked={data.remember}
-                        onChange={(e) => setData('remember', e.target.checked)}
-                        className="rounded border-border-strong"
-                    />
-                    Remember me
-                </label>
+                <div className="flex items-center justify-between">
+                    <label className="flex items-center gap-2 text-sm text-ink-muted">
+                        <input
+                            type="checkbox"
+                            checked={data.remember}
+                            onChange={(e) => setData('remember', e.target.checked)}
+                            className="rounded border-border-strong"
+                        />
+                        Remember me
+                    </label>
+
+                    <Link
+                        href="/forgot-password"
+                        className="text-sm text-ink-muted hover:text-accent"
+                    >
+                        Forgot password?
+                    </Link>
+                </div>
 
                 <Button type="submit" disabled={processing} className="w-full">
                     {processing ? 'Signing in…' : 'Sign in'}

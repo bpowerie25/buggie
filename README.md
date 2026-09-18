@@ -111,7 +111,8 @@ built the way it is.
 Working: multi-tenancy, issues, the query language and saved views, the board, the
 reporter widget, triage, clients, the portal, email-in and notification digests.
 
-Not done: realtime updates, `@mention` autocomplete, undo for bulk edits.
+Not done: realtime updates, `@mention` autocomplete, undo for bulk edits, email
+verification on sign-up.
 
 ## Licence
 

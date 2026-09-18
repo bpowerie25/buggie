@@ -6,6 +6,7 @@ use App\Support\Tenancy\Tenancy;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Vite;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Auth\Notifications\ResetPassword;
 use Laravel\Cashier\Cashier;
 
 class AppServiceProvider extends ServiceProvider
@@ -30,6 +31,13 @@ class AppServiceProvider extends ServiceProvider
         // only one of them may be subscribed.
         Cashier::useCustomerModel(\App\Models\Workspace::class);
         Cashier::calculateTaxes();
+
+        // Built explicitly rather than by route(): the notification may be sent from
+        // a queued job with no request behind it, and workspaces live on subdomains,
+        // so the link has to be pinned to the central domain.
+        ResetPassword::createUrlUsing(fn ($user, string $token) => central_url(
+            'reset-password/'.$token.'?email='.urlencode($user->getEmailForPasswordReset()),
+        ));
 
         Model::shouldBeStrict(! $this->app->isProduction());
     }

@@ -539,7 +539,7 @@ as it sounds.
 
 ### Still open from M1
 
-- No password reset or email verification yet. Registration, login and logout only.
+- ~~No password reset~~ — added later; see §22. No email verification yet.
 - No workspace member invitations — a workspace has exactly its owner until M5.
 - Statuses are seeded and displayed but not yet editable; the reorder/rename UI is M2.
 - `laravel/sanctum` is installed but unused until the widget ingest endpoint in M4.
@@ -1171,3 +1171,40 @@ The rename touched 61 files. Two things nearly slipped through:
 
 `data-buggie-redact` is a breaking change for anyone who had the old attribute in their
 markup. Nothing is released, so it is a clean break rather than an alias to carry.
+
+---
+
+## 22. Password reset
+
+Needed before inviting anyone real: without it, the first client who forgets their
+password is locked out permanently and has to email you to be rescued by hand.
+
+Laravel provides most of it — the `password_reset_tokens` table ships in the users
+migration and the framework's base `User` already carries `CanResetPassword`. What
+needed deciding:
+
+**The link is built explicitly, not by `route()`.** Workspaces live on subdomains, and
+the notification may be sent from a queued job with no request behind it, so
+`ResetPassword::createUrlUsing()` pins it to `central_url()`. Left to `route()` this is
+the same class of problem as the sign-out bug: correct in a test, wrong in the world.
+
+**The same answer either way.** A request for an unknown address produces exactly the
+response a known one does. Saying "no account with that email" turns the form into a
+way of discovering who has an account here.
+
+**No automatic sign-in after reset.** They have just chosen the password, so typing it
+once proves it is the one they meant — and a briefly compromised mailbox does not hand
+over a live session.
+
+Rate limited to five attempts per address-and-address-pair per fifteen minutes, on top
+of the framework's own one-minute throttle between links.
+
+Two assertions worth keeping, both of which were missing on the first pass and were
+only noticed because a manual check proved nothing: **the old password must stop
+working**, and **a token must not work twice**. A link in an inbox is a link for ever.
+
+### Still open
+
+- No email verification on registration.
+- No "your password was changed" notification, which is how someone discovers an
+  account takeover.
