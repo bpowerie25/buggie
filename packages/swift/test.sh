@@ -44,3 +44,22 @@ xcodebuild build \
     -quiet
 
 echo "==> iOS build OK"
+
+# The redaction tests need somewhere to actually draw. Xcode no longer ships a
+# simulator runtime, so this is skipped loudly rather than silently: a skipped check
+# that looks like a passing one is how the screenshot bug survived as long as it did.
+simulator="$(xcrun simctl list devices available | grep -m1 -oE '[0-9A-F-]{36}' || true)"
+
+if [[ -z "$simulator" ]]; then
+    echo
+    echo "==> SKIPPED: redaction tests need an iOS simulator."
+    echo "    Install one with: xcodebuild -downloadPlatform iOS"
+    exit 0
+fi
+
+echo
+echo "==> Redaction tests (simulator)"
+xcodebuild test \
+    -scheme Buggie \
+    -destination "id=$simulator" \
+    -quiet

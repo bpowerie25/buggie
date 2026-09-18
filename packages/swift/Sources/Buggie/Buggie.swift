@@ -224,24 +224,35 @@ extension Buggie {
     public func captureScreen(compression: CGFloat = 0.8) -> Data? {
         guard let window = Self.keyWindow else { return nil }
 
-        let redacted = window.buggieRedactedSubviews()
+        return capture(window, compression: compression)
+    }
+
+    /// The same capture, of any view.
+    ///
+    /// Split out from `captureScreen()` so the redaction can be tested against a view
+    /// hierarchy built in a test, rather than only against whatever `UIApplication`
+    /// happens to have on screen. The redaction is the part of this SDK that must not
+    /// be taken on trust.
+    @MainActor
+    public func capture(_ view: UIView, compression: CGFloat = 0.8) -> Data? {
+        let redacted = view.buggieRedactedSubviews()
         redacted.forEach { $0.isHidden = true }
         defer { redacted.forEach { $0.isHidden = false } }
 
-        let renderer = UIGraphicsImageRenderer(bounds: window.bounds)
+        let renderer = UIGraphicsImageRenderer(bounds: view.bounds)
         let image = renderer.image { context in
             // `afterScreenUpdates: true` is load-bearing, not a default left alone.
             // With `false`, UIKit draws the content already composited for the screen
             // — composited before those views were hidden. The redaction would be
             // absent from the image and nothing would say so. It costs a commit, and
             // it is the whole reason this function can be trusted.
-            let drawn = window.drawHierarchy(in: window.bounds, afterScreenUpdates: true)
+            let drawn = view.drawHierarchy(in: view.bounds, afterScreenUpdates: true)
 
             // Snapshotting can refuse; a window backed by a protected surface returns
             // false. The layer tree keeps a report possible, and it honours
             // `isHidden` too, so nothing leaks either way.
             if !drawn {
-                window.layer.render(in: context.cgContext)
+                view.layer.render(in: context.cgContext)
             }
         }
 

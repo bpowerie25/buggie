@@ -28,5 +28,10 @@ let package = Package(
         // Only the parts of the device layer that do not need a device. The UIKit
         // code is covered by compiling for iOS, not from here.
         .testTarget(name: "BuggieTests", dependencies: ["Buggie"]),
+
+        // Runs only on a simulator or device: it checks the redaction against the
+        // pixels of an actual capture, which is the one claim here that must not be
+        // taken on trust. Compiles to nothing on macOS.
+        .testTarget(name: "BuggieDeviceTests", dependencies: ["Buggie"]),
     ]
 )
