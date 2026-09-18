@@ -76,6 +76,21 @@ class HandleInertiaRequests extends Middleware
                 ? Report::awaitingTriage()->count()
                 : 0,
 
+            // Drives the usage banner. Cheap: three counts, and only for staff who
+            // could act on it.
+            'billing' => fn () => config('buggy.hosted')
+                && $user && $workspace && $user->membershipIn($workspace)?->isStaff()
+                ? [
+                    'plan' => $workspace->plan()->name(),
+                    'usage' => $workspace->usage(),
+                    'on_trial' => (bool) $workspace->trial_ends_at?->isFuture(),
+                    'trial_days_left' => $workspace->trial_ends_at?->isFuture()
+                        ? (int) ceil(now()->diffInDays($workspace->trial_ends_at, false))
+                        : 0,
+                    'can_manage' => $user->can('manageBilling', $workspace),
+                ]
+                : null,
+
             'flash' => [
                 'success' => fn () => $request->session()->get('success'),
                 'error' => fn () => $request->session()->get('error'),

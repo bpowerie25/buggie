@@ -1,0 +1,61 @@
+# Self-hosting Buggy.
+#
+#   cp .env.selfhost.example .env
+#   docker compose -f docker-compose.selfhost.yml build
+#   docker compose -f docker-compose.selfhost.yml run --rm \
+#       --entrypoint php app artisan key:generate --show   # paste into .env
+#   docker compose -f docker-compose.selfhost.yml up -d
+#
+# Then open http://localhost:8080 and create your workspace.
+#
+# One container runs the web server, queue worker and scheduler, because for a small
+# install that is simpler than four. Postgres and Redis are the only dependencies.
+#
+# There are no plans, no limits and no billing: it is your server. Nothing here
+# reports anything to anybody.
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile.production
+    image: buggy:latest
+    restart: unless-stopped
+    ports:
+      - "${APP_PORT:-8080}:80"
+    env_file: .env
+    volumes:
+      # Screenshots and attachments. Back this up along with the database.
+      - storage:/var/www/html/storage/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_DATABASE:-buggy}
+      POSTGRES_USER: ${DB_USERNAME:-buggy}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
+    volumes:
+      - postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-buggy}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis:/data
+
+volumes:
+  postgres:
+  redis:
+  storage:

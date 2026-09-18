@@ -23,6 +23,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->alias([
             'workspace' => \App\Http\Middleware\EnsureWorkspaceMember::class,
+            'hosted' => \App\Http\Middleware\RequireHostedMode::class,
         ]);
 
         // The tenant must resolve before auth (an unknown subdomain is a 404, not a
@@ -34,6 +35,10 @@ return Application::configure(basePath: dirname(__DIR__))
         );
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+        // Opt-in: with no SENTRY_LARAVEL_DSN set this does nothing, so a self-hosted
+        // install never reports anything to anybody.
+        \Sentry\Laravel\Integration::handles($exceptions);
+
         $exceptions->shouldRenderJsonWhen(
             fn (Request $request) => $request->is('api/*') || $request->expectsJson(),
         );

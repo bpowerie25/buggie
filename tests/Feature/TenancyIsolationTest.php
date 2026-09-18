@@ -41,7 +41,12 @@ class TenancyIsolationTest extends TestCase
 
         foreach ($tables as $table) {
             // Pivot tables carry no model; they are reached through a scoped parent.
-            if (in_array($table, ['workspace_user', 'project_user'], true)) {
+            //
+            // `subscriptions` is Cashier's and is deliberately not scoped: it is only
+            // ever reached through $workspace->subscriptions(), and Stripe webhooks
+            // legitimately process it with no workspace bound, where a global scope
+            // would throw. Its own tenancy is asserted separately below.
+            if (in_array($table, ['workspace_user', 'project_user', 'subscriptions'], true)) {
                 continue;
             }
 
@@ -172,6 +177,34 @@ class TenancyIsolationTest extends TestCase
             Status::class,
             \App\Models\WidgetKey::class,
         ];
+    }
+
+    #[Test]
+    public function billing_records_are_reachable_only_through_their_workspace(): void
+    {
+        [$acme] = $this->workspaceWithMember();
+        [$globex] = $this->workspaceWithMember();
+
+        foreach ([$acme, $globex] as $workspace) {
+            DB::table('subscriptions')->insert([
+                'workspace_id' => $workspace->id,
+                'type' => 'default',
+                'stripe_id' => 'sub_'.$workspace->id,
+                'stripe_status' => 'active',
+                'stripe_price' => 'price_test',
+                'quantity' => 1,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+
+        // Cashier's table is not globally scoped, so the guarantee has to come from
+        // the relation. Assert that it does.
+        $this->assertSame(1, $acme->subscriptions()->count());
+        $this->assertSame(
+            'sub_'.$acme->id,
+            $acme->subscriptions()->first()->stripe_id,
+        );
     }
 
     #[Test]

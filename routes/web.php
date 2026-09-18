@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\RegisteredUserController;
+use App\Http\Controllers\BillingController;
 use App\Http\Controllers\CommentController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\HomeController;
@@ -16,6 +17,7 @@ use App\Http\Controllers\ReportController;
 use App\Http\Controllers\SavedViewController;
 use App\Http\Controllers\WidgetKeyController;
 use App\Http\Controllers\WidgetScriptController;
+use App\Http\Controllers\WorkspaceSettingsController;
 use App\Http\Controllers\WorkspaceController;
 use Illuminate\Support\Facades\Route;
 
@@ -144,6 +146,26 @@ Route::domain('{workspace}.'.$host)
             ->name('widget-keys.update');
         Route::delete('widget-keys/{widgetKey}', [WidgetKeyController::class, 'destroy'])
             ->name('widget-keys.destroy');
+
+        Route::get('settings/workspace', [WorkspaceSettingsController::class, 'edit'])
+            ->name('workspace.edit');
+        Route::patch('settings/workspace', [WorkspaceSettingsController::class, 'update'])
+            ->name('workspace.update');
+        Route::delete('settings/workspace', [WorkspaceSettingsController::class, 'destroy'])
+            ->name('workspace.destroy');
+
+        // Billing exists only on the hosted service; self-hosted installs 404 here.
+        Route::middleware('hosted')->group(function () {
+            Route::get('settings/billing', [BillingController::class, 'index'])->name('billing.index');
+            Route::post('settings/billing/checkout', [BillingController::class, 'checkout'])
+                ->name('billing.checkout');
+            Route::get('settings/billing/portal', [BillingController::class, 'portal'])
+                ->name('billing.portal');
+            Route::post('settings/billing/cancel', [BillingController::class, 'cancel'])
+                ->name('billing.cancel');
+            Route::post('settings/billing/resume', [BillingController::class, 'resume'])
+                ->name('billing.resume');
+        });
 
         Route::get('settings/members', [MemberController::class, 'index'])->name('members.index');
         Route::post('settings/members', [MemberController::class, 'store'])->name('members.store');

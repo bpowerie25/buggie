@@ -1,0 +1,95 @@
+# syntax=docker/dockerfile:1
+
+# ── Frontend build ────────────────────────────────────────────────────────────
+FROM node:22-alpine AS assets
+
+WORKDIR /build
+
+COPY package*.json ./
+RUN npm ci
+
+COPY vite.config.ts vite.widget.config.ts tsconfig.json ./
+COPY resources ./resources
+
+# Two builds: the application bundle (hashed) and the widget (stable path, because
+# customers embed the URL in their own pages).
+RUN npm run build
+
+
+# ── PHP dependencies ──────────────────────────────────────────────────────────
+FROM composer:2 AS vendor
+
+# Horizon needs pcntl and Cashier's money library needs bcmath. Installing them here
+# rather than passing --ignore-platform-req, which would only move the failure to
+# runtime and hide a genuine missing extension.
+RUN apk add --no-cache --virtual .build-deps $PHPIZE_DEPS     && docker-php-ext-install -j"$(nproc)" bcmath pcntl     && apk del .build-deps
+
+WORKDIR /build
+
+COPY composer.json composer.lock ./
+RUN composer install \
+      --no-dev \
+      --no-scripts \
+      --no-autoloader \
+      --prefer-dist \
+      --no-interaction
+
+COPY . .
+
+# --no-scripts: package discovery boots the application, which needs configuration
+# that does not exist at build time. The entrypoint runs it once the container has
+# its environment.
+RUN composer dump-autoload --optimize --classmap-authoritative --no-dev --no-scripts
+
+
+# ── Runtime ───────────────────────────────────────────────────────────────────
+FROM php:8.4-fpm-alpine AS runtime
+
+RUN apk add --no-cache \
+      libpng libjpeg-turbo freetype libwebp libzip icu-libs oniguruma \
+      postgresql-libs nginx supervisor \
+    && apk add --no-cache --virtual .build-deps \
+      $PHPIZE_DEPS libpng-dev libjpeg-turbo-dev freetype-dev libwebp-dev \
+      libzip-dev icu-dev oniguruma-dev postgresql-dev \
+    && docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp \
+    && docker-php-ext-install -j"$(nproc)" \
+      pdo_pgsql pgsql mbstring exif pcntl bcmath gd zip intl opcache \
+    && pecl install redis && docker-php-ext-enable redis \
+    && apk del .build-deps
+
+# Production PHP: opcache validation off, because the code cannot change under a
+# running container.
+RUN { \
+      echo 'opcache.enable=1'; \
+      echo 'opcache.validate_timestamps=0'; \
+      echo 'opcache.memory_consumption=256'; \
+      echo 'opcache.interned_strings_buffer=16'; \
+      echo 'opcache.max_accelerated_files=20000'; \
+      echo 'opcache.enable_cli=1'; \
+      echo 'expose_php=Off'; \
+      echo 'memory_limit=512M'; \
+      echo 'upload_max_filesize=50M'; \
+      echo 'post_max_size=55M'; \
+    } > /usr/local/etc/php/conf.d/production.ini
+
+WORKDIR /var/www/html
+
+COPY --from=vendor /build /var/www/html
+COPY --from=assets /build/public/build /var/www/html/public/build
+COPY --from=assets /build/public/widget /var/www/html/public/widget
+
+COPY docker/nginx/production.conf /etc/nginx/http.d/default.conf
+COPY docker/php/entrypoint.sh /usr/local/bin/entrypoint
+COPY docker/php/supervisord.conf /etc/supervisord.conf
+
+RUN chmod +x /usr/local/bin/entrypoint \
+    && chown -R www-data:www-data storage bootstrap/cache \
+    && rm -rf /var/www/html/tests /var/www/html/.git
+
+EXPOSE 80
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s \
+  CMD wget -qO- http://127.0.0.1/up || exit 1
+
+ENTRYPOINT ["entrypoint"]
+CMD ["supervisord", "-c", "/etc/supervisord.conf"]

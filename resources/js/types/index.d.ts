@@ -52,6 +52,13 @@ export interface SharedProps {
     workspaces: WorkspaceListing[];
     views: SavedView[];
     inboxCount: number;
+    billing: {
+        plan: string;
+        usage: Record<string, { used: number; limit: number | null; over: boolean; near: boolean }>;
+        on_trial: boolean;
+        trial_days_left: number;
+        can_manage: boolean;
+    } | null;
     flash: { success: string | null; error: string | null };
     [key: string]: unknown;
 }

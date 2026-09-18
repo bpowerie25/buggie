@@ -9,11 +9,13 @@ import {
     Bug,
     ChevronsUpDown,
     CircleDot,
+    CreditCard,
     FolderKanban,
     Inbox,
     Keyboard,
     LayoutDashboard,
     LogOut,
+    Settings,
     Tag,
     Users,
 } from 'lucide-react';
@@ -64,7 +66,7 @@ export function AppLayout({
     activeQuery?: string;
     children: ReactNode;
 }) {
-    const { auth, workspace, workspaces, views, inboxCount, ziggy } = usePage<
+    const { auth, workspace, workspaces, views, inboxCount, billing, ziggy } = usePage<
         SharedProps & { ziggy: { location: string } }
     >().props;
     const [switcherOpen, setSwitcherOpen] = useState(false);
@@ -151,13 +153,31 @@ export function AppLayout({
                         Labels
                     </NavLink>
                     {auth.role !== 'client' && (
-                        <NavLink
-                            href="/settings/members"
-                            icon={Users}
-                            active={path.startsWith('/settings/members')}
-                        >
-                            Members
-                        </NavLink>
+                        <>
+                            <NavLink
+                                href="/settings/members"
+                                icon={Users}
+                                active={path.startsWith('/settings/members')}
+                            >
+                                Members
+                            </NavLink>
+                            <NavLink
+                                href="/settings/workspace"
+                                icon={Settings}
+                                active={path.startsWith('/settings/workspace')}
+                            >
+                                Settings
+                            </NavLink>
+                            {billing?.can_manage && (
+                                <NavLink
+                                    href="/settings/billing"
+                                    icon={CreditCard}
+                                    active={path.startsWith('/settings/billing')}
+                                >
+                                    Billing
+                                </NavLink>
+                            )}
+                        </>
                     )}
 
                     {views.length > 0 && (
@@ -225,6 +245,7 @@ export function AppLayout({
                 </header>
 
                 <div className="p-6">
+                    <UsageBanner billing={billing} />
                     <Flash />
                     {children}
                 </div>
@@ -232,6 +253,52 @@ export function AppLayout({
 
             <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
             {shortcutsOpen && <ShortcutSheet onClose={() => setShortcutsOpen(false)} />}
+        </div>
+    );
+}
+
+const LIMIT_LABELS: Record<string, string> = {
+    projects: 'projects',
+    members: 'people',
+    reports_per_month: 'reports this month',
+};
+
+/**
+ * Says something only when it matters: a limit reached, or a trial about to end.
+ * A banner that is always there is a banner nobody reads.
+ */
+function UsageBanner({ billing }: { billing: SharedProps['billing'] }) {
+    if (!billing) return null;
+
+    const breached = Object.entries(billing.usage).find(([, row]) => row.over);
+    const approaching = Object.entries(billing.usage).find(([, row]) => row.near && !row.over);
+    const trialEnding = billing.on_trial && billing.trial_days_left <= 3;
+
+    if (!breached && !approaching && !trialEnding) return null;
+
+    const message = breached
+        ? `You've reached your plan's limit of ${breached[1].limit} ${LIMIT_LABELS[breached[0]] ?? breached[0]}.`
+        : approaching
+          ? `You've used ${approaching[1].used} of ${approaching[1].limit} ${LIMIT_LABELS[approaching[0]] ?? approaching[0]}.`
+          : `Your trial ends in ${billing.trial_days_left} day${billing.trial_days_left === 1 ? '' : 's'}.`;
+
+    return (
+        <div
+            className={`mb-6 flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2 text-sm ${
+                breached
+                    ? 'border-danger/30 bg-danger-soft text-danger'
+                    : 'border-amber-500/40 bg-amber-500/10 text-amber-600 dark:text-amber-500'
+            }`}
+        >
+            <span>{message}</span>
+            {billing.can_manage && (
+                <Link
+                    href="/settings/billing"
+                    className="ml-auto font-medium underline underline-offset-2"
+                >
+                    See plans
+                </Link>
+            )}
         </div>
     );
 }

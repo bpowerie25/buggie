@@ -450,8 +450,10 @@ uploads, ingest endpoint with origin/rate/size guards, fingerprinting worker, tr
 portal thread, email-in via Mailgun, notification preferences and digests. (The client
 role, visibility scopes and internal-vs-public comments arrived early, in M2.)
 
-**M6 — SaaS (3 days).** Cashier plans and limits, signup and onboarding, workspace
-settings, usage metering on reports/month, Sentry, Horizon, deploy.
+**M6 — Open source, and a hosted service. ✅ Done.** AGPL-3.0, one codebase that runs
+both ways, Cashier plans and limits behind a single flag, workspace settings, usage
+metering, Horizon, Sentry, and a self-host image that was actually installed from
+scratch to check.
 
 Roughly three weeks of focused work. M1–M3 alone already beat Mantis.
 
@@ -889,3 +891,95 @@ and nothing is ever delivered.
 - No handling of bounces or of mail sent to a closed issue.
 - The portal cannot show attachments or let a reporter add one.
 - Removing a member does not reassign their issues.
+
+---
+
+## 17. Implementation notes (M6)
+
+The plan for this milestone was "SaaS". It changed mid-build: Buggy is **AGPL-3.0**,
+and the hosted service is the same code with one flag set.
+
+### One codebase, one flag
+
+`BUGGY_HOSTED` decides whether plans, limits and billing apply. Self-hosted installs
+get a `self_hosted` plan whose every limit is `null`, so the same checks run in both
+modes without the code being littered with conditionals.
+
+This was chosen over the alternatives on purpose:
+
+- **Open core** (MIT core, proprietary `ee/`) means every new feature becomes a "which
+  side?" decision, forever, for a small team.
+- **BSL/FSL** protects the hosted service better but is not OSI open source, and the
+  argument costs more attention than it is worth here.
+- **AGPL** means anyone can run it, and anyone offering it as a service has to publish
+  their changes. The self-host burden — Postgres, Redis, a queue, a scheduler, object
+  storage, inbound mail, wildcard DNS and TLS — is real enough that hosting sells
+  itself without crippling anything.
+
+The hosted version has **no extra features**. It sells not having to run all that.
+
+### What self-hosting must never be
+
+A self-hosted install has no limits, no upgrade prompts, no billing routes, and **no
+telemetry of any kind** — no licence check, no usage ping, no error reporting unless
+the operator sets their own Sentry DSN. `SelfHostedTest` asserts all of it, including
+that `billing` is `null` in the shared Inertia props so the UI has nothing to nag with.
+
+### The hosted check is middleware, not a route condition
+
+Wrapping the billing routes in `if (config('buggy.hosted'))` looked tidier and was
+wrong: routes are registered during bootstrap, which makes the condition invisible to
+anything that changes configuration afterwards — and route caching would bake in
+whichever mode was active when the cache was built. A `hosted` middleware answers 404
+at request time instead.
+
+### Limits
+
+Metered on **reports per calendar month**, because that is what actually scales with
+usage: every report costs storage, a screenshot and a worker. Projects and members are
+counted too, because they are what customers compare on.
+
+Two details worth keeping:
+
+- Seats are counted **including outstanding invitations**. Otherwise a workspace invites
+  its way past the limit and only finds out when people try to accept, which blames the
+  wrong person.
+- Over the report limit, ingest returns **402 with a message the widget displays**. The
+  person who hit the bug did nothing wrong and should be told something true rather
+  than "could not send".
+
+`config/plans.php` holds the numbers. Prices there are placeholders; the limits are
+enforced, the displayed amounts are cosmetic and Stripe is the real source.
+
+### Self-hosting was tested by doing it
+
+The production image was built and a clean install run from an empty directory:
+`build` → `key:generate` → `up` → register → create a workspace. Four things were
+broken and would have been found by the first person who tried it:
+
+1. The `composer` image has no `pcntl` or `bcmath`, which Horizon and Cashier's money
+   library require. Adding the extensions, rather than `--ignore-platform-req`, which
+   moves the failure to runtime and hides a real missing extension.
+2. `composer dump-autoload` ran `package:discover`, which boots the application and
+   needs configuration that does not exist at build time. Deferred to the entrypoint.
+3. **There was no `.dockerignore`**, so `.env` was being copied into the image. Anyone
+   building and pushing it would have shipped their own secrets.
+4. `mbstring` needs oniguruma, which the dev image had and the production one did not.
+
+And one that was only visible by running it: with `APP_KEY` unset, migrations run
+happily and then **every page answers a bare "Server Error"**. The documented order
+made that the default experience, because it said to generate the key after starting.
+The entrypoint now refuses to start and prints the exact command.
+
+### Still open from M6
+
+- No provider chosen for the hosted deployment; `docs/DEPLOYMENT.md` describes the
+  shape and its checklist.
+- Prices are placeholders and no Stripe products exist.
+- No dunning: a failed payment downgrades entitlements at the next webhook with no
+  warning email.
+- No usage export or invoice history beyond Stripe's own portal.
+- The self-host image runs web, queue and scheduler in one container. Right for a small
+  install, wrong at scale — the deployment guide says to split them.
+- No `docker compose pull` path: self-hosters build the image rather than fetching a
+  published one. Publishing to a registry would make upgrades a great deal easier.

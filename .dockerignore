@@ -1,0 +1,38 @@
+# Never let a local environment file into an image. Somebody building this and
+# pushing it to a registry would otherwise be shipping their own secrets.
+.env
+.env.*
+!.env.example
+!.env.selfhost.example
+
+.git
+.gitignore
+.github
+
+# Installed inside the image by their own build stages.
+node_modules
+vendor
+public/build
+public/widget
+public/hot
+public/storage
+
+# Runtime state: uploads and logs belong in a volume, not in the image.
+storage/app/*
+!storage/app/.gitignore
+!storage/app/private/.gitignore
+!storage/app/public/.gitignore
+storage/framework/cache/data/*
+storage/framework/sessions/*
+storage/framework/views/*
+storage/logs/*
+bootstrap/cache/*
+!bootstrap/cache/.gitignore
+
+tests
+phpunit.xml
+.editorconfig
+.phpunit.result.cache
+docs
+*.md
+!README.md

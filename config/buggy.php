@@ -6,6 +6,22 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Hosted mode
+    |--------------------------------------------------------------------------
+    |
+    | Buggy is AGPL-3.0 and the same code runs both ways. `hosted` is true only for
+    | the commercial service at buggy.app, where plans, limits and billing apply.
+    |
+    | Self-hosted installs get everything, with no limits and no billing — you are
+    | running it on your own hardware and there is nothing to meter. Nothing here
+    | phones home in either mode.
+    |
+    */
+
+    'hosted' => (bool) env('BUGGY_HOSTED', false),
+
+    /*
+    |--------------------------------------------------------------------------
     | Central domain
     |--------------------------------------------------------------------------
     |
@@ -49,5 +65,21 @@ return [
     */
 
     'digest_delay_minutes' => (int) env('DIGEST_DELAY_MINUTES', 5),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Operators
+    |--------------------------------------------------------------------------
+    |
+    | Addresses allowed into the queue dashboard. This is infrastructure, not a
+    | workspace feature: it shows jobs from every tenant, so workspace roles are the
+    | wrong thing to check. Empty means nobody, which is the right default.
+    |
+    */
+
+    'operators' => array_values(array_filter(array_map(
+        'trim',
+        explode(',', (string) env('BUGGY_OPERATORS', '')),
+    ))),
 
 ];

@@ -48,6 +48,18 @@ class IngestController extends Controller
             return $limited;
         }
 
+        $workspace = $key->project->workspace;
+
+        if (! $workspace->isWithinLimit('reports_per_month')) {
+            // 402 rather than 429: this is not "slow down", it is "this account has
+            // run out". The widget shows the message, so the person who hit the bug
+            // is told something true rather than "could not send".
+            return response()->json([
+                'message' => 'This site has reached its monthly report limit. '
+                    .'Please let the team know directly.',
+            ], 402);
+        }
+
         $ipHash = hash_hmac('sha256', (string) $request->ip(), (string) config('app.key'));
 
         $report = app(Tenancy::class)->run($key->project->workspace, fn () => Report::create([

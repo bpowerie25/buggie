@@ -150,6 +150,27 @@ minute, run by the `scheduler` compose service) groups by person-plus-issue and 
 once the group has been quiet for `buggy.digest_delay_minutes`, measured from the last
 entry.
 
+## Open source, and the hosted service
+
+Buggy is AGPL-3.0. The same code runs somebody's own server and the commercial hosted
+service; `BUGGY_HOSTED` is the only difference.
+
+- **Self-hosted installs have no limits and no telemetry.** Not reduced features —
+  none. `SelfHostedTest` asserts this, including that `billing` is null in the shared
+  props so the UI has nothing to nag with. Anything added that phones home, meters, or
+  nags will fail it, which is the point.
+- Limits live in `config/plans.php` and are read through `Workspace::plan()`, which
+  returns the unlimited `self_hosted` plan when not hosted. Do not scatter
+  `config('buggy.hosted')` checks; add a limit to the config instead.
+- The hosted-only routes are guarded by the `hosted` **middleware**, not by a condition
+  around the route definitions. Route registration happens during bootstrap and gets
+  cached, so a condition there is invisible to later configuration changes.
+
+Two files exist because self-hosting is a first-class path: `docker-compose.selfhost.yml`
+and `docker/php/Dockerfile.production`. If you change the app's runtime requirements,
+change those too, and actually run a clean install — four separate breakages were found
+that way and none of them showed up in development.
+
 ## Conventions
 
 - Inertia page components are lowercase paths: `Inertia::render('projects/index')`

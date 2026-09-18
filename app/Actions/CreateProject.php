@@ -4,6 +4,8 @@ namespace App\Actions;
 
 use App\Models\Project;
 use App\Models\Status;
+use App\Support\Billing\LimitExceeded;
+use App\Support\Tenancy\Tenancy;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -14,6 +16,12 @@ class CreateProject
      */
     public function handle(array $attributes): Project
     {
+        $workspace = app(Tenancy::class)->currentOrFail();
+
+        if (! $workspace->isWithinLimit('projects')) {
+            throw LimitExceeded::projects($workspace->plan()->limit('projects'));
+        }
+
         return DB::transaction(function () use ($attributes) {
             $project = Project::create([
                 'name' => $attributes['name'],

@@ -265,10 +265,15 @@ export class Widget {
             });
 
             if (!response.ok) {
+                // The server's message is usually more useful than ours — a quota
+                // problem is not the reporter's fault and should not read as one.
+                const problem = await response.json().catch(() => null);
+
                 return fail(
-                    response.status === 429
-                        ? 'Too many reports just now. Please try again shortly.'
-                        : 'Could not send the report. Please try again.',
+                    problem?.message ??
+                        (response.status === 429
+                            ? 'Too many reports just now. Please try again shortly.'
+                            : 'Could not send the report. Please try again.'),
                 );
             }
 

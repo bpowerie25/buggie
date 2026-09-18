@@ -7,6 +7,7 @@ use App\Models\Invitation;
 use App\Models\Project;
 use App\Models\User;
 use App\Notifications\WorkspaceInvitation;
+use App\Support\Billing\LimitExceeded;
 use App\Support\Tenancy\Tenancy;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
@@ -19,6 +20,16 @@ class InviteToWorkspace
     public function handle(string $email, WorkspaceRole $role, array $projectIds, User $invitedBy): Invitation
     {
         $email = strtolower(trim($email));
+        $workspace = $this->tenancy->currentOrFail();
+
+        // Counted against pending invitations too: a promised seat is a taken seat,
+        // and otherwise a workspace could invite its way past the limit and only
+        // discover it when people tried to accept.
+        $promised = Invitation::pending()->where('email', '!=', $email)->count();
+
+        if (! $workspace->isWithinLimit('members', 1 + $promised)) {
+            throw LimitExceeded::members($workspace->plan()->limit('members'));
+        }
 
         return DB::transaction(function () use ($email, $role, $projectIds, $invitedBy) {
             // Re-inviting refreshes the existing invitation rather than failing on the
