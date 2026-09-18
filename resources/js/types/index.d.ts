@@ -33,6 +33,8 @@ export interface ProjectSummary {
     key: string;
     slug: string;
     description: string | null;
+    /** Seeds the origin allowlist of new widget keys. */
+    site_url: string | null;
     is_archived?: boolean;
 }
 

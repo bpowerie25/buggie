@@ -158,4 +158,96 @@ class ProjectTest extends TestCase
             );
         }
     }
+
+    #[Test]
+    public function a_new_widget_key_is_locked_to_the_project_site(): void
+    {
+        [$workspace, $user] = $this->workspaceWithMember(slug: 'acme');
+
+        $this->actingAs($user)
+            ->post($this->workspaceUrl($workspace, '/projects'), [
+                'name' => 'Marketing Site',
+                'key' => 'MS',
+                'site_url' => 'https://acme.com/pricing?utm=x',
+            ])
+            ->assertRedirect();
+
+        $project = app(Tenancy::class)->run($workspace, fn () => Project::firstOrFail());
+
+        $this->actingAs($user)
+            ->post($this->workspaceUrl($workspace, "/projects/{$project->slug}/widget-keys"))
+            ->assertRedirect();
+
+        $key = app(Tenancy::class)->run($workspace, fn () => $project->widgetKeys()->firstOrFail());
+
+        // The path and query are dropped: the browser sends an origin, not a URL.
+        $this->assertSame(
+            ['https://acme.com', 'https://www.acme.com'],
+            $key->allowed_origins,
+        );
+
+        $this->assertTrue($key->allowsOrigin('https://acme.com'));
+        $this->assertTrue($key->allowsOrigin('https://www.acme.com'));
+        $this->assertFalse($key->allowsOrigin('https://not-acme.com'));
+    }
+
+    #[Test]
+    public function a_project_without_a_site_url_still_accepts_any_origin(): void
+    {
+        // Deliberate, and the form says so. A paste-this-snippet install cannot know
+        // where it will run, and a widget that silently refuses every report is worse
+        // than one that accepts too many.
+        [$workspace, $user] = $this->workspaceWithMember(slug: 'acme');
+
+        $this->actingAs($user)
+            ->post($this->workspaceUrl($workspace, '/projects'), ['name' => 'Marketing Site', 'key' => 'MS'])
+            ->assertRedirect();
+
+        $project = app(Tenancy::class)->run($workspace, fn () => Project::firstOrFail());
+
+        $this->actingAs($user)
+            ->post($this->workspaceUrl($workspace, "/projects/{$project->slug}/widget-keys"))
+            ->assertRedirect();
+
+        $key = app(Tenancy::class)->run($workspace, fn () => $project->widgetKeys()->firstOrFail());
+
+        $this->assertSame([], $key->allowed_origins);
+        $this->assertTrue($key->allowsOrigin('https://anywhere.test'));
+    }
+
+    #[Test]
+    public function a_www_site_url_also_allows_the_apex(): void
+    {
+        $project = new Project(['site_url' => 'https://www.acme.com']);
+
+        $this->assertSame(
+            ['https://www.acme.com', 'https://acme.com'],
+            $project->defaultWidgetOrigins(),
+        );
+    }
+
+    #[Test]
+    public function a_port_is_kept_because_the_browser_sends_one(): void
+    {
+        $project = new Project(['site_url' => 'http://localhost:3000']);
+
+        $this->assertSame(
+            ['http://localhost:3000', 'http://www.localhost:3000'],
+            $project->defaultWidgetOrigins(),
+        );
+    }
+
+    #[Test]
+    public function a_site_url_must_be_a_url(): void
+    {
+        [$workspace, $user] = $this->workspaceWithMember(slug: 'acme');
+
+        $this->actingAs($user)
+            ->post($this->workspaceUrl($workspace, '/projects'), [
+                'name' => 'Marketing Site',
+                'key' => 'MS',
+                'site_url' => 'acme.com',
+            ])
+            ->assertSessionHasErrors('site_url');
+    }
 }

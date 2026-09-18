@@ -12,7 +12,7 @@ use Illuminate\Support\Str;
 class CreateProject
 {
     /**
-     * @param  array{name: string, key?: string|null, description?: string|null}  $attributes
+     * @param  array{name: string, key?: string|null, description?: string|null, site_url?: string|null}  $attributes
      */
     public function handle(array $attributes): Project
     {
@@ -28,6 +28,7 @@ class CreateProject
                 'key' => ($attributes['key'] ?? null) ?: $this->suggestKey($attributes['name']),
                 'slug' => $this->uniqueSlug($attributes['name']),
                 'description' => $attributes['description'] ?? null,
+                'site_url' => $attributes['site_url'] ?? null,
             ]);
 
             $this->seedStatuses($project);

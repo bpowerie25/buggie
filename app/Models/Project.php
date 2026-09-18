@@ -13,7 +13,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 #[Fillable([
-    'name', 'key', 'slug', 'description', 'default_assignee_id', 'is_archived', 'settings',
+    'name', 'key', 'slug', 'description', 'site_url', 'default_assignee_id', 'is_archived',
+    'settings',
 ])]
 class Project extends Model
 {
@@ -55,6 +56,44 @@ class Project extends Model
     public function issues(): HasMany
     {
         return $this->hasMany(Issue::class);
+    }
+
+    /**
+     * The origin allowlist a new widget key starts with.
+     *
+     * Derived from `site_url` rather than stored twice, so changing where the
+     * application lives does not leave a stale list behind on the project.
+     *
+     * Returns an empty list when no site URL is set, which the ingest endpoint reads
+     * as "any origin" — the only thing that can work when we do not know where the
+     * application runs.
+     */
+    public function defaultWidgetOrigins(): array
+    {
+        if (! $this->site_url) {
+            return [];
+        }
+
+        $parts = parse_url($this->site_url);
+
+        if (! is_array($parts) || ! isset($parts['host'])) {
+            return [];
+        }
+
+        $scheme = $parts['scheme'] ?? 'https';
+        $port = isset($parts['port']) ? ':'.$parts['port'] : '';
+        $host = strtolower($parts['host']);
+
+        $origins = [$scheme.'://'.$host.$port];
+
+        // A site served at both acme.com and www.acme.com sends whichever origin the
+        // visitor happened to be on. Allowing only the one they typed here produces a
+        // widget that works for some of their users and not others, with nothing on
+        // screen to explain it.
+        $sibling = str_starts_with($host, 'www.') ? substr($host, 4) : 'www.'.$host;
+        $origins[] = $scheme.'://'.$sibling.$port;
+
+        return array_values(array_unique($origins));
     }
 
     public function widgetKeys(): HasMany

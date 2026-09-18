@@ -14,9 +14,12 @@ class WidgetKeyController extends Controller
     {
         $this->authorize('update', $project);
 
+        // Inherits the project's site URL rather than starting open. An empty
+        // allowlist accepts reports from any origin, so a key created and forgotten
+        // is a key anyone who reads the page source can post to.
         WidgetKey::create([
             'project_id' => $project->id,
-            'allowed_origins' => [],
+            'allowed_origins' => $project->defaultWidgetOrigins(),
             'mode' => 'identified',
         ]);
 

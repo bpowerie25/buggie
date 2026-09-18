@@ -15,11 +15,30 @@ function suggestKey(name: string) {
     return base.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
 }
 
+/**
+ * What the origin allowlist will end up being, shown while they type.
+ *
+ * Mirrors Project::defaultWidgetOrigins(): an origin, plus its www/apex sibling,
+ * because a site served at both sends whichever one the visitor was on.
+ */
+function originHint(value: string): string {
+    try {
+        const url = new URL(value);
+        const host = url.hostname.toLowerCase();
+        const sibling = host.startsWith('www.') ? host.slice(4) : `www.${host}`;
+
+        return `${url.protocol}//${host}${url.port ? `:${url.port}` : ''} and ${url.protocol}//${sibling}`;
+    } catch {
+        return value;
+    }
+}
+
 export default function CreateProject() {
     const { data, setData, post, processing, errors } = useForm({
         name: '',
         key: '',
         description: '',
+        site_url: '',
     });
     const [keyTouched, setKeyTouched] = useState(false);
 
@@ -68,6 +87,23 @@ export default function CreateProject() {
                                 e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''),
                             );
                         }}
+                    />
+                </Field>
+
+                <Field
+                    label="Site URL"
+                    error={errors.site_url}
+                    hint={
+                        data.site_url
+                            ? `The reporter widget will only accept reports from ${originHint(data.site_url)}. You can change this later.`
+                            : 'Where this application runs. Leave blank and the reporter widget will accept reports from any site.'
+                    }
+                >
+                    <Input
+                        type="url"
+                        value={data.site_url}
+                        placeholder="https://acme.com"
+                        onChange={(e) => setData('site_url', e.target.value)}
                     />
                 </Field>
 

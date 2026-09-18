@@ -12,6 +12,8 @@ class UpdateProjectRequest extends FormRequest
         return [
             'name' => ['required', 'string', 'max:120'],
             'description' => ['nullable', 'string', 'max:2000'],
+            // Seeds the widget origin allowlist; see Project::defaultWidgetOrigins().
+            'site_url' => ['nullable', 'url', 'max:255'],
             'is_archived' => ['boolean'],
             'default_assignee_id' => [
                 'nullable',

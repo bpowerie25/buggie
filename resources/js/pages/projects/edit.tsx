@@ -44,6 +44,7 @@ export default function EditProject({
     const { data, setData, put, processing, errors } = useForm({
         name: project.name,
         description: project.description ?? '',
+        site_url: project.site_url ?? '',
         is_archived: project.is_archived ?? false,
     });
     const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -71,6 +72,19 @@ export default function EditProject({
                     hint="Fixed after creation — existing issue keys reference it."
                 >
                     <Input value={project.key} disabled className="font-mono" />
+                </Field>
+
+                <Field
+                    label="Site URL"
+                    error={errors.site_url}
+                    hint="Where this application runs. New widget keys start locked to this origin; existing keys keep their own allowlist."
+                >
+                    <Input
+                        type="url"
+                        value={data.site_url}
+                        placeholder="https://acme.com"
+                        onChange={(e) => setData('site_url', e.target.value)}
+                    />
                 </Field>
 
                 <Field label="Description" error={errors.description}>

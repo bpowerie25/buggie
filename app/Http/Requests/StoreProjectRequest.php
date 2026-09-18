@@ -18,6 +18,8 @@ class StoreProjectRequest extends FormRequest
                     ->where('workspace_id', app(\App\Support\Tenancy\Tenancy::class)->id()),
             ],
             'description' => ['nullable', 'string', 'max:2000'],
+            // Seeds the widget origin allowlist; see Project::defaultWidgetOrigins().
+            'site_url' => ['nullable', 'url', 'max:255'],
         ];
     }
 

@@ -132,6 +132,7 @@ class ProjectController extends Controller
             'key' => $project->key,
             'slug' => $project->slug,
             'description' => $project->description,
+            'site_url' => $project->site_url,
             'is_archived' => $project->is_archived,
         ];
     }
