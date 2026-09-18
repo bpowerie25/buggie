@@ -9,6 +9,12 @@ set -euo pipefail
 COMPOSE="docker compose -f deploy/docker-compose.prod.yml"
 FIRST_RUN=0
 
+# What to deploy. buggie.eu runs the private platform repo, which carries the public
+# one as an upstream remote; a self-hoster runs the public repo directly. Same script
+# either way, so there is only ever one deploy path to keep working.
+REMOTE="${BUGGIE_REMOTE:-origin}"
+BRANCH="${BUGGIE_BRANCH:-main}"
+
 for arg in "$@"; do
     [[ "$arg" == "--first-run" ]] && FIRST_RUN=1
 done
@@ -68,8 +74,12 @@ if [[ "$FIRST_RUN" == "0" ]]; then
 fi
 
 # ── 2. Code ──
-git fetch --all
-git reset --hard origin/main
+git fetch "$REMOTE" "$BRANCH"
+
+# Hard reset rather than pull: the server's tree is a deployment artefact, not
+# somewhere to work. Anything uncommitted on it is an accident and should not
+# survive, and a merge conflict mid-deploy is the worst possible time to find out.
+git reset --hard "$REMOTE/$BRANCH"
 
 # ── 3. Build ──
 # Assets are built inside the image, so there is no node_modules on the server.
