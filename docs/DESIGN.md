@@ -1325,6 +1325,18 @@ than implying a boundary that is not there.
 
 Costs about 150 bytes gzipped; the bundle is 7.08KB.
 
+### Where it actually goes: UAT, not production
+
+The intended deployment is the client's UAT or staging site, not their live one. That
+resolves the audience question outright — everyone on a UAT site is a tester, so the
+default floating button is correct and no opt-in is needed — and it makes the site URL
+field mean "where the reporter runs", which is why it is labelled that and placeholders
+`https://uat.acme.com`.
+
+`data-launcher="opt-in"` stays, because reporting on a live site is a thing people will
+want eventually and the alternative is telling them to modify their templates. But it
+is not the path being recommended.
+
 ---
 
 ## 25. The iOS SDK

@@ -61,6 +61,10 @@ class Project extends Model
     /**
      * The origin allowlist a new widget key starts with.
      *
+     * Usually the UAT or staging site rather than the live one: reporting generally
+     * belongs where testing happens, and a widget on production is a "Report a bug"
+     * button in front of the client's own customers.
+     *
      * Derived from `site_url` rather than stored twice, so changing where the
      * application lives does not leave a stale list behind on the project.
      *

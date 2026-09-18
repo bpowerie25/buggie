@@ -75,14 +75,14 @@ export default function EditProject({
                 </Field>
 
                 <Field
-                    label="Site URL"
+                    label="Where the reporter runs"
                     error={errors.site_url}
-                    hint="Where this application runs. New widget keys start locked to this origin; existing keys keep their own allowlist."
+                    hint="Usually the UAT or staging site. New widget keys start locked to this origin; existing keys keep their own allowlist."
                 >
                     <Input
                         type="url"
                         value={data.site_url}
-                        placeholder="https://acme.com"
+                        placeholder="https://uat.acme.com"
                         onChange={(e) => setData('site_url', e.target.value)}
                     />
                 </Field>
@@ -252,7 +252,7 @@ function WidgetKeyCard({ widgetKey }: { widgetKey: WidgetKeyRow }) {
                         value={origins}
                         rows={3}
                         spellCheck={false}
-                        placeholder="https://acme.com"
+                        placeholder="https://uat.acme.com"
                         className="font-mono text-xs"
                         onChange={(e) => setOrigins(e.target.value)}
                         onBlur={() => save({})}

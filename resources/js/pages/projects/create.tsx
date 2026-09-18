@@ -91,18 +91,18 @@ export default function CreateProject() {
                 </Field>
 
                 <Field
-                    label="Site URL"
+                    label="Where the reporter runs"
                     error={errors.site_url}
                     hint={
                         data.site_url
-                            ? `The reporter widget will only accept reports from ${originHint(data.site_url)}. You can change this later.`
-                            : 'Where this application runs. Leave blank and the reporter widget will accept reports from any site.'
+                            ? `New widget keys will only accept reports from ${originHint(data.site_url)}. You can add more origins per key later.`
+                            : 'Usually the UAT or staging site, since that is where testing happens. Leave blank and new widget keys will accept reports from any site.'
                     }
                 >
                     <Input
                         type="url"
                         value={data.site_url}
-                        placeholder="https://acme.com"
+                        placeholder="https://uat.acme.com"
                         onChange={(e) => setData('site_url', e.target.value)}
                     />
                 </Field>
