@@ -20,7 +20,18 @@ class HomeController extends Controller
         $user = $request->user();
 
         if ($user === null) {
-            return Inertia::render('welcome');
+            return Inertia::render('welcome', [
+                // Read from config rather than written into the page, so the prices
+                // a visitor is shown can never drift from the limits actually
+                // enforced. self_hosted is included deliberately: it is the honest
+                // comparison, and hiding it would be the wrong kind of selling.
+                'plans' => array_map(
+                    fn (\App\Support\Billing\Plan $plan) => $plan->toArray(),
+                    \App\Support\Billing\Plan::all(),
+                ),
+                'hosted' => (bool) config('buggie.hosted'),
+                'repository' => 'https://github.com/bpowerie25/buggie',
+            ]);
         }
 
         $workspace = $user->last_workspace_id

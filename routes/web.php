@@ -47,6 +47,11 @@ Route::domain($host)->group(function () {
     // The widget bundle, embedded cross-origin in customers' applications.
     // The parameter must be constrained: the default [^/]+ is greedy and swallows
     // the .js suffix, leaving nothing for the literal to match.
+    // Documentation, rendered from the same Markdown that ships in the repository.
+    Route::get('docs/{page?}', \App\Http\Controllers\DocsController::class)
+        ->where('page', '[a-z0-9-]+')
+        ->name('docs');
+
     Route::get('w/{key}.js', WidgetScriptController::class)
         ->where('key', '[A-Za-z0-9_]+')
         ->name('widget.script');

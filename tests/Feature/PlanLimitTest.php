@@ -50,10 +50,10 @@ class PlanLimitTest extends TestCase
     #[Test]
     public function a_workspace_on_trial_gets_the_trial_plan_then_falls_back(): void
     {
-        config(['plans.trial' => 'team']);
+        config(['plans.trial' => 'studio']);
         [$workspace] = $this->workspaceWithMember(slug: 'acme');
 
-        $this->assertSame('Team', $workspace->plan()->name());
+        $this->assertSame('Studio', $workspace->plan()->name());
 
         $workspace->forceFill(['trial_ends_at' => now()->subDay()])->save();
 
@@ -175,7 +175,7 @@ class PlanLimitTest extends TestCase
     {
         [$workspace] = $this->workspaceWithMember(slug: 'acme');
 
-        config(['plans.trial' => 'business']);
+        config(['plans.trial' => 'agency']);
 
         $plan = $workspace->fresh()->plan();
 
