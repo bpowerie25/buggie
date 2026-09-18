@@ -1,4 +1,4 @@
-# Buggy — Design Spec
+# Buggie — Design Spec
 
 Status: draft v1 · 2026-09-18
 
@@ -14,7 +14,7 @@ much context arrives with it, and today that context is reconstructed by hand:
 "what browser?", "can you send a screenshot?", "what were you doing?", "does it still
 happen?". Most of a maintainer's time goes into turning a bad report into a good one.
 
-Buggy's job is to make the report arrive good. A `<script>` tag in a client app captures
+Buggie's job is to make the report arrive good. A `<script>` tag in a client app captures
 the screenshot, the console, the failing request, the route, the release and the logged-in
 user at the moment the reporter clicks "report a bug". Everything else in the product
 exists to keep that firehose organised.
@@ -58,7 +58,7 @@ scope and a policy, not in 40 controllers.
 **Single database, `workspace_id` on every tenant-owned table.** No database-per-tenant;
 at your scale it buys nothing and costs migrations, connection pooling and backup pain.
 
-- Resolution: subdomain — `acme.buggy.app`. A `ResolveWorkspace` middleware looks up
+- Resolution: subdomain — `acme.buggie.eu`. A `ResolveWorkspace` middleware looks up
   `workspaces.slug`, aborts 404 on miss, and binds the model into the container.
 - Isolation: a `BelongsToWorkspace` trait adds a global scope reading the bound workspace,
   and an `creating` hook that stamps `workspace_id`. Models opt in; nothing opts out
@@ -221,14 +221,14 @@ This is the product. Everything else is table stakes.
 ### Install
 
 ```html
-<script src="https://cdn.buggy.app/w/pk_live_9f3a2b.js" async></script>
+<script src="https://cdn.buggie.eu/w/pk_live_9f3a2b.js" async></script>
 ```
 
 Optionally identify the current user so reports arrive attributed:
 
 ```js
-window.buggy?.identify({ id: 4821, email: 'a@b.com', name: 'Ann', plan: 'pro' });
-window.buggy?.setRelease('2026.09.18-a1c3');
+window.buggie?.identify({ id: 4821, email: 'a@b.com', name: 'Ann', plan: 'pro' });
+window.buggie?.setRelease('2026.09.18-a1c3');
 ```
 
 ### What it captures
@@ -247,8 +247,8 @@ window.buggy?.setRelease('2026.09.18-a1c3');
 The widget runs inside *customers'* apps, on *their users'* screens. It must be boring
 and safe:
 
-- Never capture `input[type=password]`, `[data-buggy-redact]`, or anything inside
-  `.buggy-redact` — blanked on the canvas before encoding.
+- Never capture `input[type=password]`, `[data-buggie-redact]`, or anything inside
+  `.buggie-redact` — blanked on the canvas before encoding.
 - Never read `document.cookie`, `localStorage`, or request/response bodies.
 - Strip query strings matching `/token|key|secret|password|auth|session/i` from every
   captured URL before it leaves the page.
@@ -391,7 +391,7 @@ webhook per project is a fast follow.
 
 **Email-in** — Mailgun **inbound routes**, not IMAP polling. You already run Mailgun in
 tixline, and a webhook beats a cron poll on latency and failure modes.
-`bugs+{project_token}@in.buggy.app` creates an issue; replies to notification mail
+`bugs+{project_token}@in.buggie.eu` creates an issue; replies to notification mail
 (`reply+{comment_token}@`) become comments. Strip quoted history above the `On … wrote:`
 line and any `-- ` signature before storing.
 
@@ -505,9 +505,9 @@ is one nobody checks.
 ### Three things that cost time, all worth knowing
 
 **`Route::domain()` must not carry a port.** Domain matching compares against
-`Request::getHost()`, which never includes one, so `Route::domain('buggy.localhost:8080')`
-matches nothing. Hence two config values: `buggy.host` (port-free, for routing) and
-`buggy.domain` (with port, for building URLs). `RouteUrlGenerator::addPortToDomain()`
+`Request::getHost()`, which never includes one, so `Route::domain('buggie.localhost:8080')`
+matches nothing. Hence two config values: `buggie.host` (port-free, for routing) and
+`buggie.domain` (with port, for building URLs). `RouteUrlGenerator::addPortToDomain()`
 re-adds the current request's port when generating, so `route()` still produces working
 dev URLs.
 
@@ -527,7 +527,7 @@ puts it ahead of `SubstituteBindings`.
 
 ### Testing
 
-Tests run against a real Postgres database (`buggy_testing`), not sqlite — the schema
+Tests run against a real Postgres database (`buggie_testing`), not sqlite — the schema
 uses `jsonb`. The `<env>` entries in `phpunit.xml` need `force="true"`, because PHPUnit
 will not override a variable that already exists in the real environment, and
 docker-compose sets `DB_DATABASE` for the container. Without it the suite runs
@@ -730,7 +730,7 @@ small part; only people filing a report pay for the big one.
 
 The plan said to paint over redacted regions on the captured canvas. Built that way, it
 was **wrong on the first real test**: the masks landed on the field labels while the
-password and the `data-buggy-redact` field stayed perfectly readable, because painting
+password and the `data-buggie-redact` field stayed perfectly readable, because painting
 afterwards means reproducing html2canvas's coordinate system exactly, and any
 disagreement about scroll offset or scale shifts the masks without any visible sign of
 failure.
@@ -896,12 +896,12 @@ and nothing is ever delivered.
 
 ## 17. Implementation notes (M6)
 
-The plan for this milestone was "SaaS". It changed mid-build: Buggy is **AGPL-3.0**,
+The plan for this milestone was "SaaS". It changed mid-build: Buggie is **AGPL-3.0**,
 and the hosted service is the same code with one flag set.
 
 ### One codebase, one flag
 
-`BUGGY_HOSTED` decides whether plans, limits and billing apply. Self-hosted installs
+`BUGGIE_HOSTED` decides whether plans, limits and billing apply. Self-hosted installs
 get a `self_hosted` plan whose every limit is `null`, so the same checks run in both
 modes without the code being littered with conditionals.
 
@@ -927,7 +927,7 @@ that `billing` is `null` in the shared Inertia props so the UI has nothing to na
 
 ### The hosted check is middleware, not a route condition
 
-Wrapping the billing routes in `if (config('buggy.hosted'))` looked tidier and was
+Wrapping the billing routes in `if (config('buggie.hosted'))` looked tidier and was
 wrong: routes are registered during bootstrap, which makes the condition invisible to
 anything that changes configuration afterwards — and route caching would bake in
 whichever mode was active when the cache was built. A `hosted` middleware answers 404
@@ -994,7 +994,7 @@ Three things that were on the "still open" lists and are now done.
 
 Bug reports collect personal data as a side effect of being useful: a screenshot of
 whatever was on somebody's screen, the address they wrote from, the account they were
-signed in as. `buggy:prune` runs daily and ages it out.
+signed in as. `buggie:prune` runs daily and ages it out.
 
 What goes, and what does not:
 
@@ -1006,7 +1006,7 @@ What goes, and what does not:
 | Expired portal links | Deleted 30 days after expiry. |
 | **Issues and comments** | **Never.** They are the work product; a tracker that deletes its own history is not a tracker. |
 
-Every rule is a day count in `config/buggy.retention`, and zero disables it. Pruning
+Every rule is a day count in `config/buggie.retention`, and zero disables it. Pruning
 runs across every workspace, so it deliberately bypasses the tenancy scope — it is
 housekeeping, not a tenant operation.
 
@@ -1036,7 +1036,7 @@ actual build and boot of the production image, including a check that a missing
 `APP_KEY` still stops the container with a readable message.
 
 It also fails the build if the widget exceeds **20KB gzipped**. It is 6KB today, and
-every visitor to every site running Buggy downloads it; a dependency sneaking in should
+every visitor to every site running Buggie downloads it; a dependency sneaking in should
 break the build rather than be noticed a year later.
 
 ### A bug worth recording
@@ -1059,8 +1059,8 @@ reloading a page out of habit, which is exactly how a real user would have found
 Reported as "can't login as a client", which is exactly how it presents: you cannot
 sign in as somebody else because you cannot get out of the session you are in.
 
-Workspaces are subdomains, so `POST /logout` on `acme.buggy.app` redirected to
-`buggy.app` — a different origin. Inertia issues that as XHR, the browser follows the
+Workspaces are subdomains, so `POST /logout` on `acme.buggie.eu` redirected to
+`buggie.eu` — a different origin. Inertia issues that as XHR, the browser follows the
 302 across the boundary, the cross-origin request is refused, and the page simply sits
 there. The console said `HttpNetworkError`; the interface said nothing.
 
@@ -1141,3 +1141,33 @@ contain no trace of the other customer.
 answered correctly. It never asked "what does this client learn about the existence of
 things they cannot read?" — a different question, and the one that matters when one
 workspace holds several customers.
+
+---
+
+## 21. Name and domain
+
+The product is **Buggie**, at **buggie.eu**.
+
+`buggie.app`, `buggie.dev` and `buggie.com` were all registered already, so the choice
+was `.io` or `.eu`. `.io` is the conventional signal for a developer tool, but at
+roughly €65/year against €10 it is a soft preference charged at 6.5×, and it carries a
+real question mark since the British Indian Ocean Territory was ceded to Mauritius in
+2024. `.eu` is stable, cheap, and unrestricted for an EU-based operator.
+
+Worth knowing, because it is specific to this product: **the widget URL lives in
+customers' HTML** (`<script src="https://buggie.eu/w/pk_….js">`). Changing domain later
+means keeping a redirect on `/w/{key}.js` alive indefinitely rather than asking every
+customer to edit their pages. Cheap to do, but a reason the decision was worth making
+once.
+
+The rename touched 61 files. Two things nearly slipped through:
+
+- The rename script excluded directories named `widget` to skip the build output in
+  `public/`, which also skipped `resources/widget/` — the widget's source. The public
+  API (`window.buggie`), the redaction attribute (`data-buggie-redact`) and the shadow
+  host marker would have kept the old name while everything else moved.
+- `config/buggy.php` had to be renamed as well as rewritten, since every call site now
+  asks for `config('buggie.*')`.
+
+`data-buggie-redact` is a breaking change for anyone who had the old attribute in their
+markup. Nothing is released, so it is a clean break rather than an alias to carry.

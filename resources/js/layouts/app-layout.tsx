@@ -101,7 +101,7 @@ export function AppLayout({
                     >
                         <Bug className="size-5 shrink-0 text-accent" />
                         <span className="min-w-0 flex-1 truncate text-sm font-semibold text-ink">
-                            {workspace?.name ?? 'Buggy'}
+                            {workspace?.name ?? 'Buggie'}
                         </span>
                         <ChevronsUpDown className="size-3.5 shrink-0 text-ink-subtle" />
                     </button>

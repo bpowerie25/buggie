@@ -31,7 +31,7 @@ npm run build     # must succeed
 ## What to discuss first
 
 - New dependencies, especially in the widget. It is ~6KB gzipped and every visitor to
-  every site running Buggy downloads it.
+  every site running Buggie downloads it.
 - Anything that changes the tenancy scope, the client visibility rules, or the widget's
   redaction. These have tests written adversarially on purpose; read them first.
 - New configuration. If it can be inferred, infer it.

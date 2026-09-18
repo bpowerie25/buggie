@@ -22,7 +22,7 @@ class RequireHostedMode
 {
     public function handle(Request $request, Closure $next): Response
     {
-        abort_unless(config('buggy.hosted'), 404);
+        abort_unless(config('buggie.hosted'), 404);
 
         return $next($request);
     }

@@ -16,9 +16,9 @@ export default defineConfig({
         target: 'es2018',
         lib: {
             entry: 'resources/widget/index.ts',
-            name: 'BuggyWidget',
+            name: 'BuggieWidget',
             formats: ['iife'],
-            fileName: () => 'buggy.js',
+            fileName: () => 'buggie.js',
         },
         rollupOptions: {
             output: { inlineDynamicImports: true, extend: true },

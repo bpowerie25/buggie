@@ -14,7 +14,7 @@ services:
     # Variables set here would land in $_SERVER and override phpunit.xml's <env>,
     # which is how the test suite ended up pointed at the development database.
     networks:
-      - buggy
+      - buggie
 
   nginx:
     image: nginx:1.27-alpine
@@ -26,25 +26,25 @@ services:
     depends_on:
       - app
     networks:
-      - buggy
+      - buggie
 
   postgres:
     image: postgres:16-alpine
     ports:
       - "5433:5432"
     environment:
-      POSTGRES_DB: buggy
-      POSTGRES_USER: buggy
+      POSTGRES_DB: buggie
+      POSTGRES_USER: buggie
       POSTGRES_PASSWORD: secret
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U buggy -d buggy"]
+      test: ["CMD-SHELL", "pg_isready -U buggie -d buggie"]
       interval: 5s
       timeout: 3s
       retries: 10
     networks:
-      - buggy
+      - buggie
 
   redis:
     image: redis:7-alpine
@@ -53,7 +53,7 @@ services:
     volumes:
       - redis-data:/data
     networks:
-      - buggy
+      - buggie
 
   mailpit:
     image: axllent/mailpit:latest
@@ -61,7 +61,7 @@ services:
       - "8027:8025"
       - "1027:1025"
     networks:
-      - buggy
+      - buggie
 
 
   queue:
@@ -77,7 +77,7 @@ services:
         condition: service_started
     command: php artisan queue:work --sleep=3 --tries=3 --max-time=3600
     networks:
-      - buggy
+      - buggie
 
   scheduler:
     build:
@@ -94,12 +94,12 @@ services:
     # accumulate in pending_notifications and nothing is ever delivered.
     command: php artisan schedule:work
     networks:
-      - buggy
+      - buggie
 
 volumes:
   postgres-data:
   redis-data:
 
 networks:
-  buggy:
+  buggie:
     driver: bridge

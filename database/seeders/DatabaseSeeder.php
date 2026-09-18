@@ -282,12 +282,12 @@ class DatabaseSeeder extends Seeder
         });
 
         $this->command->newLine();
-        $this->command->info('acme.buggy.localhost:8080');
+        $this->command->info('acme.buggie.localhost:8080');
         $this->command->line('  brian@example.com  / password   (owner)');
         $this->command->line('  dev@example.com    / password   (member)');
         $this->command->line('  client@example.com / password   (client — Customer Portal only)');
         $this->command->line('  northwind@example.com / password (client — Northwind Site only)');
-        $this->command->info('globex.buggy.localhost:8080');
+        $this->command->info('globex.buggie.localhost:8080');
         $this->command->line('  someone@globex.test / password');
     }
 

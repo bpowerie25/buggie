@@ -20,7 +20,7 @@
     <label for="pw">Password</label>
     <input id="pw" type="password" value="hunter2-should-never-be-captured">
     <label for="secret">Internal note</label>
-    <input id="secret" data-buggy-redact value="REDACT-ME-TOO">
+    <input id="secret" data-buggie-redact value="REDACT-ME-TOO">
     <button id="pay">Pay now</button>
   </div>
 

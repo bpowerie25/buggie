@@ -71,8 +71,8 @@ class EmailBody
     /**
      * Pull the routing token out of a recipient address.
      *
-     * bugs+abc123@in.buggy.app        -> ['bugs', 'abc123']
-     * reply+WEB-12.abc123@in.buggy.app -> ['reply', 'WEB-12.abc123']
+     * bugs+abc123@in.buggie.eu        -> ['bugs', 'abc123']
+     * reply+WEB-12.abc123@in.buggie.eu -> ['reply', 'WEB-12.abc123']
      *
      * @return array{0: string, 1: string}|null
      */

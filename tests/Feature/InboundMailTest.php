@@ -26,7 +26,7 @@ class InboundMailTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        config(['buggy.mailgun_signing_key' => self::SIGNING_KEY]);
+        config(['buggie.mailgun_signing_key' => self::SIGNING_KEY]);
     }
 
     /** @return array<string, mixed> */
@@ -46,11 +46,11 @@ class InboundMailTest extends TestCase
     #[Test]
     public function an_unsigned_or_wrongly_signed_post_is_refused(): void
     {
-        $this->postJson('/api/mail/inbound', ['recipient' => 'bugs+abc@in.buggy.test'])
+        $this->postJson('/api/mail/inbound', ['recipient' => 'bugs+abc@in.buggie.test'])
             ->assertForbidden();
 
         $this->postJson('/api/mail/inbound', $this->signed(
-            ['recipient' => 'bugs+abc@in.buggy.test'],
+            ['recipient' => 'bugs+abc@in.buggie.test'],
             'wrong-key',
         ))->assertForbidden();
     }
@@ -62,7 +62,7 @@ class InboundMailTest extends TestCase
         $token = 'tok1';
 
         $this->postJson('/api/mail/inbound', [
-            'recipient' => 'bugs+abc@in.buggy.test',
+            'recipient' => 'bugs+abc@in.buggie.test',
             'timestamp' => $timestamp,
             'token' => $token,
             'signature' => hash_hmac('sha256', $timestamp.$token, self::SIGNING_KEY),
@@ -73,9 +73,9 @@ class InboundMailTest extends TestCase
     public function with_no_signing_key_configured_nothing_is_accepted(): void
     {
         // Failing open here would mean anyone could file issues in any workspace.
-        config(['buggy.mailgun_signing_key' => null]);
+        config(['buggie.mailgun_signing_key' => null]);
 
-        $this->postJson('/api/mail/inbound', $this->signed(['recipient' => 'bugs+abc@in.buggy.test']))
+        $this->postJson('/api/mail/inbound', $this->signed(['recipient' => 'bugs+abc@in.buggie.test']))
             ->assertForbidden();
     }
 
@@ -87,7 +87,7 @@ class InboundMailTest extends TestCase
         $project = app(Tenancy::class)->run($workspace, fn () => Project::factory()->create(['key' => 'WEB']));
 
         $this->postJson('/api/mail/inbound', $this->signed([
-            'recipient' => "bugs+{$project->inbound_token}@in.buggy.test",
+            'recipient' => "bugs+{$project->inbound_token}@in.buggie.test",
             'from' => 'Ana Silva <ana@shopper.test>',
             'subject' => 'Checkout is broken again',
             'stripped-text' => "Same as last week.\n\nOn Tue someone wrote:\n> old thread",
@@ -107,13 +107,13 @@ class InboundMailTest extends TestCase
     {
         // 200, not an error: Mailgun retries failures, and these never succeed.
         $this->postJson('/api/mail/inbound', $this->signed([
-            'recipient' => 'bugs+nosuchproject@in.buggy.test',
+            'recipient' => 'bugs+nosuchproject@in.buggie.test',
             'from' => 'a@b.test',
             'stripped-text' => 'hello',
         ]))->assertOk();
 
         $this->postJson('/api/mail/inbound', $this->signed([
-            'recipient' => 'hello@in.buggy.test',
+            'recipient' => 'hello@in.buggie.test',
             'stripped-text' => 'hello',
         ]))->assertOk();
 
@@ -127,7 +127,7 @@ class InboundMailTest extends TestCase
         $project = app(Tenancy::class)->run($workspace, fn () => Project::factory()->create());
 
         $this->postJson('/api/mail/inbound', $this->signed([
-            'recipient' => "bugs+{$project->inbound_token}@in.buggy.test",
+            'recipient' => "bugs+{$project->inbound_token}@in.buggie.test",
             'from' => 'a@b.test',
             'stripped-text' => "\n> only quoted text\n--\nSignature",
         ]))->assertOk();
@@ -147,7 +147,7 @@ class InboundMailTest extends TestCase
         });
 
         $this->postJson('/api/mail/inbound', $this->signed([
-            'recipient' => "reply+{$issue->key}.{$project->inbound_token}@in.buggy.test",
+            'recipient' => "reply+{$issue->key}.{$project->inbound_token}@in.buggie.test",
             'from' => 'Ana Silva <ana@shopper.test>',
             'stripped-text' => 'Still broken this morning.',
         ]))->assertOk()->assertJson(['issue' => $issue->key]);
@@ -174,7 +174,7 @@ class InboundMailTest extends TestCase
         });
 
         $this->postJson('/api/mail/inbound', $this->signed([
-            'recipient' => "reply+{$issue->key}.{$project->inbound_token}@in.buggy.test",
+            'recipient' => "reply+{$issue->key}.{$project->inbound_token}@in.buggie.test",
             'from' => "{$staff->name} <{$staff->email}>",
             'stripped-text' => 'Looks like the payment adapter again.',
         ]))->assertOk();
@@ -200,7 +200,7 @@ class InboundMailTest extends TestCase
 
         // Valid issue key, but paired with a different project's token.
         $this->postJson('/api/mail/inbound', $this->signed([
-            'recipient' => "reply+{$issue->key}.{$other->inbound_token}@in.buggy.test",
+            'recipient' => "reply+{$issue->key}.{$other->inbound_token}@in.buggie.test",
             'from' => 'ana@shopper.test',
             'stripped-text' => 'Trying it on.',
         ]))->assertOk()->assertJson(['message' => 'Unknown issue; ignored.']);

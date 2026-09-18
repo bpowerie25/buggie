@@ -1,6 +1,6 @@
 <?php
 
-$domain = env('APP_DOMAIN', 'buggy.localhost:8080');
+$domain = env('APP_DOMAIN', 'buggie.localhost:8080');
 
 return [
 
@@ -9,8 +9,8 @@ return [
     | Hosted mode
     |--------------------------------------------------------------------------
     |
-    | Buggy is AGPL-3.0 and the same code runs both ways. `hosted` is true only for
-    | the commercial service at buggy.app, where plans, limits and billing apply.
+    | Buggie is AGPL-3.0 and the same code runs both ways. `hosted` is true only for
+    | the commercial service at buggie.eu, where plans, limits and billing apply.
     |
     | Self-hosted installs get everything, with no limits and no billing — you are
     | running it on your own hardware and there is nothing to meter. Nothing here
@@ -18,7 +18,7 @@ return [
     |
     */
 
-    'hosted' => (bool) env('BUGGY_HOSTED', false),
+    'hosted' => (bool) env('BUGGIE_HOSTED', false),
 
     /*
     |--------------------------------------------------------------------------
@@ -26,7 +26,7 @@ return [
     |--------------------------------------------------------------------------
     |
     | The bare domain serving marketing, auth and the workspace picker. Workspaces
-    | live on subdomains of it: acme.buggy.app.
+    | live on subdomains of it: acme.buggie.eu.
     |
     | 'domain' may carry a port for local development. 'host' is the same value with
     | the port stripped, because Route::domain() matches against Request::getHost(),
@@ -50,7 +50,7 @@ return [
     |
     */
 
-    'inbound_domain' => env('MAIL_INBOUND_DOMAIN', 'in.buggy.test'),
+    'inbound_domain' => env('MAIL_INBOUND_DOMAIN', 'in.buggie.test'),
 
     'mailgun_signing_key' => env('MAILGUN_SIGNING_KEY'),
 
@@ -111,7 +111,7 @@ return [
 
     'operators' => array_values(array_filter(array_map(
         'trim',
-        explode(',', (string) env('BUGGY_OPERATORS', '')),
+        explode(',', (string) env('BUGGIE_OPERATORS', '')),
     ))),
 
 ];

@@ -25,7 +25,7 @@ class PlanLimitTest extends TestCase
         parent::setUp();
 
         // Limits only apply to the hosted service; a self-hosted install has none.
-        config(['buggy.hosted' => true]);
+        config(['buggie.hosted' => true]);
 
         // Small numbers so the tests say what they mean rather than looping 100 times.
         config([

@@ -25,7 +25,7 @@ class WorkspaceSettingsController extends Controller
                 'slug' => $workspace->slug,
                 'created_at' => $workspace->created_at->toDateString(),
             ],
-            'domain' => config('buggy.domain'),
+            'domain' => config('buggie.domain'),
             'can_delete' => request()->user()->can('delete', $workspace),
         ]);
     }

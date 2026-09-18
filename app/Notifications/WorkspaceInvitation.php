@@ -25,7 +25,7 @@ class WorkspaceInvitation extends Notification
         $inviter = $this->invitation->invitedBy?->name ?? 'Someone';
 
         return (new MailMessage)
-            ->subject("{$inviter} invited you to {$workspace->name} on Buggy")
+            ->subject("{$inviter} invited you to {$workspace->name} on Buggie")
             ->greeting('You have been invited')
             ->line("{$inviter} has invited you to join {$workspace->name} as a "
                 .strtolower($this->invitation->role->label()).'.')

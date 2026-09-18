@@ -35,7 +35,7 @@ class WorkspaceResolutionTest extends TestCase
     #[Test]
     public function an_unknown_subdomain_is_a_404(): void
     {
-        $this->get('http://nope.'.config('buggy.host').'/')->assertNotFound();
+        $this->get('http://nope.'.config('buggie.host').'/')->assertNotFound();
     }
 
     #[Test]
@@ -86,7 +86,7 @@ class WorkspaceResolutionTest extends TestCase
             'slug' => 'acme',
         ]);
 
-        $response->assertRedirect('http://acme.'.config('buggy.host').'/');
+        $response->assertRedirect('http://acme.'.config('buggie.host').'/');
 
         $this->assertDatabaseHas('workspaces', ['slug' => 'acme', 'owner_id' => $user->id]);
         $this->assertDatabaseHas('workspace_user', [
@@ -118,8 +118,8 @@ class WorkspaceResolutionTest extends TestCase
         $urls = collect($response->viewData('page')['props']['workspaces'])->pluck('url');
 
         $this->assertEqualsCanonicalizing([
-            'http://acme.'.config('buggy.host').'/',
-            'http://globex.'.config('buggy.host').'/',
+            'http://acme.'.config('buggie.host').'/',
+            'http://globex.'.config('buggie.host').'/',
         ], $urls->all());
     }
 

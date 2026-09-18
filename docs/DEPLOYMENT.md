@@ -1,13 +1,13 @@
 # Deploying the hosted service
 
-For running Buggy *for other people* — the commercial service. If you are running it
+For running Buggie *for other people* — the commercial service. If you are running it
 for yourself, see [`SELF_HOSTING.md`](SELF_HOSTING.md) instead; it is simpler and has
 no billing.
 
 The difference is one flag:
 
 ```
-BUGGY_HOSTED=true
+BUGGIE_HOSTED=true
 ```
 
 Which turns on plans, limits, the billing screens and the usage banner. Everything else
@@ -45,8 +45,8 @@ two hosts running it at once.
 Beyond the self-hosting variables:
 
 ```
-BUGGY_HOSTED=true
-BUGGY_OPERATORS=you@example.com
+BUGGIE_HOSTED=true
+BUGGIE_OPERATORS=you@example.com
 
 STRIPE_KEY=
 STRIPE_SECRET=
@@ -79,10 +79,10 @@ plans silently go stale — worth an alert.
 
 ## DNS and TLS
 
-Workspaces are subdomains, so `*.buggy.app` needs a wildcard record and a wildcard
+Workspaces are subdomains, so `*.buggie.eu` needs a wildcard record and a wildcard
 certificate.
 
-`in.buggy.app` is separate and points at Mailgun.
+`in.buggie.eu` is separate and points at Mailgun.
 
 The widget is served from the app at `/w/{key}.js`; put a CDN in front of it. It is
 embedded in customers' pages, so its availability is their availability.
@@ -96,6 +96,6 @@ embedded in customers' pages, so its availability is their availability.
 - [ ] Object storage lifecycle rules — screenshots accumulate
 - [ ] `APP_DEBUG=false`, and a check that a 500 shows nothing useful to a visitor
 - [ ] Exactly one scheduler
-- [ ] `/horizon` reachable only by `BUGGY_OPERATORS`
+- [ ] `/horizon` reachable only by `BUGGIE_OPERATORS`
 - [ ] A retention policy for screenshots and reporter emails, which `docs/DESIGN.md`
       §11 lists as still undecided

@@ -12,7 +12,7 @@ use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 /**
- * Buggy is AGPL-3.0 and the same code runs the hosted service and somebody's own
+ * Buggie is AGPL-3.0 and the same code runs the hosted service and somebody's own
  * server. The difference is one flag, and these tests pin down what it means: a
  * self-hosted install is not a crippled one.
  */
@@ -25,7 +25,7 @@ class SelfHostedTest extends TestCase
         parent::setUp();
 
         config([
-            'buggy.hosted' => false,
+            'buggie.hosted' => false,
             // Even with mean limits configured, nothing should apply them.
             'plans.plans.free.limits' => ['projects' => 1, 'members' => 1, 'reports_per_month' => 1],
             'plans.trial' => 'free',

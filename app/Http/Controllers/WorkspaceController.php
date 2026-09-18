@@ -37,7 +37,7 @@ class WorkspaceController extends Controller
     public function create(): Response
     {
         return Inertia::render('workspaces/create', [
-            'domain' => config('buggy.domain'),
+            'domain' => config('buggie.domain'),
         ]);
     }
 

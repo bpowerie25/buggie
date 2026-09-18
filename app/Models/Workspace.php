@@ -31,7 +31,7 @@ class Workspace extends Model
         'mail', 'email', 'smtp', 'in', 'inbound', 'help', 'support', 'docs', 'doc',
         'status', 'blog', 'about', 'billing', 'account', 'accounts', 'login',
         'signup', 'register', 'auth', 'oauth', 'sso', 'dashboard', 'widget', 'w',
-        'cdn-widget', 'ingest', 'test', 'staging', 'dev', 'demo', 'buggy', 'root',
+        'cdn-widget', 'ingest', 'test', 'staging', 'dev', 'demo', 'buggie', 'root',
         'security', 'abuse', 'postmaster', 'webmaster', 'null', 'undefined',
     ];
 
@@ -81,7 +81,7 @@ class Workspace extends Model
     {
         // Self-hosted installs are not metered: it is somebody's own server and
         // there is nothing to sell them.
-        if (! config('buggy.hosted')) {
+        if (! config('buggie.hosted')) {
             return Plan::find('self_hosted');
         }
 

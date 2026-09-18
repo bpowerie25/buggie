@@ -84,6 +84,6 @@ class IssueDigest extends Notification
     private function replyAddress(): string
     {
         return 'reply+'.$this->issue->key.'.'.$this->issue->project->inbound_token
-            .'@'.config('buggy.inbound_domain');
+            .'@'.config('buggie.inbound_domain');
     }
 }

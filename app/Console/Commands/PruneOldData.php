@@ -21,7 +21,7 @@ use Illuminate\Support\Facades\Storage;
  */
 class PruneOldData extends Command
 {
-    protected $signature = 'buggy:prune {--dry-run : Report what would go without deleting anything}';
+    protected $signature = 'buggie:prune {--dry-run : Report what would go without deleting anything}';
 
     protected $description = 'Delete aged screenshots, reporter identities and dismissed reports';
 
@@ -49,7 +49,7 @@ class PruneOldData extends Command
 
     private function pruneScreenshots(bool $dry): int
     {
-        $days = config('buggy.retention.screenshots');
+        $days = config('buggie.retention.screenshots');
 
         if (! $days) {
             return 0;
@@ -78,7 +78,7 @@ class PruneOldData extends Command
 
     private function scrubReporters(bool $dry): int
     {
-        $days = config('buggy.retention.reporter_identity');
+        $days = config('buggie.retention.reporter_identity');
 
         if (! $days) {
             return 0;
@@ -120,7 +120,7 @@ class PruneOldData extends Command
 
     private function deleteDismissed(bool $dry): int
     {
-        $days = config('buggy.retention.dismissed_reports');
+        $days = config('buggie.retention.dismissed_reports');
 
         if (! $days) {
             return 0;
@@ -153,7 +153,7 @@ class PruneOldData extends Command
 
     private function deleteExpiredTokens(bool $dry): int
     {
-        $days = config('buggy.retention.expired_portal_tokens');
+        $days = config('buggie.retention.expired_portal_tokens');
 
         if (! $days) {
             return 0;

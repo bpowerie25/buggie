@@ -25,7 +25,7 @@ class FlushNotifications extends Command
 
     public function handle(Tenancy $tenancy): int
     {
-        $cutoff = now()->subMinutes((int) config('buggy.digest_delay_minutes'));
+        $cutoff = now()->subMinutes((int) config('buggie.digest_delay_minutes'));
         $sent = 0;
 
         // Group keys first, so one huge workspace cannot starve the others.

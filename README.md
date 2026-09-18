@@ -1,4 +1,4 @@
-# Buggy
+# Buggie
 
 **Bug tracking that starts with a good report.**
 
@@ -7,12 +7,12 @@ that context is reconstructed by hand: "what browser?", "can you send a screensh
 "what were you doing?". Most of a maintainer's time goes into turning a bad report
 into a good one.
 
-Buggy makes the report arrive good. A `<script>` tag in your app captures the
+Buggie makes the report arrive good. A `<script>` tag in your app captures the
 screenshot, the console, the failing request, the route, the release and the
 signed-in user at the moment someone clicks *report a bug*.
 
 ```html
-<script src="https://your-buggy/w/pk_live_9f3a2b.js" async></script>
+<script src="https://your-buggie/w/pk_live_9f3a2b.js" async></script>
 ```
 
 That's the whole install. ~6KB gzipped.
@@ -44,7 +44,7 @@ That's the whole install. ~6KB gzipped.
 The widget runs inside your application, on your users' screens, so it is deliberately
 boring:
 
-- Password fields and anything marked `data-buggy-redact` are masked **before** the
+- Password fields and anything marked `data-buggie-redact` are masked **before** the
   screenshot is taken, so alignment cannot silently fail.
 - Cookies, `localStorage` and request/response bodies are never read.
 - Credential-shaped query parameters are stripped from every captured URL.
@@ -59,7 +59,7 @@ reporting is off unless you set a Sentry DSN yourself.
 Requires Docker and a wildcard DNS record, because workspaces live on subdomains.
 
 ```sh
-git clone https://github.com/you/buggy && cd buggy
+git clone https://github.com/you/buggie && cd buggie
 cp .env.selfhost.example .env          # set APP_URL, APP_DOMAIN and DB_PASSWORD
 
 docker compose -f docker-compose.selfhost.yml build
@@ -94,7 +94,7 @@ npm install && npm run dev
 ./bin/art migrate --seed
 ```
 
-http://buggy.localhost:8080 — sign in as `brian@example.com` / `password`.
+http://buggie.localhost:8080 — sign in as `brian@example.com` / `password`.
 
 ```sh
 ./bin/test        # phpunit, against Postgres
@@ -117,7 +117,7 @@ Not done: realtime updates, `@mention` autocomplete, undo for bulk edits.
 
 [GNU AGPL v3](LICENSE).
 
-You can run Buggy for yourself or your company, modify it, and keep those
+You can run Buggie for yourself or your company, modify it, and keep those
 modifications private as long as you do not offer it to others over a network. If you
 do run it as a service for other people, the AGPL asks you to publish your changes.
 

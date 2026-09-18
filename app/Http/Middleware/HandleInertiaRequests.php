@@ -78,7 +78,7 @@ class HandleInertiaRequests extends Middleware
 
             // Drives the usage banner. Cheap: three counts, and only for staff who
             // could act on it.
-            'billing' => fn () => config('buggy.hosted')
+            'billing' => fn () => config('buggie.hosted')
                 && $user && $workspace && $user->membershipIn($workspace)?->isStaff()
                 ? [
                     'plan' => $workspace->plan()->name(),

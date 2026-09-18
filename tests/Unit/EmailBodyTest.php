@@ -14,9 +14,9 @@ class EmailBodyTest extends TestCase
         $body = <<<'EMAIL'
         Still broken for us this morning.
 
-        On Tue, 17 Sep 2026 at 09:14, Buggy <noreply@buggy.app> wrote:
+        On Tue, 17 Sep 2026 at 09:14, Buggie <noreply@buggie.eu> wrote:
         > Sam Rivera moved this from Todo to In Progress
-        > Open issue: https://acme.buggy.app/issues/WEB-12
+        > Open issue: https://acme.buggie.eu/issues/WEB-12
         EMAIL;
 
         $this->assertSame('Still broken for us this morning.', EmailBody::extract($body));
@@ -33,7 +33,7 @@ class EmailBodyTest extends TestCase
     #[Test]
     public function it_handles_outlook_style_quoting(): void
     {
-        $body = "Confirmed fixed, thanks.\n\n-----Original Message-----\nFrom: Buggy\nSent: Tuesday";
+        $body = "Confirmed fixed, thanks.\n\n-----Original Message-----\nFrom: Buggie\nSent: Tuesday";
 
         $this->assertSame('Confirmed fixed, thanks.', EmailBody::extract($body));
     }
@@ -56,19 +56,19 @@ class EmailBodyTest extends TestCase
     #[Test]
     public function it_reads_the_routing_token_from_the_recipient(): void
     {
-        $this->assertSame(['bugs', 'abc123'], EmailBody::parseRecipient('bugs+abc123@in.buggy.app'));
+        $this->assertSame(['bugs', 'abc123'], EmailBody::parseRecipient('bugs+abc123@in.buggie.eu'));
         $this->assertSame(
             ['reply', 'web-12.abc123'],
-            EmailBody::parseRecipient('Buggy <reply+WEB-12.abc123@in.buggy.app>'),
+            EmailBody::parseRecipient('Buggie <reply+WEB-12.abc123@in.buggie.eu>'),
         );
 
         // Our address may not be first in a multi-recipient header.
         $this->assertSame(
             ['bugs', 'abc123'],
-            EmailBody::parseRecipient('someone@else.com, bugs+abc123@in.buggy.app'),
+            EmailBody::parseRecipient('someone@else.com, bugs+abc123@in.buggie.eu'),
         );
 
-        $this->assertNull(EmailBody::parseRecipient('hello@in.buggy.app'));
+        $this->assertNull(EmailBody::parseRecipient('hello@in.buggie.eu'));
         $this->assertNull(EmailBody::parseRecipient(null));
     }
 

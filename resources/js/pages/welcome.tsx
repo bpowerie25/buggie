@@ -29,7 +29,7 @@ export default function Welcome() {
                 <header className="mx-auto flex max-w-5xl items-center justify-between px-6 py-5">
                     <span className="flex items-center gap-2 font-semibold text-ink">
                         <Bug className="size-5 text-accent" />
-                        Buggy
+                        Buggie
                     </span>
                     <nav className="flex items-center gap-2">
                         <Link href="/login">
@@ -50,7 +50,7 @@ export default function Welcome() {
                         </h1>
                         <p className="mt-5 max-w-xl text-lg text-pretty text-ink-muted">
                             Most of the work in a bug tracker is turning a bad report into a
-                            useful one. Buggy captures the context at the moment the bug
+                            useful one. Buggie captures the context at the moment the bug
                             happens, so the report arrives ready to act on.
                         </p>
                         <div className="mt-8 flex gap-3">

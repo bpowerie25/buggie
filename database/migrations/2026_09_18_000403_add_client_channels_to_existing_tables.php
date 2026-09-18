@@ -15,7 +15,7 @@ return new class extends Migration
         });
 
         Schema::table('projects', function (Blueprint $table) {
-            // The local-part suffix for bugs+{token}@in.buggy.app
+            // The local-part suffix for bugs+{token}@in.buggie.eu
             $table->string('inbound_token', 32)->nullable()->unique()->after('slug');
         });
 

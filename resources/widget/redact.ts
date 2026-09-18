@@ -7,7 +7,7 @@
  *
  * Rules, all enforced here:
  *   - never read cookies, localStorage, or request/response bodies
- *   - never capture password fields or anything opted out with data-buggy-redact
+ *   - never capture password fields or anything opted out with data-buggie-redact
  *   - strip credential-shaped query parameters from every captured URL
  */
 
@@ -38,14 +38,14 @@ export function safeUrl(input: string | null | undefined): string {
 export function redactedElements(root: ParentNode = document): Element[] {
     return [
         ...root.querySelectorAll<HTMLElement>(
-            'input[type=password], [data-buggy-redact], .buggy-redact',
+            'input[type=password], [data-buggie-redact], .buggie-redact',
         ),
     ];
 }
 
-const MASK_STYLE_ID = 'buggy-mask-style';
+const MASK_STYLE_ID = 'buggie-mask-style';
 
-const MASK_CSS = `[data-buggy-masked] {
+const MASK_CSS = `[data-buggie-masked] {
   color: transparent !important;
   text-shadow: none !important;
   background-image: none !important;
@@ -53,7 +53,7 @@ const MASK_CSS = `[data-buggy-masked] {
   border-color: #94a3b8 !important;
   caret-color: transparent !important;
 }
-[data-buggy-masked] * { visibility: hidden !important; }`;
+[data-buggie-masked] * { visibility: hidden !important; }`;
 
 /**
  * Mask redacted regions *before* rasterising, by restyling them in the DOM.
@@ -74,12 +74,12 @@ export function maskForCapture(): () => void {
     const masked = redactedElements();
 
     for (const element of masked) {
-        element.setAttribute('data-buggy-masked', '');
+        element.setAttribute('data-buggie-masked', '');
     }
 
     return () => {
         for (const element of masked) {
-            element.removeAttribute('data-buggy-masked');
+            element.removeAttribute('data-buggie-masked');
         }
 
         style.remove();

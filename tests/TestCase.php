@@ -67,11 +67,11 @@ abstract class TestCase extends BaseTestCase
     /** An absolute URL on a workspace's subdomain, as the browser would request it. */
     protected function workspaceUrl(Workspace $workspace, string $path = '/'): string
     {
-        return 'http://'.$workspace->slug.'.'.config('buggy.host').'/'.ltrim($path, '/');
+        return 'http://'.$workspace->slug.'.'.config('buggie.host').'/'.ltrim($path, '/');
     }
 
     protected function centralUrl(string $path = '/'): string
     {
-        return 'http://'.config('buggy.host').'/'.ltrim($path, '/');
+        return 'http://'.config('buggie.host').'/'.ltrim($path, '/');
     }
 }

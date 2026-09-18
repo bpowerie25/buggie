@@ -52,7 +52,7 @@ export default function ShowProject({
                 <h2 className="text-sm font-semibold text-ink">Workflow</h2>
                 <p className="mt-1 text-sm text-pretty text-ink-muted">
                     Statuses are yours to rename. Each one maps to a fixed category, which
-                    is what lets Buggy answer "is this issue still open?" without guessing.
+                    is what lets Buggie answer "is this issue still open?" without guessing.
                 </p>
 
                 <ul className="mt-4 divide-y divide-border overflow-hidden rounded-xl border border-border bg-raised">

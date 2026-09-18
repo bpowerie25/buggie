@@ -1,6 +1,6 @@
-# Self-hosting Buggy
+# Self-hosting Buggie
 
-Buggy is AGPL-3.0 and self-hosted installs have **no limits**: no plans, no seat
+Buggie is AGPL-3.0 and self-hosted installs have **no limits**: no plans, no seat
 counts, no metering, no billing screens, no telemetry. The hosted service runs the same
 code with one flag flipped.
 
@@ -8,7 +8,7 @@ code with one flag flipped.
 
 - Docker and Docker Compose.
 - A domain, and a **wildcard DNS record** — workspaces live on subdomains
-  (`acme.buggy.example.com`), so `*.buggy.example.com` must point at the server.
+  (`acme.buggie.example.com`), so `*.buggie.example.com` must point at the server.
 - A **wildcard TLS certificate**, for the same reason. Let's Encrypt issues these via
   the DNS-01 challenge.
 - An SMTP account for outgoing mail. Invitations, notification digests and the
@@ -19,7 +19,7 @@ Roughly 1GB of RAM is enough for a small team.
 ## Install
 
 ```sh
-git clone https://github.com/you/buggy && cd buggy
+git clone https://github.com/you/buggie && cd buggie
 cp .env.selfhost.example .env
 ```
 
@@ -27,9 +27,9 @@ Edit `.env` and set at least:
 
 | Variable | |
 |---|---|
-| `APP_URL` | `https://buggy.example.com` |
-| `APP_DOMAIN` | `buggy.example.com` — no scheme, include a port only in development |
-| `SESSION_DOMAIN` | `.buggy.example.com` — the leading dot shares the session across workspace subdomains |
+| `APP_URL` | `https://buggie.example.com` |
+| `APP_DOMAIN` | `buggie.example.com` — no scheme, include a port only in development |
+| `SESSION_DOMAIN` | `.buggie.example.com` — the leading dot shares the session across workspace subdomains |
 | `DB_PASSWORD` | anything long |
 | `MAIL_*` | your SMTP details |
 
@@ -55,13 +55,13 @@ once there is data.
 
 The container serves plain HTTP on `APP_PORT` (8080 by default). Put it behind
 something that terminates TLS — Caddy, nginx, Traefik or a load balancer — and make
-sure it forwards the original host header, because the host is how Buggy decides which
+sure it forwards the original host header, because the host is how Buggie decides which
 workspace you are looking at.
 
 A minimal Caddyfile:
 
 ```
-*.buggy.example.com, buggy.example.com {
+*.buggie.example.com, buggie.example.com {
     reverse_proxy localhost:8080
     tls you@example.com {
         dns cloudflare {env.CF_API_TOKEN}
@@ -74,7 +74,7 @@ A minimal Caddyfile:
 Lets people file issues by writing to a project address, and reply to a notification to
 comment on the issue.
 
-1. Point a Mailgun inbound route at `https://buggy.example.com/api/mail/inbound`.
+1. Point a Mailgun inbound route at `https://buggie.example.com/api/mail/inbound`.
 2. Set `MAIL_INBOUND_DOMAIN` and `MAILGUN_SIGNING_KEY` in `.env`.
 
 Without a signing key the endpoint rejects everything, which is the safe default —
@@ -88,7 +88,7 @@ Serve it from your own domain; the snippet in project settings already points at
 The bundle reads its own script URL to find the key, so nothing needs configuring.
 
 If the sites you are embedding in have a strict `Content-Security-Policy`, they need
-`connect-src` to allow your Buggy domain. Screenshot capture additionally loads
+`connect-src` to allow your Buggie domain. Screenshot capture additionally loads
 html2canvas from cdnjs; if that is blocked, reports still arrive, just without an
 image.
 
@@ -99,11 +99,11 @@ Two things hold state:
 ```sh
 # Database
 docker compose -f docker-compose.selfhost.yml exec -T postgres \
-    pg_dump -U buggy buggy | gzip > buggy-$(date +%F).sql.gz
+    pg_dump -U buggie buggie | gzip > buggie-$(date +%F).sql.gz
 
 # Screenshots and attachments (the `storage` volume)
-docker run --rm -v buggy_storage:/data -v "$PWD":/backup alpine \
-    tar czf /backup/buggy-storage-$(date +%F).tar.gz -C /data .
+docker run --rm -v buggie_storage:/data -v "$PWD":/backup alpine \
+    tar czf /backup/buggie-storage-$(date +%F).tar.gz -C /data .
 ```
 
 Redis holds only cache, sessions and the queue. Losing it logs everyone out and drops
@@ -124,7 +124,7 @@ Migrations run on start. Take a database backup first.
 The queue dashboard at `/horizon` is closed to everybody until you list yourself:
 
 ```
-BUGGY_OPERATORS=you@example.com
+BUGGIE_OPERATORS=you@example.com
 ```
 
 It shows jobs across every workspace, which is why it is not tied to a workspace role.

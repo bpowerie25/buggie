@@ -22,11 +22,11 @@ use App\Http\Controllers\WorkspaceSettingsController;
 use App\Http\Controllers\WorkspaceController;
 use Illuminate\Support\Facades\Route;
 
-$host = config('buggy.host');
+$host = config('buggie.host');
 
 /*
 |--------------------------------------------------------------------------
-| Central domain — buggy.app
+| Central domain — buggie.eu
 |--------------------------------------------------------------------------
 | Marketing, authentication and the workspace picker. No workspace is bound
 | here, so tenant models are unreachable (WorkspaceScope throws in strict mode).
@@ -71,7 +71,7 @@ Route::domain($host)->group(function () {
 |--------------------------------------------------------------------------
 | A deliberately broken checkout page for developing the reporter widget against:
 | it throws a real error, logs to the console, makes a failing request, and contains
-| a password field and a data-buggy-redact field to prove redaction works.
+| a password field and a data-buggie-redact field to prove redaction works.
 */
 
 if (! app()->isProduction()) {
@@ -82,14 +82,14 @@ if (! app()->isProduction()) {
 
         return view('widget-demo', [
             // Cache-busted, so widget rebuilds are picked up immediately.
-            'snippetUrl' => '/w/'.$key->public_key.'.js?v='.filemtime(public_path('widget/buggy.js')),
+            'snippetUrl' => '/w/'.$key->public_key.'.js?v='.filemtime(public_path('widget/buggie.js')),
         ]);
     })->name('widget.demo');
 }
 
 /*
 |--------------------------------------------------------------------------
-| Workspace domains — {workspace}.buggy.app
+| Workspace domains — {workspace}.buggie.eu
 |--------------------------------------------------------------------------
 | ResolveWorkspace (global) has already bound the tenant by the time these run;
 | 'workspace' middleware then requires the signed-in user to be a member.

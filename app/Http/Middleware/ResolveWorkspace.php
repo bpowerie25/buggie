@@ -66,6 +66,6 @@ class ResolveWorkspace
 
     protected function centralHost(): string
     {
-        return strtolower((string) config('buggy.host'));
+        return strtolower((string) config('buggie.host'));
     }
 }

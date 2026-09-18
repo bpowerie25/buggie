@@ -19,13 +19,13 @@ jobs:
         # The schema uses jsonb, tsvector and partial indexes; sqlite cannot run it.
         image: postgres:16-alpine
         env:
-          POSTGRES_DB: buggy_testing
-          POSTGRES_USER: buggy
+          POSTGRES_DB: buggie_testing
+          POSTGRES_USER: buggie
           POSTGRES_PASSWORD: secret
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U buggy"
+          --health-cmd "pg_isready -U buggie"
           --health-interval 5s
           --health-timeout 3s
           --health-retries 10
@@ -62,8 +62,8 @@ jobs:
           DB_CONNECTION: pgsql
           DB_HOST: 127.0.0.1
           DB_PORT: 5432
-          DB_DATABASE: buggy_testing
-          DB_USERNAME: buggy
+          DB_DATABASE: buggie_testing
+          DB_USERNAME: buggie
           DB_PASSWORD: secret
           REDIS_HOST: 127.0.0.1
         run: php artisan test
@@ -89,10 +89,10 @@ jobs:
         run: npm run build
 
       - name: Check the widget has not grown
-        # Every visitor to every site running Buggy downloads this, so a dependency
+        # Every visitor to every site running Buggie downloads this, so a dependency
         # sneaking in should fail the build rather than be noticed a year later.
         run: |
-          SIZE=$(gzip -c public/widget/buggy.js | wc -c)
+          SIZE=$(gzip -c public/widget/buggie.js | wc -c)
           LIMIT=20480
           echo "Widget: ${SIZE} bytes gzipped (limit ${LIMIT})"
           if [ "$SIZE" -gt "$LIMIT" ]; then
@@ -110,33 +110,33 @@ jobs:
       - name: Build the production image
         # Self-hosting is a first-class path, so it is built on every change rather
         # than discovered to be broken by whoever tries it first.
-        run: docker build -f docker/php/Dockerfile.production -t buggy:ci .
+        run: docker build -f docker/php/Dockerfile.production -t buggie:ci .
 
       - name: Boot it and check it answers
         run: |
-          docker network create buggy-ci
-          docker run -d --name pg --network buggy-ci \
-            -e POSTGRES_DB=buggy -e POSTGRES_USER=buggy -e POSTGRES_PASSWORD=secret \
+          docker network create buggie-ci
+          docker run -d --name pg --network buggie-ci \
+            -e POSTGRES_DB=buggie -e POSTGRES_USER=buggie -e POSTGRES_PASSWORD=secret \
             postgres:16-alpine
-          docker run -d --name redis --network buggy-ci redis:7-alpine
+          docker run -d --name redis --network buggie-ci redis:7-alpine
 
           for i in $(seq 1 30); do
-            docker exec pg pg_isready -U buggy && break
+            docker exec pg pg_isready -U buggie && break
             sleep 2
           done
 
-          KEY=$(docker run --rm --entrypoint php buggy:ci artisan key:generate --show)
+          KEY=$(docker run --rm --entrypoint php buggie:ci artisan key:generate --show)
 
-          docker run -d --name app --network buggy-ci -p 8080:80 \
+          docker run -d --name app --network buggie-ci -p 8080:80 \
             -e APP_KEY="$KEY" \
             -e APP_ENV=production \
             -e APP_URL=http://localhost:8080 \
             -e APP_DOMAIN=localhost \
-            -e DB_CONNECTION=pgsql -e DB_HOST=pg -e DB_DATABASE=buggy \
-            -e DB_USERNAME=buggy -e DB_PASSWORD=secret \
+            -e DB_CONNECTION=pgsql -e DB_HOST=pg -e DB_DATABASE=buggie \
+            -e DB_USERNAME=buggie -e DB_PASSWORD=secret \
             -e REDIS_HOST=redis -e CACHE_STORE=redis \
             -e SESSION_DRIVER=redis -e QUEUE_CONNECTION=redis \
-            buggy:ci
+            buggie:ci
 
           for i in $(seq 1 30); do
             if curl -fsS http://localhost:8080/up > /dev/null; then
@@ -154,9 +154,9 @@ jobs:
         # An unset APP_KEY used to let migrations succeed and then answer every page
         # with a bare "Server Error".
         run: |
-          if docker run --rm --network buggy-ci \
-               -e DB_HOST=pg -e DB_DATABASE=buggy -e DB_USERNAME=buggy -e DB_PASSWORD=secret \
-               buggy:ci 2>&1 | grep -q "APP_KEY is not set"; then
+          if docker run --rm --network buggie-ci \
+               -e DB_HOST=pg -e DB_DATABASE=buggie -e DB_USERNAME=buggie -e DB_PASSWORD=secret \
+               buggie:ci 2>&1 | grep -q "APP_KEY is not set"; then
             echo "Fails loudly, as intended."
           else
             echo "::error::A missing APP_KEY should stop the container with a clear message."

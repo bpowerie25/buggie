@@ -12,7 +12,7 @@ if (! function_exists('workspace_url')) {
         $slug = $workspace instanceof Workspace ? $workspace->slug : $workspace;
         $scheme = str_starts_with((string) config('app.url'), 'https') ? 'https' : 'http';
 
-        return $scheme.'://'.$slug.'.'.config('buggy.domain').'/'.ltrim($path, '/');
+        return $scheme.'://'.$slug.'.'.config('buggie.domain').'/'.ltrim($path, '/');
     }
 }
 
@@ -44,6 +44,6 @@ if (! function_exists('central_url')) {
     {
         $scheme = str_starts_with((string) config('app.url'), 'https') ? 'https' : 'http';
 
-        return $scheme.'://'.config('buggy.domain').'/'.ltrim($path, '/');
+        return $scheme.'://'.config('buggie.domain').'/'.ltrim($path, '/');
     }
 }

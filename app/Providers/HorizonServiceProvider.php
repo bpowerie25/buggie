@@ -32,7 +32,7 @@ class HorizonServiceProvider extends HorizonApplicationServiceProvider
     protected function gate(): void
     {
         Gate::define('viewHorizon', function ($user = null) {
-            $operators = (array) config('buggy.operators');
+            $operators = (array) config('buggie.operators');
 
             // No operators configured means nobody gets in, rather than everybody.
             return $user !== null

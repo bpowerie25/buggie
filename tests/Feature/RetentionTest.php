@@ -49,7 +49,7 @@ class RetentionTest extends TestCase
         Storage::disk('local')->put('shots/old.jpg', 'x');
         Storage::disk('local')->put('shots/recent.jpg', 'x');
 
-        $this->artisan('buggy:prune')->assertSuccessful();
+        $this->artisan('buggie:prune')->assertSuccessful();
 
         Storage::disk('local')->assertMissing('shots/old.jpg');
         Storage::disk('local')->assertExists('shots/recent.jpg');
@@ -82,7 +82,7 @@ class RetentionTest extends TestCase
             return $report;
         });
 
-        $this->artisan('buggy:prune')->assertSuccessful();
+        $this->artisan('buggie:prune')->assertSuccessful();
 
         $report->refresh();
 
@@ -128,7 +128,7 @@ class RetentionTest extends TestCase
 
         Storage::disk('local')->put('shots/spam.jpg', 'x');
 
-        $this->artisan('buggy:prune')->assertSuccessful();
+        $this->artisan('buggie:prune')->assertSuccessful();
 
         $this->assertSame(1, Report::withoutGlobalScopes()->count());
         Storage::disk('local')->assertMissing('shots/spam.jpg');
@@ -149,7 +149,7 @@ class RetentionTest extends TestCase
             ])->save();
         });
 
-        $this->artisan('buggy:prune')->assertSuccessful();
+        $this->artisan('buggie:prune')->assertSuccessful();
 
         // It became an issue; the link between the two is worth keeping.
         $this->assertSame(1, Report::withoutGlobalScopes()->count());
@@ -174,7 +174,7 @@ class RetentionTest extends TestCase
             ])->forceFill(['created_at' => now()->subYears(3)])->save();
         });
 
-        $this->artisan('buggy:prune')->assertSuccessful();
+        $this->artisan('buggie:prune')->assertSuccessful();
 
         // The tracker's own history is the product; it does not age out.
         $this->assertSame(1, Issue::withoutGlobalScopes()->count());
@@ -208,7 +208,7 @@ class RetentionTest extends TestCase
             ]);
         });
 
-        $this->artisan('buggy:prune')->assertSuccessful();
+        $this->artisan('buggie:prune')->assertSuccessful();
 
         $remaining = PortalToken::withoutGlobalScopes()->pluck('email')->sort()->values()->all();
 
@@ -231,7 +231,7 @@ class RetentionTest extends TestCase
 
         Storage::disk('local')->put('shots/old.jpg', 'x');
 
-        $this->artisan('buggy:prune --dry-run')
+        $this->artisan('buggie:prune --dry-run')
             ->expectsOutputToContain('Dry run')
             ->assertSuccessful();
 
@@ -245,7 +245,7 @@ class RetentionTest extends TestCase
     #[Test]
     public function a_rule_set_to_zero_is_disabled(): void
     {
-        config(['buggy.retention.screenshots' => 0]);
+        config(['buggie.retention.screenshots' => 0]);
         Storage::fake('local');
 
         [$workspace] = $this->workspaceWithMember(slug: 'acme');
@@ -259,7 +259,7 @@ class RetentionTest extends TestCase
 
         Storage::disk('local')->put('shots/keep.jpg', 'x');
 
-        $this->artisan('buggy:prune')->assertSuccessful();
+        $this->artisan('buggie:prune')->assertSuccessful();
 
         Storage::disk('local')->assertExists('shots/keep.jpg');
     }
@@ -280,7 +280,7 @@ class RetentionTest extends TestCase
         }
 
         // Housekeeping is not a tenant operation; it runs everywhere or it is useless.
-        $this->artisan('buggy:prune')->assertSuccessful();
+        $this->artisan('buggie:prune')->assertSuccessful();
 
         $this->assertSame(
             0,

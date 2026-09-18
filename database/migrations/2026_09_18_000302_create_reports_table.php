@@ -23,7 +23,7 @@ return new class extends Migration
 
             $table->string('reporter_name')->nullable();
             $table->string('reporter_email')->nullable();
-            // Whatever the host app passed to buggy.identify(), as an opaque reference.
+            // Whatever the host app passed to buggie.identify(), as an opaque reference.
             $table->string('reporter_ref')->nullable();
 
             $table->jsonb('environment')->default('{}');

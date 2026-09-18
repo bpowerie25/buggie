@@ -20,7 +20,7 @@ class Fingerprint
     /** Frames from these paths are somebody else's code, not the bug's location. */
     private const VENDOR_MARKERS = [
         'node_modules', '/vendor/', 'chrome-extension://', 'moz-extension://',
-        'webpack-internal:', '/buggy-widget', 'cdn.jsdelivr.net', 'cdnjs.cloudflare.com',
+        'webpack-internal:', '/buggie-widget', 'cdn.jsdelivr.net', 'cdnjs.cloudflare.com',
     ];
 
     /**

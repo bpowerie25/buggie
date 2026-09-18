@@ -86,13 +86,13 @@ export function installCapture(): void {
     const originalSend = XMLHttpRequest.prototype.send;
 
     XMLHttpRequest.prototype.open = function (method: string, url: string, ...rest: unknown[]) {
-        (this as XMLHttpRequest & { __buggy?: unknown }).__buggy = { method, url };
+        (this as XMLHttpRequest & { __buggie?: unknown }).__buggie = { method, url };
         // @ts-expect-error passthrough to the original signature
         return originalOpen.call(this, method, url, ...rest);
     };
 
     XMLHttpRequest.prototype.send = function (...args: unknown[]) {
-        const meta = (this as XMLHttpRequest & { __buggy?: { method: string; url: string } }).__buggy;
+        const meta = (this as XMLHttpRequest & { __buggie?: { method: string; url: string } }).__buggie;
         const started = performance.now();
 
         if (meta) {

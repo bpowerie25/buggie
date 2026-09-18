@@ -253,7 +253,7 @@ function WidgetKeyCard({ widgetKey }: { widgetKey: WidgetKeyRow }) {
             </div>
 
             <p className="mt-3 text-[11px] text-ink-subtle">
-                Passwords and any element marked <code>data-buggy-redact</code> are never
+                Passwords and any element marked <code>data-buggie-redact</code> are never
                 captured, credential-shaped query parameters are stripped from URLs, and the
                 reporter sees the image before it is sent.
             </p>

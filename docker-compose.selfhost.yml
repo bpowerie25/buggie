@@ -1,4 +1,4 @@
-# Self-hosting Buggy.
+# Self-hosting Buggie.
 #
 #   cp .env.selfhost.example .env
 #   docker compose -f docker-compose.selfhost.yml build
@@ -19,7 +19,7 @@ services:
     build:
       context: .
       dockerfile: docker/php/Dockerfile.production
-    image: buggy:latest
+    image: buggie:latest
     restart: unless-stopped
     ports:
       - "${APP_PORT:-8080}:80"
@@ -37,13 +37,13 @@ services:
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${DB_DATABASE:-buggy}
-      POSTGRES_USER: ${DB_USERNAME:-buggy}
+      POSTGRES_DB: ${DB_DATABASE:-buggie}
+      POSTGRES_USER: ${DB_USERNAME:-buggie}
       POSTGRES_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
     volumes:
       - postgres:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-buggy}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-buggie}"]
       interval: 5s
       timeout: 3s
       retries: 10

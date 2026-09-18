@@ -27,12 +27,12 @@
         <env name="DB_CONNECTION" value="pgsql" force="true"/>
         <env name="DB_HOST" value="postgres" force="true"/>
         <env name="DB_PORT" value="5432" force="true"/>
-        <env name="DB_DATABASE" value="buggy_testing" force="true"/>
-        <env name="DB_USERNAME" value="buggy" force="true"/>
+        <env name="DB_DATABASE" value="buggie_testing" force="true"/>
+        <env name="DB_USERNAME" value="buggie" force="true"/>
         <env name="DB_PASSWORD" value="secret" force="true"/>
         <env name="REDIS_HOST" value="redis" force="true"/>
         <env name="DB_URL" value=""/>
-        <env name="APP_DOMAIN" value="buggy.test" force="true"/>
+        <env name="APP_DOMAIN" value="buggie.test" force="true"/>
         <env name="MAIL_MAILER" value="array" force="true"/>
         <env name="QUEUE_CONNECTION" value="sync" force="true"/>
         <env name="SESSION_DRIVER" value="array" force="true"/>

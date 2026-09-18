@@ -22,7 +22,7 @@ function toggleTheme() {
     const dark = root.classList.toggle('dark');
 
     try {
-        localStorage.setItem('buggy.theme', dark ? 'dark' : 'light');
+        localStorage.setItem('buggie.theme', dark ? 'dark' : 'light');
     } catch {
         // Private windows and blocked site data: the toggle still works for this page.
     }

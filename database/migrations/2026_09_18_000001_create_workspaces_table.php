@@ -11,7 +11,7 @@ return new class extends Migration
         Schema::create('workspaces', function (Blueprint $table) {
             $table->id();
             $table->string('name');
-            $table->string('slug')->unique();   // subdomain: acme.buggy.app
+            $table->string('slug')->unique();   // subdomain: acme.buggie.eu
             $table->foreignId('owner_id')->constrained('users')->cascadeOnDelete();
             $table->jsonb('settings')->default('{}');
             $table->timestamp('trial_ends_at')->nullable();

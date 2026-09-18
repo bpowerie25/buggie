@@ -184,7 +184,7 @@ class InboundMailController extends Controller
      */
     private function signatureIsValid(Request $request): bool
     {
-        $key = config('buggy.mailgun_signing_key');
+        $key = config('buggie.mailgun_signing_key');
 
         // Without a configured key this endpoint would accept anything, so it accepts
         // nothing instead.

@@ -16,7 +16,7 @@ class WidgetScriptController extends Controller
 {
     public function __invoke(Request $request, string $key): Response
     {
-        $path = public_path('widget/buggy.js');
+        $path = public_path('widget/buggie.js');
 
         abort_unless(is_file($path), 404, 'Widget bundle not built. Run npm run build:widget.');
 

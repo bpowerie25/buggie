@@ -2,9 +2,9 @@ import { installCapture } from './capture';
 import { Widget, type Identity } from './ui';
 
 /**
- * Buggy reporter widget.
+ * Buggie reporter widget.
  *
- *   <script src="https://buggy.app/w/pk_live_9f3a2b.js" async></script>
+ *   <script src="https://buggie.eu/w/pk_live_9f3a2b.js" async></script>
  *
  * The key is read from this script's own src, so the install is one tag with nothing
  * to configure and every key serves the identical cacheable bundle.
@@ -12,11 +12,11 @@ import { Widget, type Identity } from './ui';
 
 declare global {
     interface Window {
-        buggy?: BuggyApi;
+        buggie?: BuggieApi;
     }
 }
 
-interface BuggyApi {
+interface BuggieApi {
     identify(identity: Identity): void;
     setRelease(release: string): void;
     open(): void;
@@ -37,7 +37,7 @@ function boot() {
     const match = src.match(/\/w\/([A-Za-z0-9_]+)\.js/);
 
     if (!match) {
-        console.warn('[buggy] Could not determine the widget key from the script URL.');
+        console.warn('[buggie] Could not determine the widget key from the script URL.');
         return;
     }
 
@@ -54,15 +54,15 @@ function boot() {
         captureScreenshot: script?.dataset.screenshot !== 'false',
     });
 
-    const api: BuggyApi = {
+    const api: BuggieApi = {
         identify: (identity) => Object.assign(widget.identity, identity ?? {}),
         setRelease: (release) => (widget.release = release),
         open: () => void widget.show(),
     };
 
     // Replay anything queued before this script finished loading.
-    const queued = window.buggy as unknown as { q?: [keyof BuggyApi, unknown][] } | undefined;
-    window.buggy = api;
+    const queued = window.buggie as unknown as { q?: [keyof BuggieApi, unknown][] } | undefined;
+    window.buggie = api;
 
     for (const [method, argument] of queued?.q ?? []) {
         (api[method] as (value: unknown) => void)?.(argument);

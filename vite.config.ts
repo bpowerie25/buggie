@@ -21,7 +21,7 @@ export default defineConfig({
         host: '0.0.0.0',
         // The app is served from nginx on :8080; assets come from the host Vite server.
         origin: 'http://localhost:5173',
-        cors: { origin: /https?:\/\/([a-z0-9-]+\.)*buggy\.localhost(:\d+)?$/ },
+        cors: { origin: /https?:\/\/([a-z0-9-]+\.)*buggie\.localhost(:\d+)?$/ },
         watch: { ignored: ['**/storage/framework/views/**'] },
     },
 });

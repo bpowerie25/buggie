@@ -117,9 +117,9 @@ export class Widget {
 
     constructor(private config: WidgetConfig) {
         this.host = document.createElement('div');
-        this.host.setAttribute('data-buggy-widget', '');
+        this.host.setAttribute('data-buggie-widget', '');
         // Our own UI must never appear in a capture of the host page.
-        this.host.setAttribute('data-buggy-redact', '');
+        this.host.setAttribute('data-buggie-redact', '');
         this.root = this.host.attachShadow({ mode: 'open' });
 
         const style = document.createElement('style');
@@ -305,14 +305,14 @@ export class Widget {
           </header>
           <div class="body">
             <p class="error" hidden></p>
-            <label for="buggy-title">What went wrong?</label>
-            <input id="buggy-title" maxlength="200" placeholder="The checkout button does nothing" />
-            <label for="buggy-body">Anything else?</label>
-            <textarea id="buggy-body" maxlength="4000" placeholder="What you expected instead, and how to reproduce it."></textarea>
+            <label for="buggie-title">What went wrong?</label>
+            <input id="buggie-title" maxlength="200" placeholder="The checkout button does nothing" />
+            <label for="buggie-body">Anything else?</label>
+            <textarea id="buggie-body" maxlength="4000" placeholder="What you expected instead, and how to reproduce it."></textarea>
             ${
                 this.config.requireEmail || !this.identity.email
-                    ? `<label for="buggy-email">Your email${this.config.requireEmail ? '' : ' (optional)'}</label>
-                       <input id="buggy-email" type="email" value="${escapeAttribute(this.identity.email ?? '')}" placeholder="you@example.com" />`
+                    ? `<label for="buggie-email">Your email${this.config.requireEmail ? '' : ' (optional)'}</label>
+                       <input id="buggie-email" type="email" value="${escapeAttribute(this.identity.email ?? '')}" placeholder="you@example.com" />`
                     : ''
             }
             <div class="shot">${this.config.captureScreenshot ? '<p class="hint">Capturing screenshot…</p>' : ''}</div>
@@ -334,9 +334,9 @@ export class Widget {
     }
 
     private async submit(panel: HTMLElement) {
-        const title = (panel.querySelector('#buggy-title') as HTMLInputElement)?.value.trim();
-        const body = (panel.querySelector('#buggy-body') as HTMLTextAreaElement)?.value.trim();
-        const email = (panel.querySelector('#buggy-email') as HTMLInputElement | null)?.value.trim();
+        const title = (panel.querySelector('#buggie-title') as HTMLInputElement)?.value.trim();
+        const body = (panel.querySelector('#buggie-body') as HTMLTextAreaElement)?.value.trim();
+        const email = (panel.querySelector('#buggie-email') as HTMLInputElement | null)?.value.trim();
         const error = panel.querySelector('.error') as HTMLElement;
         const submit = panel.querySelector('.submit') as HTMLButtonElement;
 

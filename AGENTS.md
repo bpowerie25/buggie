@@ -28,10 +28,10 @@ npm run types               # tsc --noEmit
 
 | | |
 |---|---|
-| App | http://buggy.localhost:8080 |
-| A workspace | http://acme.buggy.localhost:8080 |
+| App | http://buggie.localhost:8080 |
+| A workspace | http://acme.buggie.localhost:8080 |
 | Mailpit | http://localhost:8027 |
-| Postgres | localhost:5433 (`buggy` / `buggy` / `secret`) |
+| Postgres | localhost:5433 (`buggie` / `buggie` / `secret`) |
 
 `*.localhost` resolves to 127.0.0.1 in every current browser, so no `/etc/hosts`
 editing is needed. Ports are shifted off the defaults because ddev already holds
@@ -62,8 +62,8 @@ the workspace exists, which is a free way to enumerate customer names.
 ## Routing gotchas, both already hit once
 
 **`Route::domain()` must not include a port.** Domain matching runs against
-`Request::getHost()`, which never has one. `config('buggy.host')` is the port-free
-value for routing; `config('buggy.domain')` keeps the port for URL building. Laravel's
+`Request::getHost()`, which never has one. `config('buggie.host')` is the port-free
+value for routing; `config('buggie.domain')` keeps the port for URL building. Laravel's
 URL generator re-adds the request's port when generating, so dev URLs still work.
 
 **`ResolveWorkspace` drops the `{workspace}` domain parameter.** The controller
@@ -116,7 +116,7 @@ which keeps the bundle every visitor downloads at ~6KB gzipped. Keep it that way
 Two things that are load-bearing:
 
 - **Redaction happens in the DOM before rasterising**, by restyling password fields and
-  `[data-buggy-redact]` elements into solid blocks. The earlier approach — painting
+  `[data-buggie-redact]` elements into solid blocks. The earlier approach — painting
   rectangles onto the finished canvas — has to reproduce html2canvas's coordinate
   system, and when it disagreed the masks landed on the labels while the password
   stayed readable. Letting the browser lay out the mask cannot be misaligned.
@@ -166,13 +166,13 @@ Three things reach people who are not staff, and all three default to silence:
 
 Notifications are recorded, never sent inline. `notifications:flush` (scheduled every
 minute, run by the `scheduler` compose service) groups by person-plus-issue and sends
-once the group has been quiet for `buggy.digest_delay_minutes`, measured from the last
+once the group has been quiet for `buggie.digest_delay_minutes`, measured from the last
 entry.
 
 ## Open source, and the hosted service
 
-Buggy is AGPL-3.0. The same code runs somebody's own server and the commercial hosted
-service; `BUGGY_HOSTED` is the only difference.
+Buggie is AGPL-3.0. The same code runs somebody's own server and the commercial hosted
+service; `BUGGIE_HOSTED` is the only difference.
 
 - **Self-hosted installs have no limits and no telemetry.** Not reduced features —
   none. `SelfHostedTest` asserts this, including that `billing` is null in the shared
@@ -180,7 +180,7 @@ service; `BUGGY_HOSTED` is the only difference.
   nags will fail it, which is the point.
 - Limits live in `config/plans.php` and are read through `Workspace::plan()`, which
   returns the unlimited `self_hosted` plan when not hosted. Do not scatter
-  `config('buggy.hosted')` checks; add a limit to the config instead.
+  `config('buggie.hosted')` checks; add a limit to the config instead.
 - The hosted-only routes are guarded by the `hosted` **middleware**, not by a condition
   around the route definitions. Route registration happens during bootstrap and gets
   cached, so a condition there is invisible to later configuration changes.
@@ -192,9 +192,9 @@ that way and none of them showed up in development.
 
 ## Retention and attachments
 
-`buggy:prune` (daily) ages out screenshots, reporter identities, dismissed reports and
+`buggie:prune` (daily) ages out screenshots, reporter identities, dismissed reports and
 expired portal links. **Issues and comments are never pruned** — they are the work
-product. Rules are day counts in `config/buggy.retention`; zero disables one.
+product. Rules are day counts in `config/buggie.retention`; zero disables one.
 
 Attachments use a type allowlist with **no SVG** (XML that can carry script, served
 from our own origin), keep the uploaded filename as a label only while generating the
@@ -229,7 +229,7 @@ first rather than chaining `->with()`.
 - `workspace_id` is never in a `#[Fillable]`. `BelongsToWorkspace` stamps it on create;
   internal call sites must not pass it. Factories that may run with no workspace bound
   use `forceCreate`.
-- Tests run against Postgres (`buggy_testing`), not sqlite — the schema uses `jsonb`.
+- Tests run against Postgres (`buggie_testing`), not sqlite — the schema uses `jsonb`.
 
 ## Never put app config in docker-compose `environment:`
 

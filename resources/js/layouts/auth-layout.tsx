@@ -19,7 +19,7 @@ export function AuthLayout({
                     className="mb-8 flex items-center justify-center gap-2 text-ink"
                 >
                     <Bug className="size-6 text-accent" />
-                    <span className="text-lg font-semibold tracking-tight">Buggy</span>
+                    <span className="text-lg font-semibold tracking-tight">Buggie</span>
                 </Link>
 
                 <div className="rounded-xl border border-border bg-raised p-6 shadow-sm">
