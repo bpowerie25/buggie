@@ -1289,5 +1289,77 @@ Not published to npm yet — the `@buggie` scope needs claiming first.
 
 ### Still open
 
-- No native SDK. The ingest endpoint is ordinary HTTP authenticated by the public key,
-  so an iOS or Android client can post to it directly, but nobody has wrapped it up.
+- ~~No native SDK~~ — an iOS one now exists; see §25. Android does not.
+
+---
+
+## 25. The iOS SDK
+
+`packages/swift` is a Swift package that posts to the same ingest endpoint as the web
+widget. No new server code was needed, which was the point of keeping ingest as plain
+HTTP authenticated by a public key.
+
+### Split in two, on purpose
+
+| Target | What it is |
+| --- | --- |
+| `BuggieCore` | Payload, redaction, ring buffers, transport. No UIKit. |
+| `Buggie` | Screen capture and device details. Needs a device. |
+
+This is not tidiness. The code that decides *what leaves a phone* is the code that
+must be tested, and putting it behind `import UIKit` would mean it could only be
+tested where an iOS simulator exists. Split out, it runs anywhere Swift does: 24 tests
+covering redaction, the wire format, buffer bounds under concurrent writers, and the
+mapping of refusals.
+
+The device layer is kept small because it is the part no test here can reach.
+
+### The wire format is shared, and now pinned by tests
+
+Native reports go through the same `IngestReportRequest` as browser reports, so the
+payload has to match exactly — including that breadcrumbs are serialised as `console`,
+because that is what the server calls them. A test asserts that key mapping. Without
+one, a rename on either side would fail validation silently, and nobody would find out
+until a customer said reporting had stopped working.
+
+Refusals are mapped to distinct cases rather than a status code: `quotaReached` for
+402 and `rateLimited(retryAfter:)` for 429 mean different things to a host app, and
+neither is the reporter's fault.
+
+### Redaction repeats a lesson already learned
+
+Views marked `buggieRedacted` are **hidden before the screen is rendered**, not painted
+over afterwards. That is the same fix the web widget needed when masks drawn on the
+finished canvas landed on the labels while the password stayed readable. A redaction
+that can be silently misaligned is not a redaction. `isSecureTextEntry` fields are
+included automatically, because relying on memory for this is how it goes wrong.
+
+### No report sheet
+
+Deliberately. What a bug report looks like inside someone's app is their decision, and
+a sheet we shipped would be the first thing they had to fight. The SDK gives them
+`captureScreen()` and `report(title:body:)`.
+
+### What is *not* verified
+
+Worth stating plainly, because the tests passing does not cover it:
+
+- **The UIKit layer has never been compiled.** There is no Xcode on this machine, only
+  the Command Line Tools, so `canImport(UIKit)` is false and that whole block is
+  skipped. It has been syntax-checked by forcing the conditional and running
+  `swiftc -parse`, which catches typos and unbalanced braces and proves nothing about
+  whether `drawHierarchy` behaves. It needs a run on a real device before release.
+- **No report has been filed from an actual phone.** The transport is tested against
+  constructed responses, not against the running server.
+
+### Packaging
+
+Swift Package Manager insists on `Package.swift` at a repository root, so this cannot
+be consumed from `packages/swift` in the monorepo. It needs a `buggie-swift` mirror
+repository before anyone can add it as a dependency.
+
+### Android
+
+Not built. There is no JDK and no Kotlin compiler on this machine, so any Android SDK
+written here would be entirely uncompiled and untested — which is worse than no SDK,
+because it looks like one.

@@ -35,6 +35,16 @@ init({ key: 'pk_live_9f3a2b', endpoint: 'https://your-buggie' });
 
 See [`packages/widget`](packages/widget).
 
+iOS apps have a Swift package that posts to the same endpoint:
+
+```swift
+Buggie.shared.start(key: "pk_live_9f3a2b")
+
+try await Buggie.shared.report(title: notes, screenshot: Buggie.shared.captureScreen())
+```
+
+See [`packages/swift`](packages/swift). There is no Android SDK yet.
+
 ---
 
 ## What it does
