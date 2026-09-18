@@ -1,5 +1,6 @@
 import { Button } from '@/components/button';
 import { Field, Input, Textarea } from '@/components/field';
+import { WorkflowEditor } from '@/components/workflow-editor';
 import { AppLayout } from '@/layouts/app-layout';
 import type { ProjectSummary } from '@/types';
 import { Head, router, useForm } from '@inertiajs/react';
@@ -18,12 +19,27 @@ interface WidgetKeyRow {
     snippet: string;
 }
 
+interface StatusRow {
+    id: number;
+    name: string;
+    category: 'backlog' | 'unstarted' | 'started' | 'done' | 'canceled';
+    color: string;
+    position: number;
+    is_default: boolean;
+    open: boolean;
+    issues_count: number;
+}
+
 export default function EditProject({
     project,
     widgetKeys,
+    statuses,
+    categories,
 }: {
     project: ProjectSummary;
     widgetKeys: WidgetKeyRow[];
+    statuses: StatusRow[];
+    categories: { value: StatusRow['category']; label: string; open: boolean }[];
 }) {
     const { data, setData, put, processing, errors } = useForm({
         name: project.name,
@@ -79,6 +95,14 @@ export default function EditProject({
                     {processing ? 'Saving…' : 'Save changes'}
                 </Button>
             </form>
+
+            <div className="mt-12">
+                <WorkflowEditor
+                    projectSlug={project.slug}
+                    statuses={statuses}
+                    categories={categories}
+                />
+            </div>
 
             <section className="mt-12 max-w-2xl">
                 <h2 className="text-sm font-semibold text-ink">Bug reporter widget</h2>

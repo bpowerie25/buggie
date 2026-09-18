@@ -22,6 +22,7 @@
     <label for="secret">Internal note</label>
     <input id="secret" data-buggie-redact value="REDACT-ME-TOO">
     <button id="pay">Pay now</button>
+    <button id="report" style="background:#4f46e5">Report a bug (our own button)</button>
   </div>
 
   <script>
@@ -32,6 +33,10 @@
       null.total;
     });
   </script>
-  <script src="{{ $snippetUrl }}" async></script>
+  <script src="{{ $snippetUrl }}" async
+          data-launcher="{{ request()->boolean('launcher', true) ? 'true' : 'false' }}"></script>
+  <script>
+    document.getElementById('report').addEventListener('click', () => window.buggie?.open());
+  </script>
 </body>
 </html>

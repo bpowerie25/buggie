@@ -6,6 +6,15 @@ export interface WidgetConfig {
     key: string;
     requireEmail: boolean;
     captureScreenshot: boolean;
+
+    /**
+     * Whether to draw the floating button.
+     *
+     * Most serious integrations already have somewhere sensible to put "Report a
+     * bug" — a help menu, a keyboard shortcut, an error boundary — and want to call
+     * buggie.open() from there rather than accept a bug in the corner of every page.
+     */
+    launcher: boolean;
 }
 
 export interface Identity {
@@ -127,7 +136,10 @@ export class Widget {
         this.root.appendChild(style);
 
         document.body.appendChild(this.host);
-        this.renderLauncher();
+
+        if (this.config.launcher) {
+            this.renderLauncher();
+        }
     }
 
     private renderLauncher() {
@@ -285,11 +297,22 @@ export class Widget {
         }
     }
 
+    /** Close the panel from outside — the host app's own cancel affordance. */
+    dismiss() {
+        this.hide();
+    }
+
     private hide() {
         this.open = false;
         this.canvas = null;
         this.annotatorAttached = false;
-        this.renderLauncher();
+
+        if (this.config.launcher) {
+            this.renderLauncher();
+        } else {
+            // Nothing of ours should remain on the page between reports.
+            this.clear();
+        }
     }
 
     private buildPanel(): HTMLElement {

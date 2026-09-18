@@ -20,6 +20,8 @@ interface BuggieApi {
     identify(identity: Identity): void;
     setRelease(release: string): void;
     open(): void;
+    close(): void;
+    isSupported(): boolean;
 }
 
 function currentScript(): HTMLScriptElement | null {
@@ -52,12 +54,18 @@ function boot() {
         key: match[1],
         requireEmail: script?.dataset.requireEmail === 'true',
         captureScreenshot: script?.dataset.screenshot !== 'false',
+        // data-launcher="false" hides the floating button, for apps that would
+        // rather call buggie.open() from their own menu.
+        launcher: script?.dataset.launcher !== 'false',
     });
 
     const api: BuggieApi = {
         identify: (identity) => Object.assign(widget.identity, identity ?? {}),
         setRelease: (release) => (widget.release = release),
         open: () => void widget.show(),
+        close: () => widget.dismiss(),
+        // Lets a host application decide whether to offer reporting at all.
+        isSupported: () => typeof document.body.attachShadow === 'function',
     };
 
     // Replay anything queued before this script finished loading.

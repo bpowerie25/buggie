@@ -15,7 +15,10 @@ signed-in user at the moment someone clicks *report a bug*.
 <script src="https://your-buggie/w/pk_live_9f3a2b.js" async></script>
 ```
 
-That's the whole install. ~6KB gzipped.
+That's the whole install. ~7KB gzipped.
+
+Add `data-launcher="false"` if you would rather trigger it from your own menu with
+`buggie.open()` than have a floating button.
 
 ---
 

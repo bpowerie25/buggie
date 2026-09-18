@@ -76,6 +76,18 @@ class ProjectController extends Controller
 
         return Inertia::render('projects/edit', [
             'project' => $this->summary($project),
+            'statuses' => $project->statuses()->withCount('issues')->get()
+                ->map(fn (Status $status) => [
+                    'id' => $status->id,
+                    'name' => $status->name,
+                    'category' => $status->category->value,
+                    'color' => $status->color,
+                    'position' => $status->position,
+                    'is_default' => $status->is_default,
+                    'open' => $status->category->isOpen(),
+                    'issues_count' => $status->issues_count,
+                ]),
+            'categories' => StatusCategory::options(),
             'widgetKeys' => $project->widgetKeys()->latest()->get()->map(fn ($key) => [
                 'id' => $key->id,
                 'public_key' => $key->public_key,

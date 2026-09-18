@@ -39,6 +39,11 @@ class Status extends Model
         return $this->belongsTo(Project::class);
     }
 
+    public function issues(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(Issue::class);
+    }
+
     public function scopeOpen(Builder $query): Builder
     {
         return $query->whereIn('category', [

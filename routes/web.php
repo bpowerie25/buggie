@@ -18,6 +18,7 @@ use App\Http\Controllers\PortalController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\SavedViewController;
+use App\Http\Controllers\StatusController;
 use App\Http\Controllers\WidgetKeyController;
 use App\Http\Controllers\WidgetScriptController;
 use App\Http\Controllers\WorkspaceSettingsController;
@@ -159,6 +160,15 @@ Route::domain('{workspace}.'.$host)
         Route::post('inbox/{report}/dismiss', [ReportController::class, 'dismiss'])->name('reports.dismiss');
         Route::get('inbox/{report}/screenshot', [ReportController::class, 'screenshot'])
             ->name('reports.screenshot');
+
+        Route::post('projects/{project}/statuses', [StatusController::class, 'store'])
+            ->name('statuses.store');
+        Route::patch('projects/{project}/statuses/order', [StatusController::class, 'reorder'])
+            ->name('statuses.reorder');
+        Route::patch('statuses/{status}', [StatusController::class, 'update'])
+            ->name('statuses.update');
+        Route::delete('statuses/{status}', [StatusController::class, 'destroy'])
+            ->name('statuses.destroy');
 
         Route::post('projects/{project}/widget-keys', [WidgetKeyController::class, 'store'])
             ->name('widget-keys.store');

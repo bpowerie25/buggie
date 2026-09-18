@@ -541,7 +541,7 @@ as it sounds.
 
 - ~~No password reset~~ — added later; see §22. No email verification yet.
 - No workspace member invitations — a workspace has exactly its owner until M5.
-- Statuses are seeded and displayed but not yet editable; the reorder/rename UI is M2.
+- ~~Statuses not editable~~ — done later; see §23.
 - `laravel/sanctum` is installed but unused until the widget ingest endpoint in M4.
 
 ---
@@ -1208,3 +1208,50 @@ working**, and **a token must not work twice**. A link in an inbox is a link for
 - No email verification on registration.
 - No "your password was changed" notification, which is how someone discovers an
   account takeover.
+
+---
+
+## 23. Editable workflows, and a widget that stays out of the way
+
+### Statuses
+
+The six seeded statuses were never editable, which §1 had waved at as an M2 job and
+M2 never did. For an agency where one client wants "Awaiting client" and another wants
+"In QA", that is a real limitation rather than a missing nicety.
+
+Now: rename, recolour, reorder by dragging, add and remove — per project, as before.
+Deliberately **not** extended to custom fields or a workflow-transition designer, which
+§1 rejects and which remain rejected.
+
+**The category stays fixed at creation.** A name is the customer's; the category behind
+it is the invariant that lets "is this issue open?" keep working. Changing it later
+rewrites the meaning of history — issues that closed under a status would silently
+reopen, or the reverse. If you need a different category, add a status and move issues
+across, which the delete flow does anyway.
+
+Four things the API refuses, each with a test:
+
+- Deleting a status that holds issues, without naming where they should go. Cascading
+  them away or leaving them pointing at nothing is how a tracker loses work.
+- Deleting the last open status. New issues have to start somewhere.
+- Deleting the last status at all.
+- Making a closed status the default.
+
+Deleting the current default promotes another open status, because a project without
+one cannot create an issue.
+
+### The widget's launcher is now optional
+
+`data-launcher="false"` suppresses the floating button, for applications that already
+have somewhere sensible to put "Report a bug" — a help menu, a keyboard shortcut, an
+error boundary — and would rather call `buggie.open()` from there. `buggie.close()` and
+`buggie.isSupported()` round out the API.
+
+Installation is still one script tag and nothing else. Two integration gaps remain and
+are worth being honest about:
+
+- **No npm package.** Fine for a `<script>` in a template; awkward in a React or Next
+  application where `npm i @buggie/widget` is the expectation.
+- **Native apps have no SDK.** The ingest endpoint is ordinary HTTP authenticated by
+  the public key, so a native client can post to it directly — but nobody has wrapped
+  that up.
