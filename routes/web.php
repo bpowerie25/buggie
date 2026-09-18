@@ -9,6 +9,7 @@ use App\Http\Controllers\IssueController;
 use App\Http\Controllers\IssueRelationController;
 use App\Http\Controllers\LabelController;
 use App\Http\Controllers\ProjectController;
+use App\Http\Controllers\SavedViewController;
 use App\Http\Controllers\WorkspaceController;
 use Illuminate\Support\Facades\Route;
 
@@ -59,6 +60,9 @@ Route::domain('{workspace}.'.$host)
 
         // Issue keys are unique per workspace (project keys are), so issues live at
         // the top level: /issues/WEB-142 rather than /projects/web/issues/142.
+        // Declared before the resource so /issues/bulk is not read as an issue key.
+        Route::patch('issues/bulk', [IssueController::class, 'bulk'])->name('issues.bulk');
+
         Route::resource('issues', IssueController::class)->except('edit');
 
         Route::post('issues/{issue}/comments', [CommentController::class, 'store'])
@@ -75,6 +79,10 @@ Route::domain('{workspace}.'.$host)
 
         Route::resource('labels', LabelController::class)
             ->only(['index', 'store', 'update', 'destroy']);
+
+        Route::resource('views', SavedViewController::class)
+            ->only(['store', 'update', 'destroy'])
+            ->parameters(['views' => 'savedView']);
 
         Route::post('logout', [AuthenticatedSessionController::class, 'destroy'])
             ->name('workspace.logout');

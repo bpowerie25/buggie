@@ -50,6 +50,7 @@ export interface SharedProps {
     auth: { user: AuthUser | null; role: WorkspaceRole | null };
     workspace: WorkspaceSummary | null;
     workspaces: WorkspaceListing[];
+    views: SavedView[];
     flash: { success: string | null; error: string | null };
     [key: string]: unknown;
 }
@@ -74,6 +75,7 @@ export interface IssueStatus {
     name: string;
     category: StatusCategory;
     color: string;
+    position: number;
     open: boolean;
 }
 
@@ -109,4 +111,14 @@ export interface Facets {
     priorities: { value: number; label: string; color: string }[];
     types: { value: string; label: string }[];
     statuses_by_project: Record<number, IssueStatus[]>;
+}
+
+export interface SavedView {
+    id: number;
+    name: string;
+    query: string;
+    layout: 'list' | 'board';
+    group_by: 'status' | 'assignee' | 'priority' | 'project';
+    shared: boolean;
+    can_edit: boolean;
 }

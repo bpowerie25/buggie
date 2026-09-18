@@ -18,7 +18,14 @@ Full rationale and data model: [`docs/DESIGN.md`](docs/DESIGN.md).
   filters and full-text search, issue detail with a merged comment/activity feed,
   tiptap comments with an internal/public split, labels, relations and watchers.
 
-Next: M3 — command palette, keyboard map, saved views, board, virtualised list.
+- **M3** — Command palette (⌘K), full keyboard map, a query language that doubles as
+  saved views, kanban board with drag-and-drop, virtualised list, optimistic inline
+  edits and bulk actions.
+
+Next: M4 — the reporter widget, which is the point of the whole thing.
+
+Realtime is deferred: Reverb v1 pins an old `guzzlehttp/psr7` and would downgrade
+guzzle 8 → 7 repo-wide. See `docs/DESIGN.md` §14.
 
 ## Running it
 

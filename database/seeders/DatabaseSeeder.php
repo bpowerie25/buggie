@@ -14,6 +14,7 @@ use App\Enums\RelationType;
 use App\Enums\WorkspaceRole;
 use App\Models\Label;
 use App\Models\Project;
+use App\Models\SavedView;
 use App\Models\User;
 use App\Support\Tenancy\Tenancy;
 use Illuminate\Database\Seeder;
@@ -129,6 +130,20 @@ class DatabaseSeeder extends Seeder
 
             $done = $site->statuses()->where('category', 'done')->first();
             app(UpdateIssue::class)->handle($stale, ['status_id' => $done->id], $owner);
+
+            foreach ([
+                ['name' => 'My work', 'query' => 'is:open assignee:@me', 'user_id' => $owner->id],
+                ['name' => 'Needs triage', 'query' => 'is:open no:assignee', 'user_id' => null],
+                ['name' => 'Regressions', 'query' => 'is:open label:regression', 'user_id' => null],
+                ['name' => 'Portal board', 'query' => 'is:open project:customer-portal',
+                    'user_id' => null, 'layout' => 'board'],
+            ] as $position => $view) {
+                SavedView::create([
+                    ...$view,
+                    'created_by_id' => $owner->id,
+                    'position' => $position,
+                ]);
+            }
         });
 
         // A second workspace, so a tenancy leak is visible by eye in development.

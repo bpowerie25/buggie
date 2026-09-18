@@ -439,10 +439,9 @@ relations, watchers. Attachments have a table and model but no upload UI yet —
 arrive with the widget in M4. Virtualised paging deferred to M3; the list is capped at
 500 rows until then.
 
-**M3 — The UX that justifies building it (3 days).** Command palette, full keyboard map,
-saved views, filter chips + text syntax, board with dnd-kit, optimistic updates, Reverb
-wiring. *This is the milestone that decides whether the thing is worth having; don't
-compress it.*
+**M3 — The UX that justifies building it. ✅ Done, except realtime.** Command palette,
+full keyboard map, saved views, filter chips + query language, board with dnd-kit,
+virtualised list, optimistic updates, bulk edit. Reverb is **deferred** — see below.
 
 **M4 — The widget (4 days).** Widget build, capture, redaction, annotation UI, presigned
 uploads, ingest endpoint with origin/rate/size guards, fingerprinting worker, triage inbox.
@@ -620,3 +619,99 @@ comment text appears nowhere in the client's response payload.
 - The list is capped at 500 rows with no paging — virtualisation is M3.
 - No keyboard navigation yet (`j`/`k`, `c`, `⌘K`) — that is the substance of M3.
 - Relations can be created and removed via the API but have no UI beyond display.
+
+---
+
+## 14. Implementation notes (M3)
+
+### The query language is the filter state
+
+The plan had chips writing query parameters and a text syntax as a separate power-user
+feature. That would have been three representations of the same thing — URL parameters,
+chip state and saved-view JSON — which drift.
+
+Instead there is one string:
+
+```
+is:open project:web assignee:@me -label:wontfix checkout
+```
+
+`IssueQuery` parses it, `IssueQueryFilter` applies it, the chips are an editor for it,
+and **a saved view is nothing more than a stored one**. The URL is shareable and
+readable, and "save this as a view" needed no extra modelling at all.
+
+Rules worth knowing:
+
+- **Unknown operators become search text.** `sevrity:high` searches for that literal
+  rather than being dropped, so a typo can never silently change what you are looking at.
+- **Exclusions accumulate; inclusions replace.** `-assignee:a -assignee:b` excludes
+  both, because excluding is a set operation. `assignee:a assignee:b` keeps the last,
+  because an issue has one assignee and the chip is a single choice.
+- **An unresolvable name matches nothing, not everything.** `assignee:nobodyhere`
+  returns an empty list. A filter that silently does nothing is the dangerous failure.
+- Both parsers produce the same canonical ordering, so a query built by clicking and the
+  same query typed by hand compare equal — which is what makes deduplicating views work.
+
+`lib/issue-query.ts` mirrors `IssueQuery` so chips can edit the string without a
+round trip. The two must stay in step; the key order constant is the thing to watch.
+
+### Partial reloads make prop laziness free
+
+Every prop on the issue index is a closure. Inertia evaluates only the props a partial
+reload asks for, so an inline edit sending `only: ['issues', 'flash']` re-runs the issue
+query and nothing else — facets, views and the rest are not recomputed. `Inertia::merge`
+was wrong here (it appends, duplicating rows) and `Inertia::optional` was wrong too (the
+chips need facets on first paint).
+
+### Optimistic updates, and rolling them back
+
+Inline edits write into an `overrides` map keyed by issue key, so the row repaints
+before the request leaves. The entry is cleared when fresh `issues` arrive, and on
+`onError` the override is dropped so the row snaps back rather than leaving a lie on
+screen.
+
+### The board merges columns by status name
+
+Statuses belong to projects, so a cross-project board has no single workflow. Columns
+are grouped by status *name*, and a drop resolves to the status with that name **in the
+dropped issue's own project**. A project with no status of that name simply cannot
+accept the drop. `PointerSensor` uses a 4px activation distance so a click still clicks.
+
+### Keyboard map
+
+`useHotkeys` handles single keys, `mod+` combos and two-key sequences (`g i`) with a
+one-second timeout. Modifier combos fire everywhere, including inside the comment
+editor; bare keys are ignored while the caret is in a field. Keyboard-first, not
+keyboard-only: everything reachable by key is also reachable by mouse.
+
+### Bulk edits are authorised per issue
+
+`IssueController@bulk` loops `authorize('update', $issue)` inside the transaction. A
+bulk action is a convenience, never a way around a policy, and because the lookup is
+workspace-scoped, keys from another tenant resolve to nothing at all.
+
+### Realtime is deferred, deliberately
+
+`laravel/reverb` exists only at v1.x, which pins `guzzlehttp/psr7 ^2.6`. Laravel 13
+ships guzzle 8 / psr7 3.1, so installing Reverb downgrades **guzzle 8 → 7** across the
+whole application. That is a major-version downgrade of a core HTTP dependency in
+exchange for websockets, on a product where optimistic updates already cover the
+responsiveness. Options, in preference order:
+
+1. Wait for a Reverb release that supports psr7 ^3.
+2. Poll with `router.reload({ only: ['issues'] })` on an interval — a few lines, no
+   dependency change, good enough for a tracker.
+3. Take the guzzle downgrade.
+
+The client side (`laravel-echo`, `pusher-js`) is already installed, so whichever path is
+taken, only the server half is outstanding.
+
+### Still open from M3
+
+- No realtime (above), and no presence/"who is viewing".
+- Bulk edit has no undo. Given it can touch 200 issues, it should.
+- Saved views cannot be reordered or renamed from the sidebar — only created and
+  deleted.
+- `shift+click` range selection is not implemented; `x` toggles one row at a time.
+- The palette searches loaded issues only. Typing a key offers it directly, but there
+  is no server-side search-as-you-type yet.

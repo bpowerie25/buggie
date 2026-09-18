@@ -1,11 +1,16 @@
+import { CommandPalette } from '@/components/command-palette';
 import { Flash } from '@/components/flash';
+import { ShortcutSheet } from '@/components/shortcut-sheet';
+import { useHotkeys } from '@/hooks/use-hotkeys';
 import type { SharedProps } from '@/types';
 import { Link, router, usePage } from '@inertiajs/react';
 import {
+    Bookmark,
     Bug,
     ChevronsUpDown,
     CircleDot,
     FolderKanban,
+    Keyboard,
     LayoutDashboard,
     LogOut,
     Tag,
@@ -45,14 +50,34 @@ export function AppLayout({
 }: {
     title: string;
     actions?: ReactNode;
+    /** Accepted for call-site clarity; views and the query come from shared props. */
+    views?: unknown;
+    activeQuery?: string;
     children: ReactNode;
 }) {
-    const { auth, workspace, workspaces, ziggy } = usePage<
+    const { auth, workspace, workspaces, views, ziggy } = usePage<
         SharedProps & { ziggy: { location: string } }
     >().props;
     const [switcherOpen, setSwitcherOpen] = useState(false);
+    const [paletteOpen, setPaletteOpen] = useState(false);
+    const [shortcutsOpen, setShortcutsOpen] = useState(false);
 
-    const path = new URL(ziggy.location).pathname;
+    const url = new URL(ziggy.location);
+    const path = url.pathname;
+    const currentQuery = url.searchParams.get('q');
+
+    useHotkeys({
+        'mod+k': () => setPaletteOpen((open) => !open),
+        '?': () => setShortcutsOpen((open) => !open),
+        c: () => router.visit('/issues/create'),
+        Escape: () => {
+            setPaletteOpen(false);
+            setShortcutsOpen(false);
+        },
+        'g i': () => router.visit('/issues'),
+        'g p': () => router.visit('/projects'),
+        'g d': () => router.visit('/'),
+    });
 
     return (
         <div className="flex min-h-screen">
@@ -105,6 +130,33 @@ export function AppLayout({
                     <NavLink href="/labels" icon={Tag} active={path.startsWith('/labels')}>
                         Labels
                     </NavLink>
+
+                    {views.length > 0 && (
+                        <div className="pt-4">
+                            <h2 className="px-2.5 pb-1 text-[11px] font-semibold tracking-wide text-ink-subtle uppercase">
+                                Views
+                            </h2>
+                            {views.map((view) => (
+                                <Link
+                                    key={view.id}
+                                    href={`/issues?q=${encodeURIComponent(view.query)}&layout=${view.layout}&group=${view.group_by}`}
+                                    className={`flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-sm transition ${
+                                        currentQuery === view.query
+                                            ? 'bg-accent-soft font-medium text-accent'
+                                            : 'text-ink-muted hover:bg-surface hover:text-ink'
+                                    }`}
+                                >
+                                    <Bookmark className="size-4 shrink-0" />
+                                    <span className="min-w-0 flex-1 truncate">{view.name}</span>
+                                    {view.shared && (
+                                        <span className="shrink-0 text-[10px] text-ink-subtle">
+                                            shared
+                                        </span>
+                                    )}
+                                </Link>
+                            ))}
+                        </div>
+                    )}
                 </nav>
 
                 <div className="border-t border-border p-3">
@@ -118,6 +170,14 @@ export function AppLayout({
                                 {auth.role}
                             </p>
                         </div>
+                        <button
+                            onClick={() => setShortcutsOpen(true)}
+                            aria-label="Keyboard shortcuts"
+                            title="Keyboard shortcuts (?)"
+                            className="rounded-md p-1.5 text-ink-subtle transition hover:bg-raised hover:text-ink"
+                        >
+                            <Keyboard className="size-4" />
+                        </button>
                         <button
                             onClick={() => router.post('/logout')}
                             aria-label="Sign out"
@@ -140,6 +200,9 @@ export function AppLayout({
                     {children}
                 </div>
             </main>
+
+            <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
+            {shortcutsOpen && <ShortcutSheet onClose={() => setShortcutsOpen(false)} />}
         </div>
     );
 }

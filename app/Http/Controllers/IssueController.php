@@ -14,36 +14,70 @@ use App\Models\Label;
 use App\Models\Project;
 use App\Models\Status;
 use App\Models\User;
+use App\Support\Issues\IssueQuery;
+use App\Support\Issues\IssueQueryFilter;
 use App\Support\Tenancy\Tenancy;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class IssueController extends Controller
 {
-    public function __construct(private Tenancy $tenancy) {}
+    public function __construct(
+        private Tenancy $tenancy,
+        private IssueQueryFilter $filter,
+    ) {}
 
     public function index(Request $request): Response
     {
         $this->authorize('viewAny', Issue::class);
 
-        $filters = $this->filters($request);
+        $query = IssueQuery::parse($request->string('q')->toString());
 
         return Inertia::render('issues/index', [
-            'issues' => $this->query($request, $filters)
-                ->with(['status:id,name,category,color', 'assignee:id,name', 'labels:id,name,color', 'project:id,key,slug,name'])
-                ->orderByRaw('priority DESC, updated_at DESC')
-                // A hard ceiling until M3 adds virtualised paging; the list is grouped
-                // client-side and 500 rows is already past what anyone reads.
-                ->limit(500)
-                ->get()
-                ->map($this->summary(...))
-                ->values(),
-            'filters' => $filters,
-            'facets' => $this->facets(),
+            // Plain closures: Inertia evaluates only the props a partial reload asks
+            // for, so an inline edit re-runs the issue query and nothing else.
+            'issues' => fn () => $this->issues($request, $query),
+            'query' => $query->toArray(),
+            'layout' => $request->string('layout')->toString() === 'board' ? 'board' : 'list',
+            'groupBy' => $this->groupBy($request),
+            'facets' => fn () => $this->facets(),
         ]);
+    }
+
+    /** @return \Illuminate\Support\Collection<int, array<string, mixed>> */
+    private function issues(Request $request, IssueQuery $query): \Illuminate\Support\Collection
+    {
+        $builder = Issue::query()->unless(
+            $this->isStaff($request->user()),
+            fn (Builder $q) => $q->visibleToClient($request->user()),
+        );
+
+        return $this->filter->apply($builder, $query, $request->user())
+            ->with([
+                'status:id,name,category,color,position',
+                'assignee:id,name',
+                'labels:id,name,color',
+                'project:id,key,slug,name',
+            ])
+            ->orderByRaw('priority DESC, updated_at DESC')
+            // A hard ceiling; the list virtualises but the payload should stay sane.
+            ->limit(1000)
+            ->get()
+            ->map($this->summary(...))
+            ->values();
+    }
+
+    private function groupBy(Request $request): string
+    {
+        $value = $request->string('group')->toString();
+
+        return in_array($value, ['status', 'assignee', 'priority', 'project'], true)
+            ? $value
+            : 'status';
     }
 
     public function create(Request $request): Response
@@ -163,6 +197,36 @@ class IssueController extends Controller
         return back();
     }
 
+    /** Apply one change to many issues, as one authorised, audited batch. */
+    public function bulk(Request $request, UpdateIssue $action): RedirectResponse
+    {
+        $validated = $request->validate([
+            'keys' => ['required', 'array', 'min:1', 'max:200'],
+            'keys.*' => ['string'],
+            'changes' => ['required', 'array', 'min:1'],
+        ]);
+
+        // Scoped, so keys from another workspace resolve to nothing.
+        $issues = Issue::whereIn('key', $validated['keys'])->get();
+
+        $changes = collect($validated['changes'])
+            ->only(['status_id', 'assignee_id', 'priority', 'type', 'visibility'])
+            ->all();
+
+        abort_if($changes === [], 422, 'No supported changes given.');
+
+        DB::transaction(function () use ($issues, $changes, $action, $request) {
+            foreach ($issues as $issue) {
+                // Authorised per issue: a bulk action is not a way around a policy.
+                $this->authorize('update', $issue);
+
+                $action->handle($issue, $changes, $request->user());
+            }
+        });
+
+        return back()->with('success', $issues->count().' issues updated.');
+    }
+
     public function destroy(Issue $issue): RedirectResponse
     {
         $this->authorize('delete', $issue);
@@ -173,69 +237,6 @@ class IssueController extends Controller
         return redirect()
             ->route('issues.index')
             ->with('success', "{$key} deleted.");
-    }
-
-    /** @return Builder<Issue> */
-    private function query(Request $request, array $filters): Builder
-    {
-        $user = $request->user();
-
-        $query = Issue::query()
-            ->unless($this->isStaff($user), fn (Builder $q) => $q->visibleToClient($user));
-
-        if ($filters['q']) {
-            $query->search($filters['q']);
-        }
-
-        if ($filters['project']) {
-            $query->whereHas('project', fn (Builder $q) => $q->where('slug', $filters['project']));
-        }
-
-        match ($filters['state']) {
-            'open' => $query->open(),
-            'closed' => $query->closed(),
-            default => null,
-        };
-
-        if ($filters['assignee'] === 'none') {
-            $query->whereNull('assignee_id');
-        } elseif ($filters['assignee'] === 'me') {
-            $query->where('assignee_id', $user->id);
-        } elseif ($filters['assignee']) {
-            $query->where('assignee_id', $filters['assignee']);
-        }
-
-        if ($filters['label']) {
-            $query->whereHas('labels', fn (Builder $q) => $q->whereKey($filters['label']));
-        }
-
-        if ($filters['type']) {
-            $query->where('type', $filters['type']);
-        }
-
-        if ($filters['priority'] !== null) {
-            $query->where('priority', $filters['priority']);
-        }
-
-        return $query;
-    }
-
-    /** @return array<string, mixed> */
-    private function filters(Request $request): array
-    {
-        return [
-            'q' => $request->string('q')->trim()->toString() ?: null,
-            'project' => $request->string('project')->toString() ?: null,
-            'state' => in_array($request->string('state')->toString(), ['open', 'closed', 'all'], true)
-                ? $request->string('state')->toString()
-                : 'open',
-            'assignee' => $request->string('assignee')->toString() ?: null,
-            'label' => $request->integer('label') ?: null,
-            'type' => $request->string('type')->toString() ?: null,
-            'priority' => $request->has('priority') && $request->input('priority') !== ''
-                ? $request->integer('priority')
-                : null,
-        ];
     }
 
     /** @return array<string, mixed> */
@@ -262,6 +263,7 @@ class IssueController extends Controller
                     'name' => $s->name,
                     'category' => $s->category->value,
                     'color' => $s->color,
+                    'position' => $s->position,
                     'open' => $s->category->isOpen(),
                 ])->values()),
         ];
@@ -295,6 +297,7 @@ class IssueController extends Controller
                 'name' => $issue->status->name,
                 'category' => $issue->status->category->value,
                 'color' => $issue->status->color,
+                'position' => $issue->status->position,
                 'open' => $issue->status->category->isOpen(),
             ],
             'assignee' => $issue->assignee?->only(['id', 'name']),

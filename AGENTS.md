@@ -92,6 +92,20 @@ Comments and events both default to `is_internal = true`. When adding anything a
 can reach, extend `ClientVisibilityTest` — it asserts over HTTP, including that internal
 text appears nowhere in the response payload.
 
+## The query language
+
+One string is the entire filter state: `is:open project:web -label:wontfix checkout`.
+`IssueQuery` parses, `IssueQueryFilter` applies, chips edit it, and a saved view stores
+it. Do not add filter query parameters alongside it — add an operator.
+
+`resources/js/lib/issue-query.ts` mirrors the PHP. If you change key order, quoting or
+the accumulate/replace rules, change both, or queries stop comparing equal and saved
+views silently duplicate.
+
+Invariants worth preserving: unknown operators fall through to search text (a typo must
+not silently change results); exclusions accumulate while single-valued inclusions
+replace; an unresolvable name matches nothing rather than everything.
+
 ## Conventions
 
 - Inertia page components are lowercase paths: `Inertia::render('projects/index')`
@@ -101,6 +115,10 @@ text appears nowhere in the response payload.
   `dark:` variant for ordinary surfaces and text.
 - Statuses are per-project and renameable, but every one maps to a fixed
   `StatusCategory`. Never test a status by name; ask its category.
+- Issue-index props are all closures. Inertia evaluates only what a partial reload
+  requests, so `only: ['issues']` re-runs the issue query alone. Don't reach for
+  `Inertia::merge` (it appends and duplicates) or `optional` (the chips need facets on
+  first paint).
 - `workspace_id` is never in a `#[Fillable]`. `BelongsToWorkspace` stamps it on create;
   internal call sites must not pass it. Factories that may run with no workspace bound
   use `forceCreate`.

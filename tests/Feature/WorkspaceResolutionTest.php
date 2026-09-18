@@ -110,11 +110,17 @@ class WorkspaceResolutionTest extends TestCase
 
         // Shared closure props are resolved on every visit, not withheld until a
         // partial reload — the sidebar reads workspaces.length unconditionally.
-        $this->actingAs($user)
+        $response = $this->actingAs($user)
             ->get($this->workspaceUrl($acme, '/'))
-            ->assertInertia(fn ($page) => $page
-                ->has('workspaces', 2)
-                ->where('workspaces.0.url', 'http://acme.'.config('buggy.host').'/'));
+            ->assertInertia(fn ($page) => $page->has('workspaces', 2));
+
+        // Ordered by name, which the factory randomises, so assert on the set.
+        $urls = collect($response->viewData('page')['props']['workspaces'])->pluck('url');
+
+        $this->assertEqualsCanonicalizing([
+            'http://acme.'.config('buggy.host').'/',
+            'http://globex.'.config('buggy.host').'/',
+        ], $urls->all());
     }
 
     #[Test]

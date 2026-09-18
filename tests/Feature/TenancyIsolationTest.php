@@ -163,6 +163,7 @@ class TenancyIsolationTest extends TestCase
             \App\Models\IssueEvent::class,
             \App\Models\IssueRelation::class,
             \App\Models\Label::class,
+            \App\Models\SavedView::class,
             Project::class,
             Status::class,
         ];

@@ -225,7 +225,7 @@ class IssueTest extends TestCase
                 ->where('issues.0.title', 'Still open'));
 
         $this->actingAs($user)
-            ->get($this->workspaceUrl($workspace, '/issues?state=all'))
+            ->get($this->workspaceUrl($workspace, '/issues?q=is%3Aany'))
             ->assertInertia(fn ($page) => $page->has('issues', 2));
     }
 

@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\SavedView;
 use App\Support\Tenancy\Tenancy;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
@@ -53,6 +54,19 @@ class HandleInertiaRequests extends Middleware
                     'slug' => $w->slug,
                     'url' => workspace_url($w->slug),
                     'role' => $w->pivot->role,
+                ])
+                : [],
+
+            // Saved views drive the sidebar and the command palette everywhere.
+            'views' => fn () => $user && $workspace
+                ? SavedView::visibleTo($user)->orderBy('position')->get()->map(fn (SavedView $view) => [
+                    'id' => $view->id,
+                    'name' => $view->name,
+                    'query' => $view->query,
+                    'layout' => $view->layout,
+                    'group_by' => $view->group_by,
+                    'shared' => $view->isShared(),
+                    'can_edit' => $user->can('update', $view),
                 ])
                 : [],
 
