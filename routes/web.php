@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\RegisteredUserController;
+use App\Http\Controllers\AttachmentController;
 use App\Http\Controllers\BillingController;
 use App\Http\Controllers\CommentController;
 use App\Http\Controllers\DashboardController;
@@ -117,6 +118,13 @@ Route::domain('{workspace}.'.$host)
         Route::patch('issues/bulk', [IssueController::class, 'bulk'])->name('issues.bulk');
 
         Route::resource('issues', IssueController::class)->except('edit');
+
+        Route::post('issues/{issue}/attachments', [AttachmentController::class, 'store'])
+            ->name('attachments.store');
+        Route::get('attachments/{attachment}', [AttachmentController::class, 'show'])
+            ->name('attachments.show');
+        Route::delete('attachments/{attachment}', [AttachmentController::class, 'destroy'])
+            ->name('attachments.destroy');
 
         Route::post('issues/{issue}/comments', [CommentController::class, 'store'])
             ->name('comments.store');

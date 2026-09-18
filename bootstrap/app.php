@@ -21,6 +21,14 @@ return Application::configure(basePath: dirname(__DIR__))
             \Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets::class,
         ]);
 
+        // An authenticated visitor hitting /login or /register is sent to the central
+        // home, which routes them on to their last workspace.
+        //
+        // Without this, Laravel looks for a route named 'dashboard', finds ours on the
+        // {workspace} subdomain, and throws for a missing parameter — a 500 on a page
+        // anyone might reload out of habit.
+        $middleware->redirectUsersTo('/');
+
         $middleware->alias([
             'workspace' => \App\Http\Middleware\EnsureWorkspaceMember::class,
             'hosted' => \App\Http\Middleware\RequireHostedMode::class,

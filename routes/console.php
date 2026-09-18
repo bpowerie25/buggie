@@ -10,3 +10,7 @@ Artisan::command('inspire', function () {
 
 // Batched notifications go out once a group has been quiet for the digest delay.
 Schedule::command('notifications:flush')->everyMinute()->withoutOverlapping();
+
+// Ages out screenshots, reporter identities and dismissed reports. Runs everywhere,
+// including self-hosted installs: keeping this data for ever is nobody's interest.
+Schedule::command('buggy:prune')->dailyAt('03:20')->withoutOverlapping();

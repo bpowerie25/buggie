@@ -124,6 +124,26 @@ class WorkspaceResolutionTest extends TestCase
     }
 
     #[Test]
+    public function an_authenticated_visitor_to_login_is_sent_onwards_not_broken(): void
+    {
+        [$workspace, $user] = $this->workspaceWithMember(slug: 'acme');
+
+        // Laravel's guest middleware looks for a route named 'dashboard'. Ours lives
+        // on the {workspace} subdomain, so generating it from the central domain
+        // throws for a missing parameter — a 500 on a page people reload out of habit.
+        foreach (['/login', '/register'] as $path) {
+            $this->actingAs($user)
+                ->get($this->centralUrl($path))
+                ->assertRedirect(rtrim(central_url('/'), '/'));
+        }
+
+        // And the central home knows where they actually belong.
+        $this->actingAs($user)
+            ->get($this->centralUrl('/'))
+            ->assertRedirect(workspace_url($workspace->slug));
+    }
+
+    #[Test]
     public function a_guest_cannot_reach_a_workspace(): void
     {
         [$workspace] = $this->workspaceWithMember(slug: 'acme');

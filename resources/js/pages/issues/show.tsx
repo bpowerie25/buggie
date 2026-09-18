@@ -1,3 +1,4 @@
+import { Attachments, type AttachmentRow } from '@/components/attachments';
 import { Button } from '@/components/button';
 import {
     Avatar,
@@ -90,6 +91,11 @@ function eventSentence(event: Event): string {
             return `${actor} closed this issue`;
         case 'reopened':
             return `${actor} reopened this issue`;
+        case 'attachment_added':
+            return `${actor} attached ${d.filename as string}`;
+        case 'occurrence':
+            return `${actor === 'Someone' ? 'Reported again' : `${actor} recorded another occurrence`}` +
+                (d.count ? ` (${d.count} in total)` : '');
         case 'related':
             return `${actor} linked ${d.key as string}`;
         case 'unrelated':
@@ -118,6 +124,7 @@ export default function ShowIssue({
     issue,
     comments,
     events,
+    attachments,
     statuses,
     facets,
     can,
@@ -125,9 +132,15 @@ export default function ShowIssue({
     issue: Issue;
     comments: Comment[];
     events: Event[];
+    attachments: AttachmentRow[];
     statuses: IssueStatus[];
     facets: Facets;
-    can: { update: boolean; comment_internally: boolean; delete: boolean };
+    can: {
+        update: boolean;
+        comment_internally: boolean;
+        delete: boolean;
+        attach: boolean;
+    };
 }) {
     const { auth } = usePage<SharedProps>().props;
 
@@ -282,6 +295,17 @@ export default function ShowIssue({
                             </div>
                         )}
                     </section>
+
+                    {(attachments.length > 0 || can.attach) && (
+                        <div className="mt-6">
+                            <Attachments
+                                issueKey={issue.key}
+                                attachments={attachments}
+                                canUpload={can.attach}
+                                canDelete={can.update}
+                            />
+                        </div>
+                    )}
 
                     <section className="mt-8">
                         <h2 className="text-xs font-semibold tracking-wide text-ink-subtle uppercase">

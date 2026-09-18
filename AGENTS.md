@@ -171,6 +171,18 @@ and `docker/php/Dockerfile.production`. If you change the app's runtime requirem
 change those too, and actually run a clean install — four separate breakages were found
 that way and none of them showed up in development.
 
+## Retention and attachments
+
+`buggy:prune` (daily) ages out screenshots, reporter identities, dismissed reports and
+expired portal links. **Issues and comments are never pruned** — they are the work
+product. Rules are day counts in `config/buggy.retention`; zero disables one.
+
+Attachments use a type allowlist with **no SVG** (XML that can carry script, served
+from our own origin), keep the uploaded filename as a label only while generating the
+stored path, and check the issue's own visibility on every read. Images render inline;
+everything else downloads with a strict CSP. Do not add `sandbox` to an image response
+— it creates an opaque origin.
+
 ## Conventions
 
 - Inertia page components are lowercase paths: `Inertia::render('projects/index')`

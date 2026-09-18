@@ -983,3 +983,69 @@ The entrypoint now refuses to start and prints the exact command.
   install, wrong at scale — the deployment guide says to split them.
 - No `docker compose pull` path: self-hosters build the image rather than fetching a
   published one. Publishing to a registry would make upgrades a great deal easier.
+
+---
+
+## 18. Post-milestone work
+
+Three things that were on the "still open" lists and are now done.
+
+### Retention
+
+Bug reports collect personal data as a side effect of being useful: a screenshot of
+whatever was on somebody's screen, the address they wrote from, the account they were
+signed in as. `buggy:prune` runs daily and ages it out.
+
+What goes, and what does not:
+
+| | |
+|---|---|
+| Screenshots | Deleted after 180 days. The report keeps its title and error. |
+| Reporter name, email, ref, IP hash | Scrubbed after 180 days, including the `identity` block inside the captured environment — the same data by another route. |
+| Spam and discarded reports | Deleted outright 30 days after triage; nobody wanted them. |
+| Expired portal links | Deleted 30 days after expiry. |
+| **Issues and comments** | **Never.** They are the work product; a tracker that deletes its own history is not a tracker. |
+
+Every rule is a day count in `config/buggy.retention`, and zero disables it. Pruning
+runs across every workspace, so it deliberately bypasses the tenancy scope — it is
+housekeeping, not a tenant operation.
+
+### Attachments
+
+Drag-and-drop, paste and a file picker on the issue page. The security decisions:
+
+- An **allowlist** of types, deliberately **without SVG** — it is an XML document that
+  can carry script, and we serve attachments from our own origin.
+- The uploaded filename is kept as a *label only*; the stored path is generated, so a
+  crafted name cannot escape the directory.
+- Every read goes through the issue's own visibility check. These files routinely hold
+  a customer's production data.
+- `X-Content-Type-Options: nosniff` on every response. Images render inline; everything
+  else is force-downloaded and carries a strict CSP.
+
+One thing corrected during the work: the response originally carried
+`Content-Security-Policy: ... sandbox` for all types. `sandbox` is document-scoped and
+puts the response in an opaque origin, which is meaningless at best for an image
+subresource. It now applies only to the types that download and are never interpreted.
+
+### CI
+
+`.github/workflows/ci.yml` runs three jobs: the test suite against real Postgres and
+Redis, typecheck plus build, and — because self-hosting is a first-class path — an
+actual build and boot of the production image, including a check that a missing
+`APP_KEY` still stops the container with a readable message.
+
+It also fails the build if the widget exceeds **20KB gzipped**. It is 6KB today, and
+every visitor to every site running Buggy downloads it; a dependency sneaking in should
+break the build rather than be noticed a year later.
+
+### A bug worth recording
+
+Any authenticated visitor to `/login` or `/register` got a **500**, not a redirect.
+Laravel's `guest` middleware looks for a route literally named `dashboard`; ours lives
+on the `{workspace}` subdomain, so generating it from the central domain throws for a
+missing parameter. Fixed with `redirectUsersTo('/')` — the central home already knows
+which workspace to send someone to.
+
+No test caught it because none visited an auth page while signed in. It was found by
+reloading a page out of habit, which is exactly how a real user would have found it.

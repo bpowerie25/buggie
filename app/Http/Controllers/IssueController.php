@@ -122,6 +122,7 @@ class IssueController extends Controller
 
         $issue->load([
             'status', 'project', 'assignee', 'reporter', 'labels',
+            'attachments.uploadedBy:id,name',
             'watchers:id,name',
             'relations.relatedIssue:id,key,title,status_id',
             'relations.relatedIssue.status:id,name,category,color',
@@ -176,11 +177,22 @@ class IssueController extends Controller
                     'actor' => $event->actor?->only(['id', 'name']),
                     'created_at' => $event->created_at->format('Y-m-d\TH:i:s.uP'),
                 ]),
+            'attachments' => $issue->attachments->map(fn ($attachment) => [
+                'id' => $attachment->id,
+                'filename' => $attachment->filename,
+                'mime' => $attachment->mime,
+                'size' => $attachment->size,
+                'url' => route('attachments.show', $attachment),
+                'is_image' => $attachment->isImage(),
+                'uploaded_by' => $attachment->uploadedBy?->name,
+                'created_at' => $attachment->created_at->toIso8601String(),
+            ]),
             'statuses' => $this->statusesFor($issue->project),
             'facets' => $this->facets(),
             'can' => [
                 'update' => request()->user()->can('update', $issue),
                 'comment_internally' => request()->user()->can('commentInternally', $issue),
+                'attach' => request()->user()->can('comment', $issue),
                 'delete' => request()->user()->can('delete', $issue),
             ],
         ]);

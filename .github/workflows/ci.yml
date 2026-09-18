@@ -1,0 +1,164 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    name: Tests
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        # The schema uses jsonb, tsvector and partial indexes; sqlite cannot run it.
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: buggy_testing
+          POSTGRES_USER: buggy
+          POSTGRES_PASSWORD: secret
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U buggy"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: pdo_pgsql, pgsql, mbstring, bcmath, gd, zip, intl, redis, pcntl
+          coverage: none
+
+      - name: Cache Composer packages
+        uses: actions/cache@v4
+        with:
+          path: vendor
+          key: composer-${{ hashFiles('composer.lock') }}
+          restore-keys: composer-
+
+      - run: composer install --prefer-dist --no-interaction --no-progress
+
+      - run: cp .env.example .env && php artisan key:generate
+
+      - name: Run tests
+        # The suite refuses to run unless the database name ends in _testing, so these
+        # must line up with the service above.
+        env:
+          DB_CONNECTION: pgsql
+          DB_HOST: 127.0.0.1
+          DB_PORT: 5432
+          DB_DATABASE: buggy_testing
+          DB_USERNAME: buggy
+          DB_PASSWORD: secret
+          REDIS_HOST: 127.0.0.1
+        run: php artisan test
+
+  frontend:
+    name: Types and build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npm run types
+
+      - name: Build application and widget
+        run: npm run build
+
+      - name: Check the widget has not grown
+        # Every visitor to every site running Buggy downloads this, so a dependency
+        # sneaking in should fail the build rather than be noticed a year later.
+        run: |
+          SIZE=$(gzip -c public/widget/buggy.js | wc -c)
+          LIMIT=20480
+          echo "Widget: ${SIZE} bytes gzipped (limit ${LIMIT})"
+          if [ "$SIZE" -gt "$LIMIT" ]; then
+            echo "::error::The widget is over ${LIMIT} bytes gzipped."
+            exit 1
+          fi
+
+  selfhost:
+    name: Self-host image
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build the production image
+        # Self-hosting is a first-class path, so it is built on every change rather
+        # than discovered to be broken by whoever tries it first.
+        run: docker build -f docker/php/Dockerfile.production -t buggy:ci .
+
+      - name: Boot it and check it answers
+        run: |
+          docker network create buggy-ci
+          docker run -d --name pg --network buggy-ci \
+            -e POSTGRES_DB=buggy -e POSTGRES_USER=buggy -e POSTGRES_PASSWORD=secret \
+            postgres:16-alpine
+          docker run -d --name redis --network buggy-ci redis:7-alpine
+
+          for i in $(seq 1 30); do
+            docker exec pg pg_isready -U buggy && break
+            sleep 2
+          done
+
+          KEY=$(docker run --rm --entrypoint php buggy:ci artisan key:generate --show)
+
+          docker run -d --name app --network buggy-ci -p 8080:80 \
+            -e APP_KEY="$KEY" \
+            -e APP_ENV=production \
+            -e APP_URL=http://localhost:8080 \
+            -e APP_DOMAIN=localhost \
+            -e DB_CONNECTION=pgsql -e DB_HOST=pg -e DB_DATABASE=buggy \
+            -e DB_USERNAME=buggy -e DB_PASSWORD=secret \
+            -e REDIS_HOST=redis -e CACHE_STORE=redis \
+            -e SESSION_DRIVER=redis -e QUEUE_CONNECTION=redis \
+            buggy:ci
+
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:8080/up > /dev/null; then
+              echo "Self-hosted install is up."
+              exit 0
+            fi
+            sleep 2
+          done
+
+          echo "::error::The self-host image did not come up."
+          docker logs app
+          exit 1
+
+      - name: Refuse to start without an application key
+        # An unset APP_KEY used to let migrations succeed and then answer every page
+        # with a bare "Server Error".
+        run: |
+          if docker run --rm --network buggy-ci \
+               -e DB_HOST=pg -e DB_DATABASE=buggy -e DB_USERNAME=buggy -e DB_PASSWORD=secret \
+               buggy:ci 2>&1 | grep -q "APP_KEY is not set"; then
+            echo "Fails loudly, as intended."
+          else
+            echo "::error::A missing APP_KEY should stop the container with a clear message."
+            exit 1
+          fi

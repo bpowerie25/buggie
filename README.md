@@ -35,6 +35,9 @@ That's the whole install. ~6KB gzipped.
   own bug through a private link without being made to create an account.
 - **Email in and out** — file issues by email, reply to a notification to comment, and
   get one digest per issue rather than nine.
+- **Attachments** — drag, drop or paste screenshots and logs onto an issue.
+- **Data ages out** — screenshots and reporter identities are pruned on a schedule you
+  control. Issues and comments are never touched.
 
 ## Privacy
 
@@ -108,8 +111,7 @@ built the way it is.
 Working: multi-tenancy, issues, the query language and saved views, the board, the
 reporter widget, triage, clients, the portal, email-in and notification digests.
 
-Not done: attachment uploads from the UI, realtime updates, `@mention` autocomplete,
-undo for bulk edits.
+Not done: realtime updates, `@mention` autocomplete, undo for bulk edits.
 
 ## Licence
 

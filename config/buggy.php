@@ -77,6 +77,38 @@ return [
     |
     */
 
+    /*
+    |--------------------------------------------------------------------------
+    | Retention
+    |--------------------------------------------------------------------------
+    |
+    | Bug reports collect personal data as a side effect of being useful: a
+    | screenshot of whatever was on somebody's screen, the address they wrote from,
+    | the account they were signed in as. Keeping that for ever is neither necessary
+    | nor defensible, so it ages out.
+    |
+    | Issues and comments are the work product and are never pruned — they are what
+    | the tracker is for. What goes is the raw intake around them.
+    |
+    | Days; null disables that rule. Workspaces may shorten these in their settings,
+    | and may not lengthen them beyond what the operator configures here.
+    |
+    */
+
+    'retention' => [
+        // Delete the image. The issue keeps the description and the error.
+        'screenshots' => (int) env('RETAIN_SCREENSHOT_DAYS', 180),
+
+        // Scrub the reporter's name, address and identity from raw reports.
+        'reporter_identity' => (int) env('RETAIN_REPORTER_DAYS', 180),
+
+        // Reports marked spam or discarded were never wanted; bin them entirely.
+        'dismissed_reports' => (int) env('RETAIN_DISMISSED_DAYS', 30),
+
+        // Expired portal links, some time after they stopped working.
+        'expired_portal_tokens' => (int) env('RETAIN_EXPIRED_TOKENS_DAYS', 30),
+    ],
+
     'operators' => array_values(array_filter(array_map(
         'trim',
         explode(',', (string) env('BUGGY_OPERATORS', '')),
