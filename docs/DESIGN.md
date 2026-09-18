@@ -1250,8 +1250,44 @@ error boundary — and would rather call `buggie.open()` from there. `buggie.clo
 Installation is still one script tag and nothing else. Two integration gaps remain and
 are worth being honest about:
 
-- **No npm package.** Fine for a `<script>` in a template; awkward in a React or Next
-  application where `npm i @buggie/widget` is the expectation.
+- ~~No npm package~~ — added; see §24.
 - **Native apps have no SDK.** The ingest endpoint is ordinary HTTP authenticated by
   the public key, so a native client can post to it directly — but nobody has wrapped
   that up.
+
+---
+
+## 24. The npm package
+
+`@buggie/widget` is **a loader, not a bundle**. It injects the script the server
+already serves at `/w/{key}.js` rather than shipping a copy.
+
+That is the whole design decision, and it matters for something self-hostable: the
+widget a visitor runs always matches the server it reports to, so upgrading Buggie
+upgrades every customer's widget without anybody redeploying a front end. Bundling
+would mean thousands of copies drifting out of date, and a support burden of "which
+version are you on?".
+
+It costs 0.8KB gzipped.
+
+Details worth keeping:
+
+- **Nothing touches the DOM at import time.** `init()` resolves to `null` during server
+  rendering rather than throwing, so Next and Remix need no guard.
+- **`init()` is idempotent.** Calling it twice — easy in React with a re-running effect
+  — reuses the first promise instead of injecting a second script. Tested.
+- **A blocked script resolves to `null`.** A strict CSP or an offline visitor must not
+  break the host application. Reporting is a nicety; the app is not.
+- **Named exports only.** A default export alongside them forces CommonJS consumers to
+  write `require('@buggie/widget').default`, which nobody expects.
+
+Verified by importing the built artifact in a real page (`/npm-demo`, local only),
+throwing an error, filing a report from the host's own button, and confirming the
+identity, release, error and screenshot all arrived.
+
+Not published to npm yet — the `@buggie` scope needs claiming first.
+
+### Still open
+
+- No native SDK. The ingest endpoint is ordinary HTTP authenticated by the public key,
+  so an iOS or Android client can post to it directly, but nobody has wrapped it up.

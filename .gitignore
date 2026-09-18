@@ -16,6 +16,8 @@
 /node_modules
 /public/build
 /public/widget
+/packages/widget/dist
+/packages/widget/node_modules
 /public/fonts-manifest.dev.json
 /public/hot
 /public/storage

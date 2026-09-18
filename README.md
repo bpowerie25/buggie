@@ -20,6 +20,21 @@ That's the whole install. ~7KB gzipped.
 Add `data-launcher="false"` if you would rather trigger it from your own menu with
 `buggie.open()` than have a floating button.
 
+For bundled front ends there is a typed package — a loader, not a copy, so the widget
+your visitors run always matches the server it reports to:
+
+```sh
+npm i @buggie/widget
+```
+
+```ts
+import { init } from '@buggie/widget';
+
+init({ key: 'pk_live_9f3a2b', endpoint: 'https://your-buggie' });
+```
+
+See [`packages/widget`](packages/widget).
+
 ---
 
 ## What it does

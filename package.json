@@ -6,7 +6,8 @@
         "build": "vite build && vite build --config vite.widget.config.ts",
         "dev": "vite",
         "types": "tsc --noEmit",
-        "build:widget": "vite build --config vite.widget.config.ts"
+        "build:widget": "vite build --config vite.widget.config.ts",
+        "build:package": "npm --prefix packages/widget run build"
     },
     "devDependencies": {
         "@tailwindcss/vite": "^4.0.0",

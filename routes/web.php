@@ -98,6 +98,21 @@ if (! app()->isProduction()) {
             'snippetUrl' => '/w/'.$key->public_key.'.js?v='.filemtime(public_path('widget/buggie.js')),
         ]);
     })->name('widget.demo');
+
+    // Harness for the @buggie/widget npm package, exercising the loader rather than
+    // a raw script tag. Serves the built package straight from packages/ so it is
+    // always whatever was last built, with nothing copied into public/.
+    Route::domain($host)->get('npm-demo', fn () => view('npm-demo'))->name('npm.demo');
+
+    Route::domain($host)->get('npm-demo/package', function () {
+        $path = base_path('packages/widget/dist/index.js');
+
+        abort_unless(is_file($path), 404, 'Run: npm --prefix packages/widget run build');
+
+        return response(file_get_contents($path), 200, [
+            'Content-Type' => 'application/javascript; charset=utf-8',
+        ]);
+    })->name('npm.demo.package');
 }
 
 /*
