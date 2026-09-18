@@ -1,3 +1,4 @@
+import { resolveOptIn, setOptIn, shouldShowLauncher } from './audience';
 import { installCapture } from './capture';
 import { Widget, type Identity } from './ui';
 
@@ -22,6 +23,9 @@ interface BuggieApi {
     open(): void;
     close(): void;
     isSupported(): boolean;
+    /** Show or hide the launcher for this browser, for data-launcher="opt-in". */
+    enable(): void;
+    disable(): void;
 }
 
 function currentScript(): HTMLScriptElement | null {
@@ -54,9 +58,11 @@ function boot() {
         key: match[1],
         requireEmail: script?.dataset.requireEmail === 'true',
         captureScreenshot: script?.dataset.screenshot !== 'false',
-        // data-launcher="false" hides the floating button, for apps that would
-        // rather call buggie.open() from their own menu.
-        launcher: script?.dataset.launcher !== 'false',
+        // "false" hides the button entirely, for apps that would rather call
+        // buggie.open() from their own menu. "opt-in" hides it until somebody
+        // visits ?buggie=on, so a client's own customers never see it without
+        // their developer having to wire anything up. See audience.ts.
+        launcher: shouldShowLauncher(script?.dataset.launcher, resolveOptIn()),
     });
 
     const api: BuggieApi = {
@@ -66,6 +72,8 @@ function boot() {
         close: () => widget.dismiss(),
         // Lets a host application decide whether to offer reporting at all.
         isSupported: () => typeof document.body.attachShadow === 'function',
+        enable: () => setOptIn(true),
+        disable: () => setOptIn(false),
     };
 
     // Replay anything queued before this script finished loading.

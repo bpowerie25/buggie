@@ -17,8 +17,27 @@ signed-in user at the moment someone clicks *report a bug*.
 
 That's the whole install. ~7KB gzipped.
 
-Add `data-launcher="false"` if you would rather trigger it from your own menu with
-`buggie.open()` than have a floating button.
+By default that puts a floating "Report a bug" button in front of **every** visitor,
+which is right for a public beta and wrong for most client work. Two attributes change
+who sees it:
+
+```html
+<!-- No button. Trigger it yourself from an admin menu with buggie.open(). -->
+<script src="https://your-buggie/w/pk_live_9f3a2b.js" data-launcher="false" async></script>
+
+<!-- No button until someone visits ?buggie=on in that browser. -->
+<script src="https://your-buggie/w/pk_live_9f3a2b.js" data-launcher="opt-in" async></script>
+```
+
+`opt-in` is the one to reach for when you are putting Buggie on a client's live site:
+their staff visit `https://theirsite.com/?buggie=on` once per browser and keep the
+button; their customers never see it, and their developer does not have to wire
+anything up. The switch is removed from the address bar so it cannot travel into a
+shared link.
+
+It hides the interface rather than restricting it — the key is in the page source
+either way. If customers must not be able to report at all, do not render the script
+tag for them.
 
 For bundled front ends there is a typed package — a loader, not a copy, so the widget
 your visitors run always matches the server it reports to:

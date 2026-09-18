@@ -1293,6 +1293,40 @@ Not published to npm yet — the `@buggie` scope needs claiming first.
 
 ---
 
+## 24b. Who sees the reporter
+
+The widget shipped with one audience: everybody. A floating button for every visitor
+is right for a public beta and wrong for most of the work this was built for — an
+agency putting Buggie on a client's live shop does not want the shop's customers
+looking at a "Report a bug" button.
+
+`data-launcher="false"` already existed, but it moves the problem to the client's
+developer: no button means somebody has to build a trigger. `data-launcher="opt-in"`
+asks nothing of them. The button stays hidden until someone visits `?buggie=on` in
+that browser, which is remembered in `localStorage`; the client's staff do it once and
+their customers never see anything.
+
+Details that matter:
+
+- **The parameter is stripped from the address bar** afterwards. Otherwise it travels
+  into a shared link, a bookmark or an analytics report, and the customers end up with
+  the button after all — which is the entire failure this was meant to prevent.
+- **Every storage access is wrapped.** Safari's private mode throws outright on
+  `setItem`, and an uncaught error here would take the host application's page down.
+  A browser that refuses storage just means opting in lasts one page view.
+- **An unrecognised value shows the button.** A typo should leave reporting working
+  rather than silently remove it from a client's live site.
+
+It is worth being exact about what this is: **it hides the interface, it does not
+restrict it.** The public key sits in the page source either way, so a curious
+customer who found this could switch it on. The things that actually restrict are the
+origin allowlist and not rendering the script tag at all. The help text says so rather
+than implying a boundary that is not there.
+
+Costs about 150 bytes gzipped; the bundle is 7.08KB.
+
+---
+
 ## 25. The iOS SDK
 
 `packages/swift` is a Swift package that posts to the same ingest endpoint as the web
