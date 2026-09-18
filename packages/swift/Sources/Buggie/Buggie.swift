@@ -183,27 +183,66 @@ public final class Buggie: @unchecked Sendable {
 }
 
 #if canImport(UIKit)
-public extension Buggie {
-    /// A JPEG of what is on screen, with anything marked private painted over.
+extension Buggie {
+    /// The window a report is being filed about.
+    @MainActor
+    static var keyWindow: UIWindow? {
+        UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap(\.windows)
+            .first { $0.isKeyWindow }
+    }
+
+    /// What the device can tell us about itself. Main-actor isolated because every
+    /// one of these accessors is.
+    @MainActor
+    static func deviceEnvironment() -> [String: AnyCodable] {
+        let device = UIDevice.current
+        var environment: [String: AnyCodable] = [
+            "os": AnyCodable("\(device.systemName) \(device.systemVersion)"),
+            "device": AnyCodable(device.model),
+        ]
+
+        // Taken from the window rather than UIScreen.main, which says nothing useful
+        // on an iPad running two scenes side by side.
+        if let window = keyWindow {
+            let size = window.bounds.size
+            environment["viewport"] = AnyCodable("\(Int(size.width))x\(Int(size.height))")
+            environment["pixel_ratio"] = AnyCodable(Double(window.screen.scale))
+        }
+
+        return environment
+    }
+
+    /// A JPEG of what is on screen, with anything marked private left out of it.
     ///
     /// Views are hidden **before** rendering rather than masked afterwards, for the
     /// same reason the web widget restyles the DOM instead of painting on the canvas:
     /// a mask positioned by separate arithmetic can be silently misaligned, and a
     /// redaction that can be silently misaligned is not a redaction.
-    func captureScreen(compression: CGFloat = 0.8) -> Data? {
-        guard let window = UIApplication.shared.connectedScenes
-            .compactMap({ $0 as? UIWindowScene })
-            .flatMap({ $0.windows })
-            .first(where: { $0.isKeyWindow })
-        else { return nil }
+    @MainActor
+    public func captureScreen(compression: CGFloat = 0.8) -> Data? {
+        guard let window = Self.keyWindow else { return nil }
 
         let redacted = window.buggieRedactedSubviews()
         redacted.forEach { $0.isHidden = true }
         defer { redacted.forEach { $0.isHidden = false } }
 
         let renderer = UIGraphicsImageRenderer(bounds: window.bounds)
-        let image = renderer.image { _ in
-            window.drawHierarchy(in: window.bounds, afterScreenUpdates: false)
+        let image = renderer.image { context in
+            // `afterScreenUpdates: true` is load-bearing, not a default left alone.
+            // With `false`, UIKit draws the content already composited for the screen
+            // — composited before those views were hidden. The redaction would be
+            // absent from the image and nothing would say so. It costs a commit, and
+            // it is the whole reason this function can be trusted.
+            let drawn = window.drawHierarchy(in: window.bounds, afterScreenUpdates: true)
+
+            // Snapshotting can refuse; a window backed by a protected surface returns
+            // false. The layer tree keeps a report possible, and it honours
+            // `isHidden` too, so nothing leaks either way.
+            if !drawn {
+                window.layer.render(in: context.cgContext)
+            }
         }
 
         return image.jpegData(compressionQuality: compression)
