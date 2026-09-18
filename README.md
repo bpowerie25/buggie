@@ -26,7 +26,11 @@ Full rationale and data model: [`docs/DESIGN.md`](docs/DESIGN.md).
   redaction, console and network ring buffers, error capture, a hostile-input ingest
   endpoint, fingerprint-based grouping, and a keyboard-driven triage inbox.
 
-Next: M5 — clients (invitations, portal threads, email-in, notifications).
+- **M5** — Invitations with per-project client scoping, a portal thread so reporters can
+  follow a bug without an account, email-in via Mailgun (new issues and replies, with
+  quoted history stripped), and batched notification digests.
+
+Next: M6 — billing, onboarding and deploy.
 
 Realtime is deferred: Reverb v1 pins an old `guzzlehttp/psr7` and would downgrade
 guzzle 8 → 7 repo-wide. See `docs/DESIGN.md` §14.

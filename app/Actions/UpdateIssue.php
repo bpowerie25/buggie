@@ -8,6 +8,8 @@ use App\Enums\WatchReason;
 use App\Models\Issue;
 use App\Models\Status;
 use App\Models\User;
+use App\Enums\NotificationReason;
+use App\Support\Notifications\Notifier;
 use App\Support\RichText\TiptapDocument;
 use Illuminate\Support\Facades\DB;
 
@@ -18,6 +20,8 @@ use Illuminate\Support\Facades\DB;
  */
 class UpdateIssue
 {
+    public function __construct(private Notifier $notifier) {}
+
     /** @param array<string, mixed> $attributes */
     public function handle(Issue $issue, array $attributes, ?User $actor = null): Issue
     {
@@ -85,6 +89,11 @@ class UpdateIssue
 
         $issue->status_id = $to->id;
 
+        $this->notifier->watchers($issue, NotificationReason::StatusChanged, $actor, [
+            'from' => $from->name,
+            'to' => $to->name,
+        ]);
+
         $this->applyClosure($issue, $from->category, $to->category, $actor);
     }
 
@@ -127,6 +136,10 @@ class UpdateIssue
 
         $issue->assignee_id = $next?->id;
         $issue->watch($next, WatchReason::Assigned);
+
+        if ($next !== null) {
+            $this->notifier->record($next, $issue, NotificationReason::Assigned, $actor);
+        }
     }
 
     private function priority(Issue $issue, int $priority, ?User $actor): void

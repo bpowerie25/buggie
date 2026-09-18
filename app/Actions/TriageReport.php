@@ -8,9 +8,12 @@ use App\Enums\ReportState;
 use App\Models\Attachment;
 use App\Models\Issue;
 use App\Models\Report;
+use App\Models\PortalToken;
 use App\Models\User;
+use App\Notifications\PortalAccess;
 use App\Support\RichText\TiptapDocument;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 
 /**
@@ -54,6 +57,8 @@ class TriageReport
                 'triaged_at' => now(),
             ])->save();
 
+            $this->grantPortalAccess($report, $issue);
+
             return $issue;
         });
     }
@@ -95,6 +100,23 @@ class TriageReport
             'triaged_by_id' => $actor->id,
             'triaged_at' => now(),
         ])->save();
+    }
+
+    /**
+     * Give a named reporter a way back to their own bug.
+     *
+     * Only when they left an address: an anonymous report has nobody to tell, and
+     * emailing someone who did not ask is not a feature.
+     */
+    private function grantPortalAccess(Report $report, Issue $issue): void
+    {
+        if (! $report->reporter_email) {
+            return;
+        }
+
+        $token = PortalToken::issueFor($issue, $report->reporter_email);
+
+        Notification::route('mail', $report->reporter_email)->notify(new PortalAccess($token));
     }
 
     /** Fold the reporter's words and the captured context into a tiptap document. */

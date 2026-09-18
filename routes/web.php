@@ -5,9 +5,12 @@ use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\CommentController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\HomeController;
+use App\Http\Controllers\InvitationController;
+use App\Http\Controllers\MemberController;
 use App\Http\Controllers\IssueController;
 use App\Http\Controllers\IssueRelationController;
 use App\Http\Controllers\LabelController;
+use App\Http\Controllers\PortalController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\SavedViewController;
@@ -28,6 +31,12 @@ $host = config('buggy.host');
 
 Route::domain($host)->group(function () {
     Route::get('/', HomeController::class)->name('home');
+
+    // The reporter's own thread. The token is the entire credential, so this sits
+    // outside every other guard on purpose.
+    Route::get('portal/{token}', [PortalController::class, 'show'])->name('portal.show');
+    Route::post('portal/{token}/comment', [PortalController::class, 'comment'])
+        ->name('portal.comment');
 
     // The widget bundle, embedded cross-origin in customers' applications.
     // The parameter must be constrained: the default [^/]+ is greedy and swallows
@@ -83,6 +92,16 @@ if (! app()->isProduction()) {
 | 'workspace' middleware then requires the signed-in user to be a member.
 */
 
+// Accepting an invitation happens on the workspace domain but outside the membership
+// gate — the whole point is that the visitor is not a member yet.
+Route::domain('{workspace}.'.$host)->group(function () {
+    Route::get('invitations/{token}', [InvitationController::class, 'show'])
+        ->name('invitations.show');
+    Route::post('invitations/{token}', [InvitationController::class, 'accept'])
+        ->middleware('auth')
+        ->name('invitations.accept');
+});
+
 Route::domain('{workspace}.'.$host)
     ->middleware(['auth', 'workspace'])
     ->group(function () {
@@ -125,6 +144,13 @@ Route::domain('{workspace}.'.$host)
             ->name('widget-keys.update');
         Route::delete('widget-keys/{widgetKey}', [WidgetKeyController::class, 'destroy'])
             ->name('widget-keys.destroy');
+
+        Route::get('settings/members', [MemberController::class, 'index'])->name('members.index');
+        Route::post('settings/members', [MemberController::class, 'store'])->name('members.store');
+        Route::delete('settings/invitations/{invitation}', [MemberController::class, 'destroy'])
+            ->name('invitations.destroy');
+        Route::delete('settings/members/{user}', [MemberController::class, 'remove'])
+            ->name('members.remove');
 
         Route::resource('views', SavedViewController::class)
             ->only(['store', 'update', 'destroy'])

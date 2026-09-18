@@ -16,7 +16,10 @@ use Illuminate\Notifications\Notifiable;
  * Users are global, not workspace-owned: one account can belong to several
  * workspaces (your own, plus every client workspace you were invited to).
  */
-#[Fillable(['name', 'email', 'password', 'avatar_path', 'timezone', 'last_workspace_id'])]
+#[Fillable([
+    'name', 'email', 'password', 'avatar_path', 'timezone',
+    'last_workspace_id', 'notification_settings',
+])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -28,6 +31,7 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'notification_settings' => 'array',
         ];
     }
 
@@ -61,6 +65,12 @@ class User extends Authenticatable
     public function belongsToWorkspace(Workspace $workspace): bool
     {
         return $this->membershipIn($workspace) !== null;
+    }
+
+    /** Opt-out rather than opt-in: silence should be chosen, not the default. */
+    public function wantsNotification(\App\Enums\NotificationReason $reason): bool
+    {
+        return (bool) ($this->notification_settings[$reason->value] ?? $reason->defaultEnabled());
     }
 
     public function initials(): string

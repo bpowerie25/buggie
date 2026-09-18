@@ -446,9 +446,9 @@ virtualised list, optimistic updates, bulk edit. Reverb is **deferred** — see 
 **M4 — The widget. ✅ Done.** Widget build, capture, redaction, annotation UI, signed
 uploads, ingest endpoint with origin/rate/size guards, fingerprinting worker, triage inbox.
 
-**M5 — Clients (3 days).** Client role, visibility scopes, internal-vs-public comments,
-portal thread by magic link, invitations, email-in via Mailgun, notification preferences
-and digests.
+**M5 — Clients. ✅ Done.** Invitations with per-project client scoping, the reporter's
+portal thread, email-in via Mailgun, notification preferences and digests. (The client
+role, visibility scopes and internal-vs-public comments arrived early, in M2.)
 
 **M6 — SaaS (3 days).** Cashier plans and limits, signup and onboarding, workspace
 settings, usage metering on reports/month, Sentry, Horizon, deploy.
@@ -804,3 +804,88 @@ rather than merely wrong.
 - The reopen window is a constant, not a per-workspace setting.
 - No "split from group" for over-grouped fingerprints; the design calls for it.
 - Screenshot uploads are not virus-scanned or re-encoded server-side.
+
+---
+
+## 16. Implementation notes (M5)
+
+### The portal is not a cut-down version of the app
+
+Someone who reported a bug is not a user of a bug tracker. They followed a link from an
+email to find out what happened. So the portal has no navigation, no jargon, and shows
+**the status category rather than the team's status name** — "closed" is honest, where
+"Won't Fix" needs explaining and reads as rude. Public comments only; the reply box can
+only ever produce a public comment, with no code path from there to an internal note.
+
+The token is the entire credential, so it is long, bound to one issue, expires after 90
+days, and rate-limits replies. `PortalTest` is mostly about what it must *not* open.
+
+An anonymous report gets no email and no token: emailing someone who never left an
+address is not a feature.
+
+### Invitations
+
+Re-inviting an address refreshes the existing invitation rather than failing on the
+unique index or leaving two live tokens. Accepting deliberately does **not** re-check
+the invitee's own email against the one written to — the token is the credential, and
+people routinely sign in with a different address than the one they were mailed at.
+
+A client invitation with no projects is refused: it produces someone who can see
+nothing, which is a confusing way to arrive. Only the workspace owner can invite another
+owner, and the owner cannot be removed.
+
+Accepting always lands in the workspace that issued the token, whatever domain the link
+was presented on.
+
+### Email-in
+
+Mailgun inbound routes rather than IMAP polling — a webhook beats a cron poll on latency
+and on failure modes. Anyone can POST to the endpoint, so the signature (timestamp +
+token, HMAC-SHA256) is verified before anything is read, and signatures older than five
+minutes are rejected as replays. **With no signing key configured the endpoint accepts
+nothing**, because failing open here would let anyone file issues in any workspace.
+
+Malformed or unknown addresses get **200, not an error**: Mailgun retries failures, and
+these will never succeed however many times they are tried.
+
+`EmailBody` strips the quoted thread and signature. An email reply is mostly not the
+reply, and storing all of it makes a thread unreadable within about three messages.
+
+Who wrote it decides where it lands: a staff member replying by email writes an internal
+note, matching what the in-app composer defaults to for them; everybody else writes in
+public. A project's inbound token is random rather than derived from the slug, so
+guessing one project's address does not reveal another's, and a reply token pairs the
+issue key *with* the project token so a valid key cannot be aimed at a different project.
+
+### Notification digests
+
+Activity is recorded into `pending_notifications` and nothing is sent inline. A
+scheduled `notifications:flush` groups by person-plus-issue and sends one message per
+group — **once the group has been quiet for the digest delay**, measured from the *last*
+entry rather than the first. Measuring from the first would mean a long argument in the
+comments posts its own digest mid-conversation.
+
+Three rules worth keeping:
+
+- Nobody is told about their own actions.
+- A client watching an issue is never told about internal activity. Email is a way for
+  an internal note to escape, so the visibility check is repeated here rather than
+  trusted from the caller.
+- Preferences are opt-out. Silence should be chosen, not the default.
+
+Digest mail sets `Reply-To` to `reply+{KEY}.{project token}@`, so replying to a
+notification lands back on the issue as a comment. The loop closes.
+
+`docker-compose.yml` now runs a `scheduler` service. Without it the digests accumulate
+and nothing is ever delivered.
+
+### Still open from M5
+
+- Notification preferences have no settings screen; the column and the check exist but
+  a person cannot change them yet.
+- No unsubscribe link in digest mail, which a production system needs.
+- Inbound attachments are discarded — Mailgun sends them, and they should become issue
+  attachments.
+- No handling of bounces or of mail sent to a closed issue.
+- The portal cannot show attachments or let a reporter add one.
+- Removing a member does not reassign their issues.

@@ -11,7 +11,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
-#[Fillable(['issue_id', 'user_id', 'body', 'body_text', 'is_internal', 'source'])]
+#[Fillable([
+    'issue_id', 'user_id', 'author_name', 'author_email',
+    'body', 'body_text', 'is_internal', 'source',
+])]
 class Comment extends Model
 {
     use BelongsToWorkspace, HasFactory, SoftDeletes;
@@ -42,6 +45,12 @@ class Comment extends Model
     public function attachments(): MorphMany
     {
         return $this->morphMany(Attachment::class, 'attachable');
+    }
+
+    /** Comments from the portal or email have no account behind them. */
+    public function displayName(): string
+    {
+        return $this->author?->name ?? $this->author_name ?? $this->author_email ?? 'Unknown';
     }
 
     public function scopePublic(Builder $query): Builder

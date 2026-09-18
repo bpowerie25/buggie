@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\InboundMailController;
 use App\Http\Controllers\Api\IngestController;
 use Illuminate\Support\Facades\Route;
 
@@ -21,3 +22,15 @@ Route::post('ingest/{publicKey}', [IngestController::class, 'store'])
 Route::post('ingest/screenshot/{report}', [IngestController::class, 'screenshot'])
     ->middleware('signed')
     ->name('ingest.screenshot');
+
+/*
+|--------------------------------------------------------------------------
+| Inbound mail
+|--------------------------------------------------------------------------
+|
+| Mailgun's inbound route webhook. Verified by signature rather than by a secret URL,
+| and the routing token in the recipient address selects the tenant.
+|
+*/
+
+Route::post('mail/inbound', InboundMailController::class)->name('mail.inbound');

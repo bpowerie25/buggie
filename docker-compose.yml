@@ -79,6 +79,23 @@ services:
     networks:
       - buggy
 
+  scheduler:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+    volumes:
+      - .:/var/www/html
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    # Notification digests are sent by a scheduled command, so without this they
+    # accumulate in pending_notifications and nothing is ever delivered.
+    command: php artisan schedule:work
+    networks:
+      - buggy
+
 volumes:
   postgres-data:
   redis-data:

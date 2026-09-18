@@ -7,11 +7,15 @@ use App\Enums\WatchReason;
 use App\Models\Issue;
 use App\Models\Project;
 use App\Models\User;
+use App\Enums\NotificationReason;
+use App\Support\Notifications\Notifier;
 use App\Support\RichText\TiptapDocument;
 use Illuminate\Support\Facades\DB;
 
 class CreateIssue
 {
+    public function __construct(private Notifier $notifier) {}
+
     /**
      * @param  array{
      *     title: string,
@@ -71,6 +75,10 @@ class CreateIssue
 
             foreach (TiptapDocument::mentionedUserIds($description) as $id) {
                 $issue->watch(User::find($id), WatchReason::Mentioned);
+            }
+
+            if ($issue->assignee) {
+                $this->notifier->record($issue->assignee, $issue, NotificationReason::Assigned, $reporter);
             }
 
             return $issue;

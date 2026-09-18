@@ -133,6 +133,23 @@ Reports are **not** issues. They land in `reports` and are promoted, merged or
 discarded from the triage inbox. Anything the fingerprinter cannot group with
 confidence goes to a human.
 
+## Client-facing surfaces
+
+Three things reach people who are not staff, and all three default to silence:
+
+- **The portal** (`/portal/{token}`, central domain, outside every guard). The token is
+  the whole credential. Public comments only, and a reporter's reply can only ever be
+  public. It shows the status *category*, not the team's status name.
+- **Email-in** (`/api/mail/inbound`). Signature-verified; with no signing key
+  configured it accepts nothing. Unknown addresses return 200 so Mailgun stops retrying.
+- **Digest mail**. A client watching an issue is never sent internal activity — the
+  check lives in `Notifier`, not in the caller.
+
+Notifications are recorded, never sent inline. `notifications:flush` (scheduled every
+minute, run by the `scheduler` compose service) groups by person-plus-issue and sends
+once the group has been quiet for `buggy.digest_delay_minutes`, measured from the last
+entry.
+
 ## Conventions
 
 - Inertia page components are lowercase paths: `Inertia::render('projects/index')`

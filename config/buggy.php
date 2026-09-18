@@ -23,4 +23,31 @@ return [
 
     'host' => explode(':', $domain, 2)[0],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Inbound mail
+    |--------------------------------------------------------------------------
+    |
+    | The domain Mailgun routes inbound mail for. Issues are created by writing to
+    | bugs+{project token}@, and replies to notification mail come back to
+    | reply+{comment token}@.
+    |
+    */
+
+    'inbound_domain' => env('MAIL_INBOUND_DOMAIN', 'in.buggy.test'),
+
+    'mailgun_signing_key' => env('MAILGUN_SIGNING_KEY'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Notification batching
+    |--------------------------------------------------------------------------
+    |
+    | How long to gather activity on one issue for one person before sending, so a
+    | burst of edits is a single email rather than one per change.
+    |
+    */
+
+    'digest_delay_minutes' => (int) env('DIGEST_DELAY_MINUTES', 5),
+
 ];

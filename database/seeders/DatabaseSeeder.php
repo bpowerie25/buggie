@@ -14,6 +14,8 @@ use App\Enums\RelationType;
 use App\Enums\WorkspaceRole;
 use App\Models\Label;
 use App\Models\Project;
+use App\Models\Invitation;
+use App\Models\PortalToken;
 use App\Models\Report;
 use App\Models\SavedView;
 use App\Models\WidgetKey;
@@ -188,6 +190,20 @@ class DatabaseSeeder extends Seeder
                     'user_agent' => 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) Safari/604.1',
                     'viewport' => '375x667',
                 ],
+            ]);
+
+            // A pending invitation and a reporter with portal access, so both
+            // client-facing surfaces have something to show.
+            Invitation::create([
+                'email' => 'newdev@example.com',
+                'role' => \App\Enums\WorkspaceRole::Member->value,
+                'invited_by_id' => $owner->id,
+            ]);
+
+            PortalToken::create([
+                'issue_id' => $checkout->id,
+                'email' => 'ana@shopper.test',
+                'token' => 'demo-portal-token-for-local-development-only',
             ]);
 
             foreach ([

@@ -15,6 +15,7 @@ import {
     LayoutDashboard,
     LogOut,
     Tag,
+    Users,
 } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 
@@ -149,6 +150,15 @@ export function AppLayout({
                     <NavLink href="/labels" icon={Tag} active={path.startsWith('/labels')}>
                         Labels
                     </NavLink>
+                    {auth.role !== 'client' && (
+                        <NavLink
+                            href="/settings/members"
+                            icon={Users}
+                            active={path.startsWith('/settings/members')}
+                        >
+                            Members
+                        </NavLink>
+                    )}
 
                     {views.length > 0 && (
                         <div className="pt-4">

@@ -33,6 +33,20 @@ class Project extends Model
         return 'slug';
     }
 
+    protected static function booted(): void
+    {
+        static::creating(function (self $project) {
+            // The suffix in bugs+{token}@in.buggy.app. Random rather than derived from
+            // the slug, so guessing one project's address does not reveal another's.
+            $project->inbound_token ??= \Illuminate\Support\Str::lower(\Illuminate\Support\Str::random(16));
+        });
+    }
+
+    public function inboundAddress(): string
+    {
+        return 'bugs+'.$this->inbound_token.'@'.config('buggy.inbound_domain');
+    }
+
     public function statuses(): HasMany
     {
         return $this->hasMany(Status::class)->orderBy('position');
