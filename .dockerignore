@@ -33,6 +33,11 @@ tests
 phpunit.xml
 .editorconfig
 .phpunit.result.cache
+# docs/ is for people working on the code and has no business in the image —
+# except docs/help, which the application SERVES at /docs. Re-included after both
+# exclusions, since the last matching pattern wins.
 docs
 *.md
 !README.md
+!docs/help
+!docs/help/*.md
