@@ -7,6 +7,7 @@ use App\Actions\CreateIssue;
 use App\Actions\CreateProject;
 use App\Actions\CreateWorkspace;
 use App\Actions\RelateIssues;
+use App\Jobs\ProcessIncomingReport;
 use App\Actions\UpdateIssue;
 use App\Enums\IssuePriority;
 use App\Enums\IssueVisibility;
@@ -176,6 +177,13 @@ class DatabaseSeeder extends Seeder
                         'stack' => $stack,
                     ],
                 ]);
+            }
+
+            // Run the seeded reports through the fingerprinter, exactly as the ingest
+            // endpoint would. Without this the demo inbox shows three identical rows
+            // instead of one with a count — which is the whole point of the feature.
+            foreach (Report::awaitingTriage()->get() as $report) {
+                ProcessIncomingReport::dispatchSync($report->id, $report->workspace_id);
             }
 
             // And one human-written report with no error, which never auto-groups.
