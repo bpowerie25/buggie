@@ -30,10 +30,17 @@ export interface BuggieOptions {
     endpoint?: string;
 
     /**
-     * Draw the floating "Report a bug" button. Set false if you would rather call
-     * `open()` from your own menu, shortcut or error boundary.
+     * Who sees the floating "Report a bug" button.
+     *
+     * `true` (default) shows it to everybody, which is right for a UAT site where
+     * every visitor is a tester. `false` draws nothing, for apps that would rather
+     * call `open()` from their own menu, shortcut or error boundary.
+     *
+     * `'opt-in'` draws nothing until someone visits `?buggie=on` in that browser,
+     * which is remembered. That is the one to use on a live site: the client's staff
+     * switch it on once and their own customers never see it.
      */
-    launcher?: boolean;
+    launcher?: boolean | 'opt-in';
 
     /** Offer a screenshot. Default true. */
     screenshot?: boolean;
@@ -121,6 +128,7 @@ export function init(options: BuggieOptions): Promise<WidgetApi | null> {
         script.setAttribute(SCRIPT_ATTRIBUTE, '');
 
         if (options.launcher === false) script.dataset.launcher = 'false';
+        if (options.launcher === 'opt-in') script.dataset.launcher = 'opt-in';
         if (options.screenshot === false) script.dataset.screenshot = 'false';
         if (options.requireEmail) script.dataset.requireEmail = 'true';
 

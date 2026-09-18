@@ -1,0 +1,90 @@
+# buggie.eu — the hosted service.
+#
+# Deliberately the same application image self-hosters run. The only differences are
+# BUGGIE_HOSTED=true, which turns on plans and billing, and Caddy in front for TLS.
+# Running the hosted service on the self-host artefact means that path cannot quietly
+# rot: if it breaks, buggie.eu breaks first and I find out before anybody else does.
+#
+#   cd /srv/buggie && docker compose -f deploy/docker-compose.prod.yml up -d
+#
+# Run from the repository root so the build context is right.
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile.production
+    image: buggie:latest
+    restart: unless-stopped
+    # No published port: Caddy is the only way in.
+    expose:
+      - "80"
+    env_file: .env
+    volumes:
+      - storage:/var/www/html/storage/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      - buggie
+
+  caddy:
+    build:
+      context: ./deploy/caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      # Workspaces live on subdomains, so the certificate has to be a wildcard, which
+      # can only be issued over a DNS-01 challenge. Hence an API token rather than
+      # Caddy's usual zero-configuration HTTP challenge.
+      CLOUDFLARE_API_TOKEN: ${CLOUDFLARE_API_TOKEN:?set CLOUDFLARE_API_TOKEN in .env}
+      BUGGIE_DOMAIN: ${BUGGIE_DOMAIN:?set BUGGIE_DOMAIN in .env}
+      ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL in .env}
+    volumes:
+      - ./deploy/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - app
+    networks:
+      - buggie
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_DATABASE:-buggie}
+      POSTGRES_USER: ${DB_USERNAME:-buggie}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
+    volumes:
+      - postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-buggie}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - buggie
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis:/data
+    networks:
+      - buggie
+
+volumes:
+  postgres:
+  redis:
+  storage:
+  caddy-data:
+  caddy-config:
+
+networks:
+  buggie:

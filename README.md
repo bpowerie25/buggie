@@ -62,7 +62,8 @@ Buggie.shared.start(key: "pk_live_9f3a2b")
 try await Buggie.shared.report(title: notes, screenshot: Buggie.shared.captureScreen())
 ```
 
-See [`packages/swift`](packages/swift). There is no Android SDK yet.
+Android apps have the same thing in Kotlin — see [`packages/kotlin`](packages/kotlin).
+Both are built from source for now; neither is published yet.
 
 ---
 

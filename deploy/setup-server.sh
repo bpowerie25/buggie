@@ -1,0 +1,103 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# ──────────────────────────────────────────────────────────
+# Buggie — Server Setup
+# Target: Ubuntu 24.04 LTS (Hetzner CX22 or better: 2 vCPU / 4 GB)
+# Run as root, once:  bash setup-server.sh
+# ──────────────────────────────────────────────────────────
+
+DEPLOY_USER="deploy"
+SSH_PORT=2222
+SWAP_SIZE="2G"
+APP_DIR="/srv/buggie"
+REPO="https://github.com/bpowerie25/buggie.git"
+
+echo "🚀 Setting up the Buggie production server..."
+
+# ── 1. System ──
+apt update && apt upgrade -y
+apt install -y ca-certificates curl git ufw fail2ban unattended-upgrades
+
+# ── 2. Deploy user ──
+# Everything after this runs unprivileged. Docker needs group membership rather
+# than sudo, so the deploy script never asks for a password.
+if ! id "$DEPLOY_USER" &>/dev/null; then
+    adduser --disabled-password --gecos "" "$DEPLOY_USER"
+    usermod -aG sudo "$DEPLOY_USER"
+    mkdir -p "/home/$DEPLOY_USER/.ssh"
+    cp /root/.ssh/authorized_keys "/home/$DEPLOY_USER/.ssh/"
+    chown -R "$DEPLOY_USER:$DEPLOY_USER" "/home/$DEPLOY_USER/.ssh"
+    chmod 700 "/home/$DEPLOY_USER/.ssh"
+    chmod 600 "/home/$DEPLOY_USER/.ssh/authorized_keys"
+    echo "$DEPLOY_USER ALL=(ALL) NOPASSWD:ALL" > "/etc/sudoers.d/$DEPLOY_USER"
+fi
+
+# ── 3. Swap ──
+# 4 GB is enough until a composer install and a vite build overlap, at which point
+# the OOM killer takes PHP-FPM and the deploy fails in a confusing way.
+if [ ! -f /swapfile ]; then
+    fallocate -l "$SWAP_SIZE" /swapfile
+    chmod 600 /swapfile
+    mkswap /swapfile
+    swapon /swapfile
+    echo '/swapfile none swap sw 0 0' >> /etc/fstab
+    sysctl vm.swappiness=10
+    echo 'vm.swappiness=10' >> /etc/sysctl.conf
+fi
+
+# ── 4. Docker ──
+if ! command -v docker &>/dev/null; then
+    install -m 0755 -d /etc/apt/keyrings
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+    chmod a+r /etc/apt/keyrings/docker.asc
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] \
+https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" \
+        > /etc/apt/sources.list.d/docker.list
+    apt update
+    apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+fi
+
+usermod -aG docker "$DEPLOY_USER"
+
+# ── 5. SSH ──
+# Moved off 22 and password login disabled. Do not close this session until you have
+# opened a second one on the new port and confirmed it works.
+sed -i "s/^#\?Port .*/Port $SSH_PORT/" /etc/ssh/sshd_config
+sed -i 's/^#\?PasswordAuthentication .*/PasswordAuthentication no/' /etc/ssh/sshd_config
+sed -i 's/^#\?PermitRootLogin .*/PermitRootLogin prohibit-password/' /etc/ssh/sshd_config
+
+# ── 6. Firewall ──
+ufw allow "$SSH_PORT"/tcp
+ufw allow 80/tcp
+ufw allow 443/tcp
+ufw --force enable
+
+# Docker publishes ports by writing iptables rules that bypass ufw entirely, so a
+# container binding 0.0.0.0 is reachable whatever ufw says. Only Caddy publishes
+# anything, and it is meant to be public — but the gap is worth knowing about.
+
+systemctl enable --now fail2ban
+systemctl restart ssh
+
+# ── 7. Application directory ──
+mkdir -p "$APP_DIR"
+chown "$DEPLOY_USER:$DEPLOY_USER" "$APP_DIR"
+
+cat <<EOF
+
+✅ Server ready.
+
+Next, as $DEPLOY_USER (ssh -p $SSH_PORT $DEPLOY_USER@this-host):
+
+  git clone $REPO $APP_DIR
+  cd $APP_DIR
+  cp deploy/env.production.example .env
+  \$EDITOR .env                  # every value marked CHANGE ME
+  docker compose -f deploy/docker-compose.prod.yml run --rm \\
+      --entrypoint php app artisan key:generate --show   # paste into .env
+  bash deploy/deploy.sh --first-run
+
+⚠ Open a second SSH session on port $SSH_PORT and confirm it works BEFORE closing
+  this one. Getting this wrong means a trip to the Hetzner web console.
+EOF

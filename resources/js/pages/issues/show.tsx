@@ -199,7 +199,7 @@ export default function ShowIssue({
                 <div className="min-w-0">
                     <div className="flex items-center gap-2 text-xs text-ink-subtle">
                         <Link
-                            href={`/issues?project=${issue.project.slug}`}
+                            href={`/issues?q=${encodeURIComponent(`project:${issue.project.slug}`)}`}
                             className="hover:text-ink"
                         >
                             {issue.project.name}
