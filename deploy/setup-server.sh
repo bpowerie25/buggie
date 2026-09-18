@@ -11,7 +11,10 @@ DEPLOY_USER="deploy"
 SSH_PORT=2222
 SWAP_SIZE="2G"
 APP_DIR="/srv/buggie"
-REPO="https://github.com/bpowerie25/buggie.git"
+# buggie.eu deploys the private platform repository, which carries the public one as
+# an upstream remote. A self-hoster puts their own clone URL here, or just clones the
+# public repository by hand.
+REPO="${BUGGIE_REPO:-git@github.com:bpowerie25/buggie-platform.git}"
 
 echo "🚀 Setting up the Buggie production server..."
 
@@ -20,8 +23,20 @@ apt update && apt upgrade -y
 apt install -y ca-certificates curl git ufw fail2ban unattended-upgrades
 
 # ── 2. Deploy user ──
+# NOTE: this copies root's authorized_keys to the deploy user. If you reached this
+# box with a password rather than a key, that file is empty, and step 5 disabling
+# password authentication would lock you out. The script refuses rather than risk it.
 # Everything after this runs unprivileged. Docker needs group membership rather
 # than sudo, so the deploy script never asks for a password.
+if [ ! -s /root/.ssh/authorized_keys ]; then
+    echo "❌ /root/.ssh/authorized_keys is empty or missing."
+    echo "   Password authentication is disabled below, so this would lock you out."
+    echo "   From your own machine, run:"
+    echo "     ssh-copy-id -i ~/.ssh/id_ed25519_hetzner.pub root@\$(hostname -I | awk '{print \$1}')"
+    echo "   then run this script again."
+    exit 1
+fi
+
 if ! id "$DEPLOY_USER" &>/dev/null; then
     adduser --disabled-password --gecos "" "$DEPLOY_USER"
     usermod -aG sudo "$DEPLOY_USER"
