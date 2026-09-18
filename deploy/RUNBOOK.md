@@ -121,7 +121,7 @@ Still as `deploy`:
 git clone git@github.com:bpowerie25/buggie-platform.git /srv/buggie
 cd /srv/buggie
 
-cp deploy/env.production.example .env
+cp --update=none deploy/env.production.example .env
 nano .env
 ```
 
@@ -139,7 +139,7 @@ billing screens handle a plan with no price by not offering it.
 Then the application key:
 
 ```sh
-docker compose -f deploy/docker-compose.prod.yml run --rm \
+docker compose --project-directory . --env-file .env -f deploy/docker-compose.prod.yml run --rm \
     --entrypoint php app artisan key:generate --show
 ```
 
@@ -170,7 +170,7 @@ maintenance page rather than a 500. Fix the cause and re-run, or if you are sati
 it is serviceable:
 
 ```sh
-docker compose -f deploy/docker-compose.prod.yml exec app php artisan up
+docker compose --project-directory . --env-file .env -f deploy/docker-compose.prod.yml exec app php artisan up
 ```
 
 ---
@@ -180,7 +180,7 @@ docker compose -f deploy/docker-compose.prod.yml exec app php artisan up
 ```sh
 curl -I https://buggie.eu                    # 200, and a valid certificate
 curl -I https://anything.buggie.eu           # the wildcard certificate covers this too
-docker compose -f deploy/docker-compose.prod.yml ps
+docker compose --project-directory . --env-file .env -f deploy/docker-compose.prod.yml ps
 ```
 
 All five services up: `app`, `caddy`, `postgres`, `redis`. Then in a browser: register
@@ -191,7 +191,7 @@ invitation and notification depends on it.
 Watch the first certificate being issued if it is slow:
 
 ```sh
-docker compose -f deploy/docker-compose.prod.yml logs -f caddy
+docker compose --project-directory . --env-file .env -f deploy/docker-compose.prod.yml logs -f caddy
 ```
 
 ---
@@ -214,7 +214,7 @@ you deleting something by hand.
 
 ```sh
 gunzip -c /srv/backups/db-YYYYMMDD-HHMMSS.sql.gz | \
-    docker compose -f deploy/docker-compose.prod.yml exec -T postgres \
+    docker compose --project-directory . --env-file .env -f deploy/docker-compose.prod.yml exec -T postgres \
     psql -U buggie -d buggie_restore_test
 ```
 

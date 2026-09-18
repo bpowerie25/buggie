@@ -6,7 +6,10 @@ set -euo pipefail
 # Run as the deploy user from the repository root:  bash deploy/deploy.sh
 # ──────────────────────────────────────────────────────────
 
-COMPOSE="docker compose -f deploy/docker-compose.prod.yml"
+# --project-directory and --env-file are both load-bearing. Without them Compose
+# treats deploy/ as the project directory: it looks for deploy/.env, and resolves the
+# build context and env_file from there too, so every variable comes back empty.
+COMPOSE="docker compose --project-directory . --env-file .env -f deploy/docker-compose.prod.yml"
 FIRST_RUN=0
 
 # What to deploy. buggie.eu runs the private platform repo, which carries the public

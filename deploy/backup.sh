@@ -9,7 +9,10 @@ set -euo pipefail
 # A backup you have never restored is a hope, not a backup. Restore one into a
 # scratch database before you rely on this — the procedure is in README.md.
 
-COMPOSE="docker compose -f deploy/docker-compose.prod.yml"
+# --project-directory and --env-file are both load-bearing. Without them Compose
+# treats deploy/ as the project directory: it looks for deploy/.env, and resolves the
+# build context and env_file from there too, so every variable comes back empty.
+COMPOSE="docker compose --project-directory . --env-file .env -f deploy/docker-compose.prod.yml"
 APP_DIR="${BUGGIE_APP_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 BACKUP_DIR="${BUGGIE_BACKUP_DIR:-/srv/backups}"
 KEEP_DAYS=14
