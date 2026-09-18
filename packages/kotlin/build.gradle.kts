@@ -1,0 +1,4 @@
+plugins {
+    kotlin("jvm") version "2.2.10" apply false
+    id("com.android.library") version "9.3.0" apply false
+}

@@ -1484,11 +1484,76 @@ The ordering test was checked by deleting the masking and confirming it fails. A
 never seen to fail is a decoration.
 
 The credential parameter list is deliberately identical to `Redactor.swift`'s, and
-tested against the same twelve names on both sides. A name stripped on one platform
-and not the other is a leak that only shows up on half the reports.
+tested against the same twelve names on all three sides. A name stripped on one platform
+and not another is a leak that only shows up on some of the reports.
 
-### Android
+## 26. The Android SDK
 
-Not built. There is no JDK and no Kotlin compiler on this machine, so any Android SDK
-written here would be entirely uncompiled and untested — which is worse than no SDK,
-because it looks like one.
+`packages/kotlin` is the same SDK again, in Kotlin, split the same way and for the same
+reason: `buggie-core` is plain Kotlin/JVM with no Android imports, `buggie-android` is
+screen capture and device details. With no Android SDK on the machine the root project
+does not even configure the second module, and says so.
+
+It carries no dependencies at all — not a JSON library, not a HTTP client, not
+coroutines. It is compiled into other people's applications, where every library we
+insist on is a version they may already be fighting over, so the JSON encoder and the
+small parser that reads the server's answer are ours and are tested rather than trusted.
+`Transport` blocks; a host app that wants a coroutine can wrap it in one.
+
+### `View.draw`, not `PixelCopy`
+
+The redaction rule ported unchanged — hide before rendering, never mask afterwards — but
+the reason the iOS version failed ported with it, and Android has the same trap under a
+different name.
+
+`PixelCopy` is the tool everyone reaches for: it reads the real composited window,
+including surfaces the view system cannot draw. It also reads the buffer the compositor
+has **already produced**, and hiding a view only requests a new frame rather than waiting
+for one. The copy comes back with the password still in it and nothing says so. That is
+`drawHierarchy(afterScreenUpdates: false)` again, arrived at by a third route.
+
+`View.draw(Canvas)` walks the hierarchy synchronously, draws the state the views are in
+now, and skips anything not `VISIBLE` as it goes. Hiding and drawing happen in one call
+stack with no frame in between, so there is nothing to go stale. The cost is that
+`SurfaceView`, `TextureView`, video and other windows are absent from the picture. A
+screenshot missing content is a poor screenshot; a screenshot containing a password is an
+incident.
+
+Two smaller decisions worth recording. The views are set `INVISIBLE`, not `GONE`: `GONE`
+triggers a layout pass and the rest of the screen reflows around the hole, so the report
+would show an arrangement the reporter never saw. And password detection checks the input
+**class** before the variation, because the variation bits only mean anything inside their
+class — `0x10` is both `TYPE_NUMBER_VARIATION_PASSWORD` and `TYPE_TEXT_VARIATION_URI`, so
+testing the variation alone misses PIN entries while hiding URL boxes for no reason.
+
+### Tested against pixels, on a laptop
+
+80 tests, all of which run without a device. The redaction ones use Robolectric in
+`GraphicsMode.NATIVE`, which rasterises through the real Android graphics code on the
+JVM, so the screenshot claim is checked against actual pixels rather than reasoned about
+— which is the whole lesson of the iOS SDK.
+
+Every one of them was checked by putting the bug back. Two results are worth keeping:
+
+- Drawing the image **before** hiding the redacted views — Android's stale buffer — fails
+  "a marked view does not appear in the capture", as it should.
+- Drawing **nothing at all** passes that same test, and fails only its control, "the same
+  view does appear when it is not marked". Exactly as on iOS. A negative assertion is
+  satisfied by an empty result.
+
+The first attempt at the stale-buffer mutation was itself wrong — it drew twice, and the
+second pass painted over the first — and the suite stayed green. Mutations need reading
+as carefully as the code, or "the test did not fail" is read as "the test is weak" when
+it means "the bug was not reintroduced".
+
+### What is not verified
+
+- **No report has been filed from an actual phone**, and nothing has run on a device or
+  an emulator. Robolectric is a faithful re-implementation, not Android.
+- **The capture has never met a real window** — only view hierarchies laid out by hand.
+  What `SurfaceView`, a `Dialog` or the system bars actually do to it is reasoned about
+  above, not observed.
+- **Robolectric cannot instrument a new enough JDK.** Its bundled ASM refuses the class
+  files, with an error that reads like a broken test rather than a broken toolchain. JDK
+  17 works and JDK 27 does not; the cut-off between them was not established. `test.sh`
+  picks a 17 when it can, and skips the Android tests loudly when it cannot.

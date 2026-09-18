@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+        The key under which a view carries its redaction marker.
+
+        View.setTag(int, Object) refuses any key that is not an application resource
+        id, so the marker needs a real one rather than a constant of our own.
+    -->
+    <item name="buggie_redacted" type="id" />
+</resources>
