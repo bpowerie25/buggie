@@ -1374,8 +1374,40 @@ testable, and is.
   and proves nothing about types. `test.sh` now runs `xcodebuild -destination
   'generic/platform=iOS'` when Xcode is present, which is the only real check this
   code ever gets.
-- **No report has been filed from an actual phone.** The transport is tested against
-  constructed responses, not against the running server.
+- **No report has been filed from a physical phone.** The SDK has now been driven
+  against the running server — see below — but on macOS, not on hardware.
+
+### Verified against the real server
+
+The wire format was asserted only against the SDK's own expectations, which proves
+the encoder agrees with itself. So a maximal report — every field populated, 50
+breadcrumbs, 30 network events — was encoded by the actual `JSONEncoder` path and
+posted to a running Buggie. Then the whole flow was run through `Transport` itself
+rather than curl: `send()`, then `upload(screenshot:)` to the signed URL that came
+back.
+
+What that established, none of which the unit tests could:
+
+- The server accepts the payload (202) and `IngestResponse` decodes the real response.
+- Breadcrumbs arrive under `console`, all 50 of them, and all 30 network events.
+- **Credential redaction survives to storage**: `api_key=[redacted]` and
+  `token=[redacted]` in the persisted rows, not merely in the SDK's own assertions.
+- The screenshot reaches the store through the multipart body the SDK builds.
+- **Two native reports of the same bug share a fingerprint and group.** Duplicate
+  collapsing is the headline feature and nothing had shown it working for native
+  reports, whose payloads have no page URL and no JavaScript stack.
+
+### A dead queue worker says nothing
+
+Finding the fingerprint null led somewhere unrelated to the SDK: the development
+`queue` worker had exited an hour earlier on a timed-out job and stayed dead, because
+no service in `docker-compose.yml` had a `restart:` policy.
+
+Nothing surfaces that. Ingest still returns 202, reports still land, and they simply
+never get fingerprinted, never group and never notify. The self-host image runs under
+supervisord with `autorestart=true`, so only development was exposed — but development
+is where the demo data is built and where the product gets judged. `restart:
+unless-stopped` is now set on the queue and the scheduler.
 
 ### Packaging
 

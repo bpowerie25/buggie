@@ -76,6 +76,11 @@ services:
       redis:
         condition: service_started
     command: php artisan queue:work --sleep=3 --tries=3 --max-time=3600
+    # A worker exits on a timed-out job, and without this it stays dead. Nothing
+    # surfaces that: reports still return 202, they just never get fingerprinted,
+    # never group and never notify. The self-host image runs under supervisord with
+    # autorestart, so only development was exposed to this.
+    restart: unless-stopped
     networks:
       - buggie
 
@@ -93,6 +98,7 @@ services:
     # Notification digests are sent by a scheduled command, so without this they
     # accumulate in pending_notifications and nothing is ever delivered.
     command: php artisan schedule:work
+    restart: unless-stopped
     networks:
       - buggie
 
