@@ -22,7 +22,11 @@ Full rationale and data model: [`docs/DESIGN.md`](docs/DESIGN.md).
   saved views, kanban board with drag-and-drop, virtualised list, optimistic inline
   edits and bulk actions.
 
-Next: M4 — the reporter widget, which is the point of the whole thing.
+- **M4** — The reporter widget (~6KB gzipped): screenshot with annotation and
+  redaction, console and network ring buffers, error capture, a hostile-input ingest
+  endpoint, fingerprint-based grouping, and a keyboard-driven triage inbox.
+
+Next: M5 — clients (invitations, portal threads, email-in, notifications).
 
 Realtime is deferred: Reverb v1 pins an old `guzzlehttp/psr7` and would downgrade
 guzzle 8 → 7 repo-wide. See `docs/DESIGN.md` §14.

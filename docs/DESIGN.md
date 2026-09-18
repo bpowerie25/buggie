@@ -443,7 +443,7 @@ arrive with the widget in M4. Virtualised paging deferred to M3; the list is cap
 full keyboard map, saved views, filter chips + query language, board with dnd-kit,
 virtualised list, optimistic updates, bulk edit. Reverb is **deferred** — see below.
 
-**M4 — The widget (4 days).** Widget build, capture, redaction, annotation UI, presigned
+**M4 — The widget. ✅ Done.** Widget build, capture, redaction, annotation UI, signed
 uploads, ingest endpoint with origin/rate/size guards, fingerprinting worker, triage inbox.
 
 **M5 — Clients (3 days).** Client role, visibility scopes, internal-vs-public comments,
@@ -715,3 +715,92 @@ taken, only the server half is outstanding.
 - `shift+click` range selection is not implemented; `x` toggles one row at a time.
 - The palette searches loaded issues only. Typing a key offers it directly, but there
   is no server-side search-as-you-type yet.
+
+---
+
+## 15. Implementation notes (M4)
+
+The widget is ~6KB gzipped because html2canvas (~50KB) is fetched from a CDN only when
+someone actually opens the reporter. Every visitor to a customer's site pays for the
+small part; only people filing a report pay for the big one.
+
+### Redaction must happen before rasterising
+
+The plan said to paint over redacted regions on the captured canvas. Built that way, it
+was **wrong on the first real test**: the masks landed on the field labels while the
+password and the `data-buggy-redact` field stayed perfectly readable, because painting
+afterwards means reproducing html2canvas's coordinate system exactly, and any
+disagreement about scroll offset or scale shifts the masks without any visible sign of
+failure.
+
+The fix is to restyle the elements in the DOM — solid background, transparent text,
+children hidden — let the browser lay out the masks, rasterise, then undo. Alignment
+becomes the browser's problem, which it cannot get wrong. **A redaction mechanism that
+can be silently misaligned is not a redaction mechanism.**
+
+Also: `backgroundColor: null` produced a canvas that was 48% transparent, which becomes
+a **black** JPEG on export. The capture now falls back to the page's own background.
+
+### No requestAnimationFrame in the capture path
+
+The first version waited a frame before capturing, so the panel was laid out and the
+widget's own UI hidden. rAF does not fire in a hidden tab, so a report filed from a
+background window sat on "Capturing screenshot…" indefinitely. It is a `setTimeout`
+now, and the CDN load has a six-second ceiling — a blocked CDN gives a report with no
+image, never a stuck panel.
+
+### Fingerprinting
+
+```
+sha1( normalised message | first application stack frame | route pattern )
+```
+
+Build hashes are stripped from stack frames so a deploy does not split a group; ids,
+UUIDs, hex and quoted strings are removed from messages; `/orders/8412/checkout`
+becomes `/orders/:id/checkout`. **A report with no error gets no fingerprint** — human
+prose is not reliably comparable, and merging two people's different problems is worse
+than showing two inbox rows.
+
+Reopen window: an occurrence against an issue closed **less than 14 days ago** reopens
+it. Older than that, the report stays in the inbox so a person decides whether it is a
+regression worth linking, rather than quietly reviving month-old history.
+
+### Reports are not issues
+
+Intake lands in `reports` and is promoted, merged or discarded from the triage inbox —
+`a`, `m`, `s`, `x`, one keystroke each. Reports sharing a fingerprint collapse into one
+inbox row with a count, and acting on the row acts on the whole group. Sibling ids are
+re-fetched and filtered by fingerprint server-side, never trusted from the request.
+
+### Two Laravel/nginx gotchas
+
+- `Route::get('w/{key}.js', …)` never matches without `->where('key', '[A-Za-z0-9_]+')`:
+  the default `[^/]+` is greedy, swallows the `.js`, and leaves nothing for the literal.
+- nginx's static-asset rule matches anything ending `.js`, so `/w/{key}.js` 404ed before
+  reaching PHP. It needs an explicit `location ^~ /w/`.
+
+### The test database, corrected
+
+**The M1 note in §12 was wrong.** `force="true"` in `phpunit.xml` does *not* beat a
+container environment variable: those land in `$_SERVER`, and Laravel's env repository
+reads `$_SERVER` before `$_ENV`, while PHPUnit's force only writes `$_ENV` and
+`putenv()`. The suite had been running `RefreshDatabase` against the **development
+database** ever since — which is why the dev data kept needing reseeding after test
+runs.
+
+The real fix is that no application configuration lives in `docker-compose.yml` any
+more; it all comes from the bind-mounted `.env`, and the `app`/`queue` services have no
+`environment:` block at all. `TestCase::setUp()` now asserts the database name ends in
+`_testing` and fails loudly otherwise, because this class of mistake is destructive
+rather than merely wrong.
+
+### Still open from M4
+
+- No hCaptcha on anonymous keys; the design calls for it once a key trips its hourly
+  rate. Rate limits and the origin allowlist are in place.
+- Screenshots are stored on the local disk. The `Attachment` model already prefers a
+  temporary URL when the disk supports one, so moving to S3 is configuration.
+- No reply-to-reporter flow from the inbox — the magic-link thread is M5.
+- The reopen window is a constant, not a per-workspace setting.
+- No "split from group" for over-grouped fingerprints; the design calls for it.
+- Screenshot uploads are not virus-scanned or re-encoded server-side.

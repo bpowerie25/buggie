@@ -51,6 +51,7 @@ export interface SharedProps {
     workspace: WorkspaceSummary | null;
     workspaces: WorkspaceListing[];
     views: SavedView[];
+    inboxCount: number;
     flash: { success: string | null; error: string | null };
     [key: string]: unknown;
 }
@@ -121,4 +122,21 @@ export interface SavedView {
     group_by: 'status' | 'assignee' | 'priority' | 'project';
     shared: boolean;
     can_edit: boolean;
+}
+
+export interface ReportRow {
+    id: number;
+    ids: number[];
+    count: number;
+    title: string;
+    body: string | null;
+    project: { key: string; name: string; slug: string };
+    reporter: { name: string | null; email: string | null };
+    environment: Record<string, unknown>;
+    console: { level: string; message: string; at: number }[];
+    network: { method: string; url: string; status: number | string; duration: number }[];
+    error: { message?: string; stack?: string } | null;
+    fingerprint: string | null;
+    screenshot_url: string | null;
+    created_at: string;
 }

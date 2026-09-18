@@ -106,6 +106,33 @@ Invariants worth preserving: unknown operators fall through to search text (a ty
 not silently change results); exclusions accumulate while single-valued inclusions
 replace; an unresolvable name matches nothing rather than everything.
 
+## The widget
+
+`resources/widget/` builds separately (`npm run build:widget`) to a stable, unhashed
+path, because customers embed the URL. It is vanilla TypeScript with no runtime
+dependencies — html2canvas is fetched from a CDN only when someone opens the reporter,
+which keeps the bundle every visitor downloads at ~6KB gzipped. Keep it that way.
+
+Two things that are load-bearing:
+
+- **Redaction happens in the DOM before rasterising**, by restyling password fields and
+  `[data-buggy-redact]` elements into solid blocks. The earlier approach — painting
+  rectangles onto the finished canvas — has to reproduce html2canvas's coordinate
+  system, and when it disagreed the masks landed on the labels while the password
+  stayed readable. Letting the browser lay out the mask cannot be misaligned.
+- **No `requestAnimationFrame` in the capture path.** rAF does not fire in a hidden
+  tab, and a report filed from a background window hung for ever on "Capturing
+  screenshot…".
+
+The ingest endpoint is unauthenticated by necessity and treated as hostile: origin
+allowlist, rate limits, hard size caps, URL secret-stripping, and the IP stored only as
+an HMAC. `/widget-demo` (local only) is a deliberately broken checkout page for
+developing against.
+
+Reports are **not** issues. They land in `reports` and are promoted, merged or
+discarded from the triage inbox. Anything the fingerprinter cannot group with
+confidence goes to a human.
+
 ## Conventions
 
 - Inertia page components are lowercase paths: `Inertia::render('projects/index')`
@@ -123,5 +150,17 @@ replace; an unresolvable name matches nothing rather than everything.
   internal call sites must not pass it. Factories that may run with no workspace bound
   use `forceCreate`.
 - Tests run against Postgres (`buggy_testing`), not sqlite — the schema uses `jsonb`.
-  The `<env>` entries in `phpunit.xml` need `force="true"` to beat the container's
-  real environment variables.
+
+## Never put app config in docker-compose `environment:`
+
+Container environment variables land in `$_SERVER`, and Laravel's env repository reads
+`$_SERVER` **before** `$_ENV`. PHPUnit's `<env force="true">` only sets `$_ENV` and
+`putenv()`, so a variable defined in `docker-compose.yml` silently wins over
+`phpunit.xml` — and the suite runs `RefreshDatabase` against the development database.
+
+This is not theoretical: it happened here, and `force="true"` did **not** fix it. All
+configuration now comes from `.env`, which is bind-mounted into the container, and the
+`app`/`queue` services deliberately have no `environment:` block. Don't add one.
+
+`TestCase::setUp()` asserts the database name ends in `_testing` and fails loudly
+otherwise, because a misconfiguration here is destructive rather than merely wrong.

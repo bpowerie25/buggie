@@ -14,7 +14,9 @@ use App\Enums\RelationType;
 use App\Enums\WorkspaceRole;
 use App\Models\Label;
 use App\Models\Project;
+use App\Models\Report;
 use App\Models\SavedView;
+use App\Models\WidgetKey;
 use App\Models\User;
 use App\Support\Tenancy\Tenancy;
 use Illuminate\Database\Seeder;
@@ -130,6 +132,63 @@ class DatabaseSeeder extends Seeder
 
             $done = $site->statuses()->where('category', 'done')->first();
             app(UpdateIssue::class)->handle($stale, ['status_id' => $done->id], $owner);
+
+            // A widget key per project, plus an inbox with something in it.
+            foreach ([$site, $portal] as $project) {
+                WidgetKey::create([
+                    'project_id' => $project->id,
+                    'allowed_origins' => [],
+                    'mode' => 'identified',
+                ]);
+            }
+
+            $stack = "TypeError: Cannot read properties of null (reading 'total')\n"
+                ."    at calcTotal (https://acme.test/assets/checkout-a1b2c3.js:212:19)\n"
+                ."    at onSubmit (https://acme.test/assets/checkout-a1b2c3.js:88:5)";
+
+            // Three arrivals of the same bug: they share a fingerprint and collapse to
+            // one inbox row.
+            foreach ([['Ana Silva', 'ana@shopper.test', 4102], ['Tom Reed', 'tom@shopper.test', 5517], [null, null, 7781]] as [$name, $email, $order]) {
+                Report::create([
+                    'project_id' => $portal->id,
+                    'title' => 'Pay now button does nothing',
+                    'body' => 'I click Pay now and the page just sits there.',
+                    'reporter_name' => $name,
+                    'reporter_email' => $email,
+                    'environment' => [
+                        'url' => "https://acme.test/orders/{$order}/checkout",
+                        'user_agent' => 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Safari/605.1.15',
+                        'viewport' => '1440x900',
+                        'release' => '2026.09.18-a1c3',
+                    ],
+                    'console' => [
+                        ['level' => 'error', 'message' => "Cannot read properties of null (reading 'total')", 'at' => now()->timestamp],
+                        ['level' => 'warn', 'message' => 'Deprecated payment API in use', 'at' => now()->timestamp],
+                    ],
+                    'network' => [
+                        ['method' => 'POST', 'url' => 'https://acme.test/api/cart/total', 'status' => 500, 'duration' => 412],
+                        ['method' => 'GET', 'url' => 'https://acme.test/api/cart', 'status' => 200, 'duration' => 88],
+                    ],
+                    'error' => [
+                        'message' => "Cannot read properties of null (reading 'total') for order {$order}",
+                        'stack' => $stack,
+                    ],
+                ]);
+            }
+
+            // And one human-written report with no error, which never auto-groups.
+            Report::create([
+                'project_id' => $site->id,
+                'title' => 'Pricing page is unreadable on my phone',
+                'body' => 'The comparison table runs off the side of the screen on an iPhone SE.',
+                'reporter_name' => 'Priya Nair',
+                'reporter_email' => 'priya@example.test',
+                'environment' => [
+                    'url' => 'https://acme.test/pricing',
+                    'user_agent' => 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) Safari/604.1',
+                    'viewport' => '375x667',
+                ],
+            ]);
 
             foreach ([
                 ['name' => 'My work', 'query' => 'is:open assignee:@me', 'user_id' => $owner->id],

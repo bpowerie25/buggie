@@ -9,7 +9,10 @@ use App\Http\Controllers\IssueController;
 use App\Http\Controllers\IssueRelationController;
 use App\Http\Controllers\LabelController;
 use App\Http\Controllers\ProjectController;
+use App\Http\Controllers\ReportController;
 use App\Http\Controllers\SavedViewController;
+use App\Http\Controllers\WidgetKeyController;
+use App\Http\Controllers\WidgetScriptController;
 use App\Http\Controllers\WorkspaceController;
 use Illuminate\Support\Facades\Route;
 
@@ -25,6 +28,13 @@ $host = config('buggy.host');
 
 Route::domain($host)->group(function () {
     Route::get('/', HomeController::class)->name('home');
+
+    // The widget bundle, embedded cross-origin in customers' applications.
+    // The parameter must be constrained: the default [^/]+ is greedy and swallows
+    // the .js suffix, leaving nothing for the literal to match.
+    Route::get('w/{key}.js', WidgetScriptController::class)
+        ->where('key', '[A-Za-z0-9_]+')
+        ->name('widget.script');
 
     Route::middleware('guest')->group(function () {
         Route::get('login', [AuthenticatedSessionController::class, 'create'])->name('login');
@@ -42,6 +52,28 @@ Route::domain($host)->group(function () {
         Route::post('logout', [AuthenticatedSessionController::class, 'destroy'])->name('logout');
     });
 });
+
+/*
+|--------------------------------------------------------------------------
+| Widget harness (local only)
+|--------------------------------------------------------------------------
+| A deliberately broken checkout page for developing the reporter widget against:
+| it throws a real error, logs to the console, makes a failing request, and contains
+| a password field and a data-buggy-redact field to prove redaction works.
+*/
+
+if (! app()->isProduction()) {
+    Route::domain($host)->get('widget-demo', function () {
+        $key = \App\Models\WidgetKey::withoutGlobalScopes()->where('is_active', true)->first();
+
+        abort_if($key === null, 404, 'Seed the database first: ./bin/art migrate:fresh --seed');
+
+        return view('widget-demo', [
+            // Cache-busted, so widget rebuilds are picked up immediately.
+            'snippetUrl' => '/w/'.$key->public_key.'.js?v='.filemtime(public_path('widget/buggy.js')),
+        ]);
+    })->name('widget.demo');
+}
 
 /*
 |--------------------------------------------------------------------------
@@ -79,6 +111,20 @@ Route::domain('{workspace}.'.$host)
 
         Route::resource('labels', LabelController::class)
             ->only(['index', 'store', 'update', 'destroy']);
+
+        Route::get('inbox', [ReportController::class, 'index'])->name('reports.index');
+        Route::post('inbox/{report}/accept', [ReportController::class, 'accept'])->name('reports.accept');
+        Route::post('inbox/{report}/merge', [ReportController::class, 'merge'])->name('reports.merge');
+        Route::post('inbox/{report}/dismiss', [ReportController::class, 'dismiss'])->name('reports.dismiss');
+        Route::get('inbox/{report}/screenshot', [ReportController::class, 'screenshot'])
+            ->name('reports.screenshot');
+
+        Route::post('projects/{project}/widget-keys', [WidgetKeyController::class, 'store'])
+            ->name('widget-keys.store');
+        Route::patch('widget-keys/{widgetKey}', [WidgetKeyController::class, 'update'])
+            ->name('widget-keys.update');
+        Route::delete('widget-keys/{widgetKey}', [WidgetKeyController::class, 'destroy'])
+            ->name('widget-keys.destroy');
 
         Route::resource('views', SavedViewController::class)
             ->only(['store', 'update', 'destroy'])

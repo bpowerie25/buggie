@@ -6,6 +6,7 @@ import {
     Bookmark,
     CircleDot,
     FolderKanban,
+    Inbox,
     LayoutGrid,
     List,
     Moon,
@@ -179,6 +180,11 @@ export function CommandPalette({
                             <LayoutGrid className="size-4 text-ink-subtle" />
                             Switch to board
                             <Shortcut keys="g b" />
+                        </Item>
+                        <Item value="triage inbox reports" onSelect={() => go('/inbox')}>
+                            <Inbox className="size-4 text-ink-subtle" />
+                            Triage inbox
+                            <Shortcut keys="g t" />
                         </Item>
                         <Item value="labels" onSelect={() => go('/labels')}>
                             <Tag className="size-4 text-ink-subtle" />

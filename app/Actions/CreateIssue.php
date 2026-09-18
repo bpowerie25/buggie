@@ -54,6 +54,10 @@ class CreateIssue
                 'key' => "{$project->key}-{$number}",
                 'first_seen_at' => now(),
                 'last_seen_at' => now(),
+                // Set explicitly rather than left to the column default: callers hold
+                // this instance and increment it, and a default only the database
+                // knows about reads back as null.
+                'occurrence_count' => 1,
             ])->save();
 
             if ($labels = $attributes['labels'] ?? []) {

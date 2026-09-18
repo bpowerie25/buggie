@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\Report;
 use App\Models\SavedView;
 use App\Support\Tenancy\Tenancy;
 use Illuminate\Http\Request;
@@ -69,6 +70,11 @@ class HandleInertiaRequests extends Middleware
                     'can_edit' => $user->can('update', $view),
                 ])
                 : [],
+
+            // Staff only: the badge should not tell a client an inbox exists.
+            'inboxCount' => fn () => $user && $workspace && $user->can('viewAny', Report::class)
+                ? Report::awaitingTriage()->count()
+                : 0,
 
             'flash' => [
                 'success' => fn () => $request->session()->get('success'),

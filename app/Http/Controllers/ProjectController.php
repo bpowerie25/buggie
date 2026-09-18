@@ -74,6 +74,17 @@ class ProjectController extends Controller
 
         return Inertia::render('projects/edit', [
             'project' => $this->summary($project),
+            'widgetKeys' => $project->widgetKeys()->latest()->get()->map(fn ($key) => [
+                'id' => $key->id,
+                'public_key' => $key->public_key,
+                'allowed_origins' => $key->allowed_origins,
+                'mode' => $key->mode,
+                'require_email' => $key->require_email,
+                'capture_screenshot' => $key->capture_screenshot,
+                'is_active' => $key->is_active,
+                'last_used_at' => $key->last_used_at?->toIso8601String(),
+                'snippet' => '<script src="'.central_url('w/'.$key->public_key.'.js').'" async></script>',
+            ]),
         ]);
     }
 

@@ -43,6 +43,16 @@ class Project extends Model
         return $this->hasMany(Issue::class);
     }
 
+    public function widgetKeys(): HasMany
+    {
+        return $this->hasMany(WidgetKey::class);
+    }
+
+    public function reports(): HasMany
+    {
+        return $this->hasMany(Report::class);
+    }
+
     public function defaultStatus(): ?Status
     {
         return $this->statuses()->where('is_default', true)->first()

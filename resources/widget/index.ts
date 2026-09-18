@@ -1,0 +1,76 @@
+import { installCapture } from './capture';
+import { Widget, type Identity } from './ui';
+
+/**
+ * Buggy reporter widget.
+ *
+ *   <script src="https://buggy.app/w/pk_live_9f3a2b.js" async></script>
+ *
+ * The key is read from this script's own src, so the install is one tag with nothing
+ * to configure and every key serves the identical cacheable bundle.
+ */
+
+declare global {
+    interface Window {
+        buggy?: BuggyApi;
+    }
+}
+
+interface BuggyApi {
+    identify(identity: Identity): void;
+    setRelease(release: string): void;
+    open(): void;
+}
+
+function currentScript(): HTMLScriptElement | null {
+    if (document.currentScript instanceof HTMLScriptElement) {
+        return document.currentScript;
+    }
+
+    // async/defer scripts lose document.currentScript, so fall back to a src match.
+    return document.querySelector<HTMLScriptElement>('script[src*="/w/"][src$=".js"]');
+}
+
+function boot() {
+    const script = currentScript();
+    const src = script?.src ?? '';
+    const match = src.match(/\/w\/([A-Za-z0-9_]+)\.js/);
+
+    if (!match) {
+        console.warn('[buggy] Could not determine the widget key from the script URL.');
+        return;
+    }
+
+    const endpoint = new URL(src).origin;
+
+    // Buffers must be installed immediately: the interesting things happen well before
+    // anyone thinks to click "report a bug".
+    installCapture();
+
+    const widget = new Widget({
+        endpoint,
+        key: match[1],
+        requireEmail: script?.dataset.requireEmail === 'true',
+        captureScreenshot: script?.dataset.screenshot !== 'false',
+    });
+
+    const api: BuggyApi = {
+        identify: (identity) => Object.assign(widget.identity, identity ?? {}),
+        setRelease: (release) => (widget.release = release),
+        open: () => void widget.show(),
+    };
+
+    // Replay anything queued before this script finished loading.
+    const queued = window.buggy as unknown as { q?: [keyof BuggyApi, unknown][] } | undefined;
+    window.buggy = api;
+
+    for (const [method, argument] of queued?.q ?? []) {
+        (api[method] as (value: unknown) => void)?.(argument);
+    }
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', boot, { once: true });
+} else {
+    boot();
+}

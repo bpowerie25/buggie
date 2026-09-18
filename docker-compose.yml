@@ -10,20 +10,9 @@ services:
         condition: service_healthy
       redis:
         condition: service_started
-    environment: &app-env
-      DB_CONNECTION: pgsql
-      DB_HOST: postgres
-      DB_PORT: 5432
-      DB_DATABASE: buggy
-      DB_USERNAME: buggy
-      DB_PASSWORD: secret
-      REDIS_HOST: redis
-      CACHE_STORE: redis
-      SESSION_DRIVER: redis
-      QUEUE_CONNECTION: redis
-      MAIL_MAILER: smtp
-      MAIL_HOST: mailpit
-      MAIL_PORT: 1025
+    # No environment: block. Configuration comes from .env, which is bind-mounted.
+    # Variables set here would land in $_SERVER and override phpunit.xml's <env>,
+    # which is how the test suite ended up pointed at the development database.
     networks:
       - buggy
 
@@ -86,7 +75,6 @@ services:
         condition: service_healthy
       redis:
         condition: service_started
-    environment: *app-env
     command: php artisan queue:work --sleep=3 --tries=3 --max-time=3600
     networks:
       - buggy

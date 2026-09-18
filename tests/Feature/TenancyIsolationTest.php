@@ -165,7 +165,9 @@ class TenancyIsolationTest extends TestCase
             \App\Models\Label::class,
             \App\Models\SavedView::class,
             Project::class,
+            \App\Models\Report::class,
             Status::class,
+            \App\Models\WidgetKey::class,
         ];
     }
 

@@ -10,6 +10,7 @@ import {
     ChevronsUpDown,
     CircleDot,
     FolderKanban,
+    Inbox,
     Keyboard,
     LayoutDashboard,
     LogOut,
@@ -22,11 +23,13 @@ function NavLink({
     icon: Icon,
     children,
     active,
+    badge,
 }: {
     href: string;
     icon: typeof Bug;
     children: ReactNode;
     active: boolean;
+    badge?: number;
 }) {
     return (
         <Link
@@ -37,8 +40,13 @@ function NavLink({
                     : 'text-ink-muted hover:bg-surface hover:text-ink'
             }`}
         >
-            <Icon className="size-4" />
-            {children}
+            <Icon className="size-4 shrink-0" />
+            <span className="min-w-0 flex-1 truncate">{children}</span>
+            {badge ? (
+                <span className="shrink-0 rounded-full bg-accent px-1.5 py-0.5 text-[10px] font-semibold text-accent-ink">
+                    {badge}
+                </span>
+            ) : null}
         </Link>
     );
 }
@@ -55,7 +63,7 @@ export function AppLayout({
     activeQuery?: string;
     children: ReactNode;
 }) {
-    const { auth, workspace, workspaces, views, ziggy } = usePage<
+    const { auth, workspace, workspaces, views, inboxCount, ziggy } = usePage<
         SharedProps & { ziggy: { location: string } }
     >().props;
     const [switcherOpen, setSwitcherOpen] = useState(false);
@@ -76,6 +84,7 @@ export function AppLayout({
         },
         'g i': () => router.visit('/issues'),
         'g p': () => router.visit('/projects'),
+        'g t': () => router.visit('/inbox'),
         'g d': () => router.visit('/'),
     });
 
@@ -120,6 +129,16 @@ export function AppLayout({
                     >
                         Issues
                     </NavLink>
+                    {auth.role !== 'client' && (
+                        <NavLink
+                            href="/inbox"
+                            icon={Inbox}
+                            active={path.startsWith('/inbox')}
+                            badge={inboxCount}
+                        >
+                            Triage
+                        </NavLink>
+                    )}
                     <NavLink
                         href="/projects"
                         icon={FolderKanban}

@@ -13,8 +13,31 @@ abstract class TestCase extends BaseTestCase
     {
         parent::setUp();
 
+        $this->assertRunningAgainstTheTestDatabase();
+
         // Rendering a page should not depend on `npm run build` having been run.
         $this->withoutVite();
+    }
+
+    /**
+     * RefreshDatabase truncates whatever it is pointed at, so being pointed at the
+     * wrong database is silently destructive rather than merely wrong.
+     *
+     * This has happened once already: container environment variables land in
+     * $_SERVER, which Laravel reads before $_ENV, so they quietly beat phpunit.xml's
+     * <env force="true"> and the suite ran against development data. Assert rather
+     * than trust the configuration.
+     */
+    private function assertRunningAgainstTheTestDatabase(): void
+    {
+        $database = (string) config('database.connections.'.config('database.default').'.database');
+
+        if (! str_ends_with($database, '_testing') && $database !== ':memory:') {
+            $this->fail(
+                "Refusing to run: the test suite is pointed at [{$database}], which is not a "
+                .'test database. Check for DB_DATABASE in the environment overriding phpunit.xml.'
+            );
+        }
     }
 
     /**

@@ -15,6 +15,7 @@ const groups: { heading: string; items: [string, string][] }[] = [
             ['g b', 'Board'],
             ['g l', 'List'],
             ['g p', 'Projects'],
+            ['g t', 'Triage inbox'],
             ['g a', 'Assigned to me'],
         ],
     },
@@ -28,6 +29,15 @@ const groups: { heading: string; items: [string, string][] }[] = [
             ['a', 'Assignee'],
             ['p', 'Priority'],
             ['x', 'Select'],
+        ],
+    },
+    {
+        heading: 'Triage inbox',
+        items: [
+            ['a', 'Accept as issue'],
+            ['m', 'Merge into issue'],
+            ['s', 'Spam'],
+            ['x', 'Discard'],
         ],
     },
     {
