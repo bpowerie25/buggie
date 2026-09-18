@@ -29,6 +29,21 @@ return Application::configure(basePath: dirname(__DIR__))
         // anyone might reload out of habit.
         $middleware->redirectUsersTo('/');
 
+        // Behind a reverse proxy, which is how this is deployed and how most
+        // self-hosters will run it. Without this Laravel never sees
+        // X-Forwarded-Proto, generates every asset URL as http:// on an https://
+        // page, and the browser blocks them as mixed content — which presents as a
+        // blank white page with a working 200 response and nothing in the log.
+        //
+        // Private ranges only, not '*': the self-host compose file publishes the
+        // application's port directly, so on that setup a visitor could otherwise
+        // spoof the header themselves. Override with TRUSTED_PROXIES if a load
+        // balancer sits on a public address.
+        $middleware->trustProxies(at: array_map('trim', explode(',', (string) env(
+            'TRUSTED_PROXIES',
+            '10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,127.0.0.1,::1',
+        ))));
+
         $middleware->alias([
             'workspace' => \App\Http\Middleware\EnsureWorkspaceMember::class,
             'hosted' => \App\Http\Middleware\RequireHostedMode::class,

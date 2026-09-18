@@ -2,6 +2,17 @@
 	email {$ACME_EMAIL}
 }
 
+# www redirects to the apex. It is a reserved slug, so it can never be a workspace,
+# and without this it falls through to the workspace resolver and 404s. Listed before
+# the wildcard because Caddy matches the most specific site block.
+www.{$BUGGIE_DOMAIN} {
+	tls {
+		dns cloudflare {$CLOUDFLARE_API_TOKEN}
+	}
+
+	redir https://{$BUGGIE_DOMAIN}{uri} permanent
+}
+
 # The central domain and every workspace subdomain, on one wildcard certificate.
 #
 # Listed separately because a wildcard does not cover the apex: *.buggie.eu matches
