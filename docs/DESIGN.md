@@ -1049,3 +1049,42 @@ which workspace to send someone to.
 
 No test caught it because none visited an auth page while signed in. It was found by
 reloading a page out of habit, which is exactly how a real user would have found it.
+
+---
+
+## 19. Two bugs found by using it
+
+### Signing out did nothing
+
+Reported as "can't login as a client", which is exactly how it presents: you cannot
+sign in as somebody else because you cannot get out of the session you are in.
+
+Workspaces are subdomains, so `POST /logout` on `acme.buggy.app` redirected to
+`buggy.app` — a different origin. Inertia issues that as XHR, the browser follows the
+302 across the boundary, the cross-origin request is refused, and the page simply sits
+there. The console said `HttpNetworkError`; the interface said nothing.
+
+Every cross-origin redirect now goes through `redirect_across_domains()`, which
+returns `Inertia::location()` for Inertia requests — a 409 carrying
+`X-Inertia-Location`, telling the client to do a hard visit — and an ordinary redirect
+otherwise. That covers sign-in, sign-out, workspace creation, workspace switching,
+invitation acceptance and workspace deletion; `CrossDomainRedirectTest` covers all of
+them.
+
+Worth noting what made this hard to see: the tests passed, because they follow
+redirects without caring about origins. Only a browser can tell you that nothing
+happened.
+
+### Annotating a screenshot in a 380px panel
+
+The reporter widget captured a 1600px-wide screenshot and offered it for markup inside
+a 380px panel, which meant aiming at a thumbnail and scrolling in both directions to
+find anything.
+
+The preview is now a button into a full-screen editor: the same canvas element moves
+into an overlay scaled to the viewport (about 1400px wide), and moves back when done,
+so there is only ever one image and nothing is copied between them. Drawing listeners
+attach once rather than per open, or reopening would draw one rectangle per time the
+editor had been opened.
+
+The widget went from 6.1KB to 6.8KB gzipped, against a 20KB budget enforced in CI.

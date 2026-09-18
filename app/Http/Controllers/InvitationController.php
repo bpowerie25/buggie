@@ -8,6 +8,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
 
 /**
  * Accepting an invitation. Lives on the workspace domain but outside the membership
@@ -15,7 +16,7 @@ use Inertia\Response;
  */
 class InvitationController extends Controller
 {
-    public function show(Request $request, string $token): Response|RedirectResponse
+    public function show(Request $request, string $token): Response|SymfonyResponse
     {
         $invitation = Invitation::withoutGlobalScopes()
             ->with('workspace', 'invitedBy')
@@ -30,7 +31,7 @@ class InvitationController extends Controller
             // Come back here once they have an account or a session.
             $request->session()->put('invitation_token', $token);
 
-            return redirect(central_url('register').'?invitation='.$token);
+            return redirect_across_domains(central_url('register').'?invitation='.$token);
         }
 
         return Inertia::render('invitations/show', [
@@ -44,7 +45,7 @@ class InvitationController extends Controller
         ]);
     }
 
-    public function accept(Request $request, string $token, InviteToWorkspace $action): RedirectResponse
+    public function accept(Request $request, string $token, InviteToWorkspace $action): SymfonyResponse
     {
         $invitation = Invitation::withoutGlobalScopes()->where('token', $token)->firstOrFail();
 
@@ -55,7 +56,10 @@ class InvitationController extends Controller
 
         $request->session()->forget('invitation_token');
 
-        return redirect(workspace_url($invitation->workspace->slug))
-            ->with('success', "Welcome to {$invitation->workspace->name}.");
+        // Flashed rather than chained: Inertia::location returns a plain response,
+        // which has no ->with().
+        $request->session()->flash('success', "Welcome to {$invitation->workspace->name}.");
+
+        return redirect_across_domains(workspace_url($invitation->workspace->slug));
     }
 }

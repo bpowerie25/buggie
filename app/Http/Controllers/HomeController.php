@@ -7,6 +7,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
 
 /**
  * Central-domain root. Signed-out visitors get the marketing page; signed-in users
@@ -14,7 +15,7 @@ use Inertia\Response;
  */
 class HomeController extends Controller
 {
-    public function __invoke(Request $request): Response|RedirectResponse
+    public function __invoke(Request $request): Response|SymfonyResponse
     {
         $user = $request->user();
 
@@ -27,7 +28,7 @@ class HomeController extends Controller
             : $user->workspaces()->orderBy('name')->first();
 
         if ($workspace && $user->belongsToWorkspace($workspace)) {
-            return redirect(workspace_url($workspace->slug));
+            return redirect_across_domains(workspace_url($workspace->slug));
         }
 
         return $user->workspaces()->exists()

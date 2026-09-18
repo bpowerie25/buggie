@@ -51,6 +51,42 @@ canvas { width: 100%; border: 1px solid #e2e8f0; border-radius: 8px; cursor: cro
 .tool { border: 1px solid #cbd5e1; background: #fff; border-radius: 6px; padding: 3px 9px; font-size: 11px; cursor: pointer; color: #475569; }
 .tool[aria-pressed="true"] { border-color: #4f46e5; background: #eef2ff; color: #4f46e5; }
 .hint { font-size: 11px; color: #64748b; margin: 6px 0 0; }
+.shot { cursor: zoom-in; }
+.shot canvas { pointer-events: none; }
+.expand {
+  position: absolute; right: 8px; top: 8px;
+  display: flex; align-items: center; gap: 4px;
+  padding: 4px 8px; border: 0; border-radius: 6px;
+  background: rgba(15,23,42,.82); color: #fff; font-size: 11px; cursor: pointer;
+}
+
+/* Annotating a 1600px screenshot inside a 380px panel is unusable, so the editor
+   takes over the viewport. */
+.editor {
+  position: fixed; inset: 0; z-index: 2147483001;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 12px; padding: 20px; background: rgba(2,6,23,.88);
+}
+.editor canvas {
+  max-width: min(94vw, 1400px); max-height: 76vh;
+  width: auto; height: auto; cursor: crosshair;
+  border-radius: 10px; box-shadow: 0 24px 60px rgba(0,0,0,.5);
+  background: #fff; pointer-events: auto;
+}
+.editor-bar {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 8px 12px; border-radius: 999px; background: #fff;
+  box-shadow: 0 8px 24px rgba(0,0,0,.3);
+}
+.editor-bar .tool { padding: 5px 12px; font-size: 12px; }
+.editor-bar .hint { margin: 0; }
+.editor-done {
+  border: 0; border-radius: 999px; background: #4f46e5; color: #fff;
+  padding: 6px 16px; font-size: 12px; font-weight: 600; cursor: pointer;
+}
+@media (prefers-color-scheme: dark) {
+  .editor-bar { background: #0f172a; }
+}
 footer { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-top: 1px solid #e2e8f0; }
 .submit { flex: 1; border: 0; border-radius: 8px; background: #4f46e5; color: #fff; padding: 9px; font-size: 13px; font-weight: 600; cursor: pointer; }
 .submit:disabled { opacity: .5; cursor: default; }
@@ -74,6 +110,7 @@ export class Widget {
     private open = false;
     private canvas: HTMLCanvasElement | null = null;
     private tool: Tool = 'box';
+    private annotatorAttached = false;
 
     identity: Identity = {};
     release: string | null = null;
@@ -141,10 +178,48 @@ export class Widget {
         this.canvas = canvas;
         slot.innerHTML = '';
         slot.appendChild(canvas);
-        attachAnnotator(canvas, () => this.tool);
 
-        const tools = document.createElement('div');
-        tools.className = 'tools';
+        // The preview is a button into the editor; the drawing happens there, where
+        // the image is big enough to aim at.
+        const expand = document.createElement('button');
+        expand.type = 'button';
+        expand.className = 'expand';
+        expand.textContent = '✎ Mark up';
+        slot.appendChild(expand);
+
+        const hint = document.createElement('p');
+        hint.className = 'hint';
+        hint.textContent = 'Tap the image to highlight a problem or hide anything private.';
+        slot.appendChild(hint);
+
+        const open = () => this.openEditor();
+        expand.addEventListener('click', (e) => { e.stopPropagation(); open(); });
+        slot.addEventListener('click', open);
+    }
+
+    /**
+     * Full-screen annotation.
+     *
+     * The captured image is far larger than the panel, so marking it up in place means
+     * aiming at a thumbnail. The same canvas element moves into an overlay, scaled to
+     * the viewport, and moves back when done — so there is only ever one image and no
+     * copying between them.
+     */
+    private openEditor() {
+        if (!this.canvas || this.root.querySelector('.editor')) return;
+
+        const canvas = this.canvas;
+        const slot = this.root.querySelector('.shot') as HTMLElement;
+
+        const editor = document.createElement('div');
+        editor.className = 'editor';
+        editor.setAttribute('role', 'dialog');
+        editor.setAttribute('aria-label', 'Mark up the screenshot');
+
+        const bar = document.createElement('div');
+        bar.className = 'editor-bar';
+
+        const buttons: HTMLButtonElement[] = [];
 
         for (const [tool, label] of [
             ['box', 'Highlight'],
@@ -157,24 +232,63 @@ export class Widget {
             button.setAttribute('aria-pressed', String(this.tool === tool));
             button.addEventListener('click', () => {
                 this.tool = tool;
-                tools.querySelectorAll('.tool').forEach((el, index) =>
-                    el.setAttribute('aria-pressed', String(index === (tool === 'box' ? 0 : 1))),
+                buttons.forEach((b) =>
+                    b.setAttribute('aria-pressed', String(b.textContent === label)),
                 );
             });
-            tools.appendChild(button);
+            buttons.push(button);
+            bar.appendChild(button);
         }
 
         const hint = document.createElement('span');
         hint.className = 'hint';
-        hint.textContent = 'Drag on the image to mark or hide something.';
-        tools.appendChild(hint);
+        hint.textContent = 'Drag on the image.';
+        bar.appendChild(hint);
 
-        slot.appendChild(tools);
+        const done = document.createElement('button');
+        done.type = 'button';
+        done.className = 'editor-done';
+        done.textContent = 'Done';
+        bar.appendChild(done);
+
+        editor.appendChild(canvas);
+        editor.appendChild(bar);
+        this.root.appendChild(editor);
+
+        const close = () => {
+            // Put the image back in the panel so the reporter still sees what they
+            // are about to send.
+            slot.insertBefore(canvas, slot.firstChild);
+            editor.remove();
+            document.removeEventListener('keydown', onKey);
+        };
+
+        const onKey = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') {
+                event.stopPropagation();
+                close();
+            }
+        };
+
+        done.addEventListener('click', close);
+        editor.addEventListener('click', (event) => {
+            // Clicking the backdrop closes; clicking the image draws.
+            if (event.target === editor) close();
+        });
+        document.addEventListener('keydown', onKey);
+
+        // Listeners live on the canvas, which outlives the overlay — attaching on
+        // every open would draw one rectangle per time it had been opened.
+        if (!this.annotatorAttached) {
+            attachAnnotator(canvas, () => this.tool);
+            this.annotatorAttached = true;
+        }
     }
 
     private hide() {
         this.open = false;
         this.canvas = null;
+        this.annotatorAttached = false;
         this.renderLauncher();
     }
 

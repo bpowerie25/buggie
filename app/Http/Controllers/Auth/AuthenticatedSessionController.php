@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
 
 class AuthenticatedSessionController extends Controller
 {
@@ -20,7 +21,7 @@ class AuthenticatedSessionController extends Controller
         ]);
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request): SymfonyResponse
     {
         $credentials = $request->validate([
             'email' => ['required', 'string', 'email'],
@@ -35,16 +36,19 @@ class AuthenticatedSessionController extends Controller
 
         $request->session()->regenerate();
 
-        return redirect()->intended($this->destinationFor($request));
+        // intended() may hold a URL on any workspace subdomain.
+        return redirect_across_domains(
+            $request->session()->pull('url.intended', $this->destinationFor($request)),
+        );
     }
 
-    public function destroy(Request $request): RedirectResponse
+    public function destroy(Request $request): SymfonyResponse
     {
         Auth::guard('web')->logout();
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 
-        return redirect(central_url('/'));
+        return redirect_across_domains(central_url('/'));
     }
 
     /** Drop the user back into their last workspace, or the picker if they have none. */

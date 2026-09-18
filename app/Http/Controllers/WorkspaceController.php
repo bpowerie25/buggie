@@ -9,18 +9,19 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
 
 /**
  * Lives on the central domain: picking a workspace, and creating the first one.
  */
 class WorkspaceController extends Controller
 {
-    public function index(Request $request): Response|RedirectResponse
+    public function index(Request $request): Response|SymfonyResponse
     {
         $workspaces = $request->user()->workspaces()->orderBy('name')->get();
 
         if ($workspaces->count() === 1) {
-            return redirect(workspace_url($workspaces->first()->slug));
+            return redirect_across_domains(workspace_url($workspaces->first()->slug));
         }
 
         return Inertia::render('workspaces/index', [
@@ -40,7 +41,7 @@ class WorkspaceController extends Controller
         ]);
     }
 
-    public function store(StoreWorkspaceRequest $request, CreateWorkspace $action): RedirectResponse
+    public function store(StoreWorkspaceRequest $request, CreateWorkspace $action): SymfonyResponse
     {
         $workspace = $action->handle(
             $request->user(),
@@ -48,6 +49,6 @@ class WorkspaceController extends Controller
             $request->string('slug')->toString(),
         );
 
-        return redirect(workspace_url($workspace->slug));
+        return redirect_across_domains(workspace_url($workspace->slug));
     }
 }

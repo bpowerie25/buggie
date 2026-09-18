@@ -183,6 +183,17 @@ stored path, and check the issue's own visibility on every read. Images render i
 everything else downloads with a strict CSP. Do not add `sandbox` to an image response
 — it creates an opaque origin.
 
+## Crossing the origin boundary
+
+Workspaces are subdomains, so signing in, signing out, switching workspace and
+accepting an invitation all leave the current origin. Use
+`redirect_across_domains($url)`, never a bare `redirect()`: Inertia issues these as
+XHR, the browser follows the 302 to the other origin, the cross-origin request is
+refused, and **nothing appears to happen at all**. Sign-out failed silently this way.
+
+`Inertia::location()` returns a plain response, so flash any message to the session
+first rather than chaining `->with()`.
+
 ## Conventions
 
 - Inertia page components are lowercase paths: `Inertia::render('projects/index')`

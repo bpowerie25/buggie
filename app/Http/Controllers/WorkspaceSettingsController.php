@@ -8,6 +8,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
 
 class WorkspaceSettingsController extends Controller
 {
@@ -45,7 +46,7 @@ class WorkspaceSettingsController extends Controller
         return back()->with('success', 'Workspace updated.');
     }
 
-    public function destroy(Request $request): RedirectResponse
+    public function destroy(Request $request): SymfonyResponse
     {
         $workspace = $this->tenancy->currentOrFail();
         $this->authorize('delete', $workspace);
@@ -56,6 +57,8 @@ class WorkspaceSettingsController extends Controller
 
         $workspace->delete();
 
-        return redirect(central_url('/'))->with('success', 'Workspace deleted.');
+        $request->session()->flash('success', 'Workspace deleted.');
+
+        return redirect_across_domains(central_url('/'));
     }
 }
