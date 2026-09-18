@@ -3,15 +3,17 @@
 namespace App\Actions;
 
 use App\Enums\IssueEventType;
+use App\Enums\IssueVisibility;
+use App\Enums\NotificationReason;
 use App\Enums\StatusCategory;
 use App\Enums\WatchReason;
 use App\Models\Issue;
 use App\Models\Status;
 use App\Models\User;
-use App\Enums\NotificationReason;
 use App\Support\Notifications\Notifier;
 use App\Support\RichText\TiptapDocument;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Applies a partial update and writes one activity event per field that actually
@@ -128,6 +130,10 @@ class UpdateIssue
         $previous = $issue->assignee;
         $next = $userId ? User::find($userId) : null;
 
+        if ($next !== null) {
+            $this->assignableToClient($issue, $next, $actor);
+        }
+
         $issue->recordEvent(
             $next ? IssueEventType::Assigned : IssueEventType::Unassigned,
             ['from' => $previous?->name, 'to' => $next?->name],
@@ -139,6 +145,43 @@ class UpdateIssue
 
         if ($next !== null) {
             $this->notifier->record($next, $issue, NotificationReason::Assigned, $actor);
+        }
+    }
+
+    /**
+     * Assigning to a client makes the issue visible to them, and refuses outright if
+     * they have no grant on its project.
+     *
+     * Asking a client a question is a real workflow — "which browser was it?", "can
+     * you confirm this is fixed?" — and it was half-built: a client could be assigned,
+     * and would be notified, but IssuePolicy still required the issue to be marked
+     * client-visible, so following the notification gave them a 404. Being told about
+     * something you then cannot open is worse than not being told.
+     *
+     * The visibility change is recorded as its own event rather than done quietly.
+     * Who can see an issue is the most consequential thing about it in this product,
+     * and it should never change without the activity feed saying so.
+     */
+    private function assignableToClient(Issue $issue, User $assignee, ?User $actor): void
+    {
+        if ($assignee->membershipIn($issue->workspace)?->isStaff() ?? true) {
+            return;
+        }
+
+        if (! $assignee->projects()->whereKey($issue->project_id)->exists()) {
+            throw ValidationException::withMessages([
+                'assignee_id' => "{$assignee->name} does not have access to this project, so they cannot be asked about it.",
+            ]);
+        }
+
+        if ($issue->visibility !== IssueVisibility::Client) {
+            $issue->visibility = IssueVisibility::Client;
+
+            // Not internal: the client should see why they can suddenly see this.
+            $issue->recordEvent(IssueEventType::VisibilityChanged, [
+                'to' => IssueVisibility::Client->value,
+                'because' => 'assigned to a client',
+            ], $actor, isInternal: false);
         }
     }
 
