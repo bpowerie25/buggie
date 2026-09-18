@@ -60,8 +60,17 @@ struct RedactionTests {
 
     @Test("The same view does appear when it is not marked")
     func unredactedViewIsPresent() throws {
-        // The control. Without it the test above passes for a capture that is blank,
-        // or for a `containsRed` that never returns true.
+        // The control, and it is not a formality: it is the only test here that
+        // catches the bug this file exists for.
+        //
+        // Reverting `captureScreen` to `afterScreenUpdates: false` was tried. The test
+        // above — the one that sounds like the important one — *passed*, because
+        // nothing was drawn at all and a blank image contains no red. Only this test
+        // failed. A negative assertion is satisfied by an empty result, so on its own
+        // it proves nothing about redaction; it proves the capture produced no red,
+        // which is also true of a capture that produced nothing.
+        //
+        // Delete this and the suite still passes while the screenshot is broken.
         let data = try #require(Buggie.shared.capture(hierarchy(redacted: false)))
 
         #expect(try containsRed(data) == true)

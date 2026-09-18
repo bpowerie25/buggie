@@ -1383,6 +1383,22 @@ Swift Package Manager insists on `Package.swift` at a repository root, so this c
 be consumed from `packages/swift` in the monorepo. It needs a `buggie-swift` mirror
 repository before anyone can add it as a dependency.
 
+### The negative test was worthless on its own
+
+The redaction tests were checked by putting the bug back: `afterScreenUpdates: false`,
+fallback disabled. The result is worth recording, because it is not what anyone would
+predict.
+
+"A marked view does not appear in the capture" — the test that sounds like the
+important one — **passed**. With the bug in place nothing was drawn at all, and a blank
+image contains no red. The only test that failed was the control: "the same view does
+appear when it is not marked".
+
+A negative assertion is satisfied by an empty result. On its own it says the capture
+contained no secret, which is equally true of a capture that contained nothing. Every
+"X must not appear" test needs a paired "X does appear when it should" or it is
+decoration — and this one would have shipped a broken screenshot with a green suite.
+
 ### The web widget had the same gap
 
 Porting the redaction to Swift made something obvious: the web widget's redaction had

@@ -59,7 +59,13 @@ fi
 
 echo
 echo "==> Redaction tests (simulator)"
+# Buggie-Package, not Buggie: SwiftPM generates a scheme per library product, and
+# only the package-wide one carries the test targets.
+# Not -quiet: it suppresses swift-testing's output while leaving XCTest's empty
+# bundles visible, so a run that executed nothing reads exactly like a passing one.
 xcodebuild test \
-    -scheme Buggie \
+    -scheme Buggie-Package \
     -destination "id=$simulator" \
-    -quiet
+    | grep -E "^(◇|✔|✘)|Test run with|error:" || true
+
+exit "${PIPESTATUS[0]}"
