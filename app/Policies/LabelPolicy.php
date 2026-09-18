@@ -11,9 +11,11 @@ class LabelPolicy
 {
     public function __construct(private Tenancy $tenancy) {}
 
+    /** Managing the workspace vocabulary is staff work; clients see labels on their
+     * own issues and nowhere else. */
     public function viewAny(User $user): bool
     {
-        return $this->role($user) !== null;
+        return $this->role($user)?->isStaff() ?? false;
     }
 
     public function create(User $user): bool

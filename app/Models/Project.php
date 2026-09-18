@@ -92,6 +92,25 @@ class Project extends Model
     }
 
     /**
+     * Projects this person may know about at all.
+     *
+     * Staff see every project in the workspace. A client sees only the ones they were
+     * granted — not merely a filtered issue list, but no knowledge that the others
+     * exist. An agency runs several clients in one workspace, and one client learning
+     * the names of another's projects is a leak even if they can read none of the work.
+     */
+    public function scopeVisibleTo(Builder $query, User $user): Builder
+    {
+        $workspace = app(\App\Support\Tenancy\Tenancy::class)->current();
+
+        if ($workspace && ($user->membershipIn($workspace)?->isStaff() ?? false)) {
+            return $query;
+        }
+
+        return $query->whereIn('id', $user->projects()->select('projects.id'));
+    }
+
+    /**
      * Reserve the next issue number for this project.
      *
      * Locks the project row so concurrent requests cannot hand out the same number.

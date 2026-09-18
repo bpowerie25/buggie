@@ -43,6 +43,14 @@ class DatabaseSeeder extends Seeder
             ['name' => 'Jo Patel', 'password' => 'password'],
         );
 
+        // A second client, on a different project, so the demo shows what an agency
+        // actually looks like: several customers in one workspace, none of them aware
+        // of the others.
+        $otherClient = User::firstOrCreate(
+            ['email' => 'northwind@example.com'],
+            ['name' => 'Ade Okafor', 'password' => 'password'],
+        );
+
         $workspace = app(CreateWorkspace::class)->handle($owner, 'Acme Ltd', 'acme');
 
         $workspace->members()->attach($dev->id, [
@@ -51,8 +59,11 @@ class DatabaseSeeder extends Seeder
         $workspace->members()->attach($client->id, [
             'role' => WorkspaceRole::Client->value, 'joined_at' => now(),
         ]);
+        $workspace->members()->attach($otherClient->id, [
+            'role' => WorkspaceRole::Client->value, 'joined_at' => now(),
+        ]);
 
-        app(Tenancy::class)->run($workspace, function () use ($owner, $dev, $client) {
+        app(Tenancy::class)->run($workspace, function () use ($owner, $dev, $client, $otherClient) {
             $labels = collect([
                 ['name' => 'regression', 'color' => '#ef4444'],
                 ['name' => 'needs-repro', 'color' => '#f59e0b'],
@@ -73,6 +84,28 @@ class DatabaseSeeder extends Seeder
             ]);
 
             $portal->clients()->attach($client->id, ['role' => 'client']);
+
+            // A different customer's project, granted to a different client.
+            $northwind = app(CreateProject::class)->handle([
+                'name' => 'Northwind Site',
+                'key' => 'NW',
+                'description' => "Northwind's marketing site.",
+            ]);
+
+            $northwind->clients()->attach($otherClient->id, ['role' => 'client']);
+
+            app(CreateIssue::class)->handle($northwind, [
+                'title' => 'Contact form rejects valid phone numbers',
+                'priority' => IssuePriority::High->value,
+                'visibility' => IssueVisibility::Client->value,
+            ], $owner);
+
+            // Same project, but never marked client-visible — being in the project is
+            // not enough on its own.
+            app(CreateIssue::class)->handle($northwind, [
+                'title' => 'Rewrite their legacy jQuery before the redesign',
+                'priority' => IssuePriority::Low->value,
+            ], $owner);
 
             $checkout = app(CreateIssue::class)->handle($portal, [
                 'title' => 'Checkout button does nothing on Safari',
@@ -253,6 +286,7 @@ class DatabaseSeeder extends Seeder
         $this->command->line('  brian@example.com  / password   (owner)');
         $this->command->line('  dev@example.com    / password   (member)');
         $this->command->line('  client@example.com / password   (client — Customer Portal only)');
+        $this->command->line('  northwind@example.com / password (client — Northwind Site only)');
         $this->command->info('globex.buggy.localhost:8080');
         $this->command->line('  someone@globex.test / password');
     }

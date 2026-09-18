@@ -133,6 +133,25 @@ Reports are **not** issues. They land in `reports` and are promoted, merged or
 discarded from the triage inbox. Anything the fingerprinter cannot group with
 confidence goes to a human.
 
+## What a client may know
+
+Three separate gates, and all of them must be open:
+
+1. **Workspace membership** with the `client` role.
+2. **A grant on the project** (`project_user`). Without it the project does not exist
+   as far as they are concerned — not a filtered list, no knowledge of the name.
+3. **`visibility = client` on the individual issue.** Holding the project is not
+   enough; issues are shared one at a time, deliberately.
+
+A client may hold several projects; they see the union. An agency runs several
+customers in one workspace, so **one client learning another's project name is a leak**
+even when they can read none of the work. Everything a client can reach is scoped:
+`Project::visibleTo()`, the filter-bar facets (projects, labels, members), and saved
+views — shared views belong to the team and can be named after a customer.
+
+`MultiClientAccessTest` asserts the whole shape, including that the serialised page
+props contain no other customer's name.
+
 ## Client-facing surfaces
 
 Three things reach people who are not staff, and all three default to silence:

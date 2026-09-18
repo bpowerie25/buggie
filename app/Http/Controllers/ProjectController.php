@@ -9,17 +9,19 @@ use App\Http\Requests\UpdateProjectRequest;
 use App\Models\Project;
 use App\Models\Status;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class ProjectController extends Controller
 {
-    public function index(): Response
+    public function index(Request $request): Response
     {
         $this->authorize('viewAny', Project::class);
 
         return Inertia::render('projects/index', [
             'projects' => Project::query()
+                ->visibleTo($request->user())
                 ->orderBy('is_archived')
                 ->orderBy('name')
                 ->get()

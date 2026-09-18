@@ -9,14 +9,14 @@ use Inertia\Response;
 
 class DashboardController extends Controller
 {
-    public function __invoke(Tenancy $tenancy): Response
+    public function __invoke(\Illuminate\Http\Request $request, Tenancy $tenancy): Response
     {
         return Inertia::render('dashboard', [
             'workspace' => [
                 'name' => $tenancy->currentOrFail()->name,
                 'trial_ends_at' => $tenancy->currentOrFail()->trial_ends_at?->toDateString(),
             ],
-            'projects' => Project::active()
+            'projects' => Project::active()->visibleTo($request->user())
                 ->withCount('statuses')
                 ->orderBy('name')
                 ->get()

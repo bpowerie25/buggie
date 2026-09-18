@@ -149,11 +149,15 @@ export function AppLayout({
                     >
                         Projects
                     </NavLink>
-                    <NavLink href="/labels" icon={Tag} active={path.startsWith('/labels')}>
-                        Labels
-                    </NavLink>
                     {auth.role !== 'client' && (
                         <>
+                            <NavLink
+                                href="/labels"
+                                icon={Tag}
+                                active={path.startsWith('/labels')}
+                            >
+                                Labels
+                            </NavLink>
                             <NavLink
                                 href="/settings/members"
                                 icon={Users}

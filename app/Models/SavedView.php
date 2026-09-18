@@ -29,9 +29,21 @@ class SavedView extends Model
         return $this->user_id === null;
     }
 
-    /** Views this user may see: the shared ones plus their own. */
+    /**
+     * Views this user may see: the shared ones plus their own.
+     *
+     * Shared views belong to the team. Their names describe internal process and can
+     * name customers, so a client sees only views they made themselves.
+     */
     public function scopeVisibleTo(Builder $query, User $user): Builder
     {
+        $workspace = app(\App\Support\Tenancy\Tenancy::class)->current();
+        $isStaff = $workspace && ($user->membershipIn($workspace)?->isStaff() ?? false);
+
+        if (! $isStaff) {
+            return $query->where('user_id', $user->id);
+        }
+
         return $query->where(fn (Builder $q) => $q
             ->whereNull('user_id')
             ->orWhere('user_id', $user->id));

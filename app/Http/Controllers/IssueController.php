@@ -254,19 +254,36 @@ class IssueController extends Controller
     /** @return array<string, mixed> */
     private function facets(): array
     {
+        $user = request()->user();
+        $staff = $this->isStaff($user);
+
         return [
-            'projects' => Project::active()->orderBy('name')
+            'projects' => Project::active()->visibleTo($user)->orderBy('name')
                 ->get(['id', 'name', 'key', 'slug'])
                 ->map->only(['id', 'name', 'key', 'slug']),
-            'labels' => Label::orderBy('name')->get(['id', 'name', 'color'])
+
+            // Clients get only the labels actually on work they can see. The full
+            // list is the team's own vocabulary and says plenty about other clients.
+            'labels' => Label::query()
+                ->unless($staff, fn ($q) => $q->whereHas(
+                    'issues',
+                    fn ($issues) => $issues->visibleToClient($user),
+                ))
+                ->orderBy('name')->get(['id', 'name', 'color'])
                 ->map->only(['id', 'name', 'color']),
-            'members' => $this->tenancy->currentOrFail()->members()
-                ->orderBy('name')->get(['users.id', 'users.name'])
-                ->map(fn (User $u) => ['id' => $u->id, 'name' => $u->name]),
+
+            // Clients cannot assign anything, so the staff list is of no use to them
+            // and is simply a list of names they have not been introduced to.
+            'members' => $staff
+                ? $this->tenancy->currentOrFail()->members()
+                    ->orderBy('name')->get(['users.id', 'users.name'])
+                    ->map(fn (User $u) => ['id' => $u->id, 'name' => $u->name])
+                : collect(),
             'priorities' => IssuePriority::options(),
             'types' => IssueType::options(),
             // Keyed by project: the list spans projects and each has its own workflow.
             'statuses_by_project' => Status::query()
+                ->whereIn('project_id', Project::visibleTo($user)->select('projects.id'))
                 ->orderBy('position')
                 ->get()
                 ->groupBy('project_id')

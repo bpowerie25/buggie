@@ -1088,3 +1088,56 @@ attach once rather than per open, or reopening would draw one rectangle per time
 editor had been opened.
 
 The widget went from 6.1KB to 6.8KB gzipped, against a 20KB budget enforced in CI.
+
+---
+
+## 20. Clients, scoped properly
+
+Asked whether the product supports several projects, several clients, and a client
+confined to one project. It did — and checking properly turned up three leaks.
+
+### The model
+
+Three gates, all of which must be open for a client to see an issue:
+
+| Gate | |
+|---|---|
+| Workspace membership | role `client` |
+| Project grant | a row in `project_user` |
+| Issue visibility | `visibility = client`, set per issue |
+
+The third is the one people do not expect: **holding the project is not enough**.
+Issues are shared with a client one at a time, because a project contains plenty that
+is not the customer's business — internal rewrites, estimates, opinions about their
+legacy code.
+
+A client may hold several projects and sees the union. Nothing restricts them to one.
+
+### What was leaking
+
+An agency runs several customers in one workspace, which makes one client learning
+another's project *name* a leak even when they can read none of the work. Three places
+gave it away:
+
+- The **dashboard** and **project list** returned every project in the workspace.
+- The **labels page** was reachable by clients, exposing the team's own vocabulary and
+  issue counts across projects they cannot see.
+- The **filter bar** offered every project, every label, and the full staff list.
+
+Also fixed: shared **saved views** were shown to clients, and a view named "Globex
+escalations" names a customer in the sidebar of a different one.
+
+Everything a client can reach now goes through `Project::visibleTo()` or an equivalent
+scope, `LabelPolicy::viewAny` is staff-only, facets are filtered per role, and
+`SavedView::visibleTo` gives clients only their own.
+
+`MultiClientAccessTest` builds the agency shape — two client projects, one internal,
+a different client on each — and asserts that the serialised page props for one client
+contain no trace of the other customer.
+
+### Why the earlier tests missed it
+
+`ClientVisibilityTest` asked "can this client read that issue?", which was always
+answered correctly. It never asked "what does this client learn about the existence of
+things they cannot read?" — a different question, and the one that matters when one
+workspace holds several customers.
