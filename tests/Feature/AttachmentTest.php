@@ -142,7 +142,7 @@ class AttachmentTest extends TestCase
             'role' => WorkspaceRole::Client->value, 'joined_at' => now(),
         ]);
 
-        $this->actingAs($client)->get($url)->assertForbidden();
+        $this->actingAs($client)->get($url)->assertNotFound();
 
         // And a guest gets nothing at all. actingAs persists for the rest of the
         // test, so the guard has to be cleared to make a genuinely anonymous request.

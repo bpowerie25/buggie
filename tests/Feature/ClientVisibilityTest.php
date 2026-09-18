@@ -123,7 +123,7 @@ class ClientVisibilityTest extends TestCase
 
         $this->actingAs($client)
             ->get($this->workspaceUrl($workspace, '/issues/'.$internal->key))
-            ->assertForbidden();
+            ->assertNotFound();
 
         // And it is absent from the list, not merely hidden in the UI.
         $this->actingAs($client)
@@ -144,7 +144,7 @@ class ClientVisibilityTest extends TestCase
 
         $this->actingAs($client)
             ->get($this->workspaceUrl($workspace, '/issues/'.$other->key))
-            ->assertForbidden();
+            ->assertNotFound();
     }
 
     #[Test]

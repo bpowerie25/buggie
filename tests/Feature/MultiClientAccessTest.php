@@ -121,7 +121,7 @@ class MultiClientAccessTest extends TestCase
                 $this->world['workspace'],
                 '/issues/'.$this->world['issues']['northwind_internal']->key,
             ))
-            ->assertForbidden();
+            ->assertNotFound();
     }
 
     #[Test]
@@ -135,7 +135,7 @@ class MultiClientAccessTest extends TestCase
                 $this->world['workspace'],
                 '/issues/'.$this->world['issues']['northwind_shared']->key,
             ))
-            ->assertForbidden();
+            ->assertNotFound();
     }
 
     #[Test]

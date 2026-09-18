@@ -7,6 +7,7 @@ use App\Enums\WorkspaceRole;
 use App\Models\Issue;
 use App\Models\User;
 use App\Support\Tenancy\Tenancy;
+use Illuminate\Auth\Access\Response;
 
 /**
  * Tenancy is handled by WorkspaceScope — an issue from another workspace is not
@@ -21,22 +22,32 @@ class IssuePolicy
         return $this->role($user) !== null;
     }
 
-    public function view(User $user, Issue $issue): bool
+    /**
+     * Denied as NOT FOUND rather than forbidden.
+     *
+     * A 403 confirms the issue exists. Keys are sequential per project, so a client
+     * who can see WEB-4 could walk WEB-1..WEB-500 and learn how many issues sit in
+     * projects they were never granted — which is a fair measure of how much work
+     * the agency is doing for its other clients.
+     */
+    public function view(User $user, Issue $issue): Response
     {
         $role = $this->role($user);
 
         if ($role === null) {
-            return false;
+            return Response::denyAsNotFound();
         }
 
         if ($role->isStaff()) {
-            return true;
+            return Response::allow();
         }
 
         // Clients: the issue must be marked client-visible AND sit in a project they
         // were granted. Either one alone is not enough.
-        return $issue->visibility === IssueVisibility::Client
+        $visible = $issue->visibility === IssueVisibility::Client
             && $user->projects()->whereKey($issue->project_id)->exists();
+
+        return $visible ? Response::allow() : Response::denyAsNotFound();
     }
 
     public function create(User $user): bool
@@ -51,7 +62,7 @@ class IssuePolicy
         return $this->role($user)?->isStaff() ?? false;
     }
 
-    public function comment(User $user, Issue $issue): bool
+    public function comment(User $user, Issue $issue): Response
     {
         return $this->view($user, $issue);
     }
