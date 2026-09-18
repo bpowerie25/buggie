@@ -1340,15 +1340,40 @@ Deliberately. What a bug report looks like inside someone's app is their decisio
 a sheet we shipped would be the first thing they had to fight. The SDK gives them
 `captureScreen()` and `report(title:body:)`.
 
-### What is *not* verified
+### Three bugs found by reading the untestable part
 
-Worth stating plainly, because the tests passing does not cover it:
+The UIKit layer could not be compiled when it was written, so it was read line by
+line instead. That found three defects, one of them serious:
 
-- **The UIKit layer has never been compiled.** There is no Xcode on this machine, only
-  the Command Line Tools, so `canImport(UIKit)` is false and that whole block is
-  skipped. It has been syntax-checked by forcing the conditional and running
-  `swiftc -parse`, which catches typos and unbalanced braces and proves nothing about
-  whether `drawHierarchy` behaves. It needs a run on a real device before release.
+- **The redaction did not work.** `captureScreen()` hid the redacted views and then
+  rendered with `drawHierarchy(afterScreenUpdates: false)`, which draws the content
+  *already composited for the screen* — composited before anything was hidden. The
+  password field would have been in the image, and nothing anywhere would have said
+  so. This is the same failure as the web widget's canvas masks, arrived at by a
+  completely different route, which is what makes it worth writing down: the rule
+  "hide before rendering, never mask afterwards" is not enough on its own if the
+  render is reading from a stale buffer. `afterScreenUpdates: true` is now load-bearing
+  and commented as such, with a fallback to the layer tree for windows that refuse to
+  snapshot.
+- **UIKit was read off the main actor.** `environment()` touched `UIDevice.current`
+  and `UIScreen.main` but was called from `report()`, which is async and non-isolated.
+  A hard error under the Swift 6 language mode, and a real thread-safety bug before
+  that. Device details are now gathered through an explicit `MainActor.run` hop, so
+  a report can still be filed from wherever the problem was noticed.
+- **`UIScreen.main` was the wrong screen.** It says nothing useful about an iPad
+  running two scenes side by side. The viewport now comes from the window itself.
+
+Splitting the environment so it no longer touches UIKit had a second effect: it became
+testable, and is.
+
+### What is *still* not verified
+
+- **The UIKit layer has never been compiled.** `canImport(UIKit)` is false without an
+  iOS SDK, so the block is skipped entirely. It is syntax-checked by forcing the
+  conditional and running `swiftc -parse`, which catches typos and unbalanced braces
+  and proves nothing about types. `test.sh` now runs `xcodebuild -destination
+  'generic/platform=iOS'` when Xcode is present, which is the only real check this
+  code ever gets.
 - **No report has been filed from an actual phone.** The transport is tested against
   constructed responses, not against the running server.
 

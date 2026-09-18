@@ -111,7 +111,7 @@ public final class Buggie: @unchecked Sendable {
                 email: reporterEmail ?? state.identity["email"],
                 ref: state.identity["id"]
             ),
-            environment: Self.environment(release: state.release, identity: state.identity),
+            environment: await Self.fullEnvironment(release: state.release, identity: state.identity),
             breadcrumbs: breadcrumbs.entries,
             network: network.entries,
             error: state.error,
@@ -142,7 +142,24 @@ public final class Buggie: @unchecked Sendable {
         return Snapshot(transport: transport, identity: identity, release: release, error: lastError)
     }
 
-    /// What the device can tell us about itself.
+    /// The device details have to be read on the main actor, so they are fetched with
+    /// a hop rather than by making the whole of `report()` main-actor isolated — an
+    /// app should be able to file a report from wherever it noticed the problem.
+    static func fullEnvironment(release: String?, identity: [String: String]) async -> [String: AnyCodable] {
+        var environment = Self.environment(release: release, identity: identity)
+
+        #if canImport(UIKit)
+        let device = await MainActor.run { Self.deviceEnvironment() }
+        environment.merge(device) { _, new in new }
+        #endif
+
+        return environment
+    }
+
+    /// What can be said about the report without touching UIKit.
+    ///
+    /// Deliberately free of device details: every UIKit accessor below is main-actor
+    /// isolated, and this runs on whatever thread `report()` was called from.
     static func environment(release: String?, identity: [String: String]) -> [String: AnyCodable] {
         var environment: [String: AnyCodable] = [
             "platform": AnyCodable("ios"),
@@ -152,15 +169,6 @@ public final class Buggie: @unchecked Sendable {
         if let release { environment["release"] = AnyCodable(release) }
         if !identity.isEmpty { environment["identity"] = AnyCodable(identity) }
 
-        #if canImport(UIKit)
-        let device = UIDevice.current
-        environment["os"] = AnyCodable("\(device.systemName) \(device.systemVersion)")
-        environment["device"] = AnyCodable(device.model)
-        environment["viewport"] = AnyCodable(
-            "\(Int(UIScreen.main.bounds.width))x\(Int(UIScreen.main.bounds.height))"
-        )
-        environment["pixel_ratio"] = AnyCodable(Double(UIScreen.main.scale))
-
         if let bundle = Bundle.main.infoDictionary {
             if let version = bundle["CFBundleShortVersionString"] as? String {
                 environment["app_version"] = AnyCodable(version)
@@ -169,7 +177,6 @@ public final class Buggie: @unchecked Sendable {
                 environment["app_build"] = AnyCodable(build)
             }
         }
-        #endif
 
         return environment
     }

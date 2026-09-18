@@ -24,5 +24,9 @@ let package = Package(
         .target(name: "Buggie", dependencies: ["BuggieCore"]),
 
         .testTarget(name: "BuggieCoreTests", dependencies: ["BuggieCore"]),
+
+        // Only the parts of the device layer that do not need a device. The UIKit
+        // code is covered by compiling for iOS, not from here.
+        .testTarget(name: "BuggieTests", dependencies: ["Buggie"]),
     ]
 )
