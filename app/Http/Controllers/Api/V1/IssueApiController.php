@@ -143,6 +143,18 @@ class IssueApiController extends Controller
              * the screens — the API disagreeing with the UI about who may see what is
              * a mistake this codebase has already made once.
              */
+            /*
+             * Time, for staff tokens only.
+             *
+             * A client's token gets the key absent rather than zeroed: "no time
+             * logged" and "you may not see the time" are different answers, and only
+             * one of them is true.
+             */
+            ...($this->isStaff(request()) ? [
+                'estimate_minutes' => $issue->estimate_minutes,
+                'time_spent_minutes' => (int) $issue->timeEntries()->sum('minutes'),
+            ] : []),
+
             'custom_fields' => collect(
                 app(\App\Support\CustomFields\FieldValues::class)
                     ->forIssue($issue, clientOnly: ! $this->isStaff(request()))

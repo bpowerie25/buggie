@@ -3,12 +3,14 @@ import { Head, Link } from '@inertiajs/react';
 import {
     Bug,
     Camera,
+    Clock,
     Check,
     Code2,
     Inbox,
     Layers,
     Mail,
     Server,
+    SlidersHorizontal,
     Smartphone,
     Tag,
     Upload,
@@ -88,6 +90,16 @@ const alsoDoes = [
         icon: Upload,
         title: 'Bring your backlog',
         body: 'Import a CSV export from Jira or MantisBT, or a spreadsheet you have been keeping. You see what it will create before anything is created.',
+    },
+    {
+        icon: SlidersHorizontal,
+        title: 'Fields that match the work',
+        body: 'Add your own fields per project — a client reference, an environment, a browser. Filter on them, export them, fill them in over the API. Each one is internal until you say otherwise.',
+    },
+    {
+        icon: Clock,
+        title: 'Time, if you bill for it',
+        body: 'Log hours against an issue, set an estimate, and get a total per client and per person for any month. Exports in minutes and hours, so nobody argues about rounding. Clients never see it.',
     },
     {
         icon: Webhook,

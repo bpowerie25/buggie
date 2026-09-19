@@ -256,6 +256,17 @@ Route::domain('{workspace}.'.$host)
         Route::delete('projects/{project}/versions/{version}', [\App\Http\Controllers\VersionController::class, 'destroy'])
             ->name('versions.destroy');
 
+        Route::post('issues/{issue}/time', [\App\Http\Controllers\TimeEntryController::class, 'store'])
+            ->name('time.store');
+        Route::delete('time/{entry}', [\App\Http\Controllers\TimeEntryController::class, 'destroy'])
+            ->name('time.destroy');
+        Route::patch('issues/{issue}/estimate', [\App\Http\Controllers\TimeEntryController::class, 'estimate'])
+            ->name('time.estimate');
+        Route::get('time', [\App\Http\Controllers\TimeReportController::class, 'index'])
+            ->name('time.index');
+        Route::get('time/export', [\App\Http\Controllers\TimeReportController::class, 'export'])
+            ->name('time.export');
+
         Route::post('projects/{project}/fields', [\App\Http\Controllers\CustomFieldController::class, 'store'])
             ->name('fields.store');
         Route::patch('projects/{project}/fields/{field}', [\App\Http\Controllers\CustomFieldController::class, 'update'])

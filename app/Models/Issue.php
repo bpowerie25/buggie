@@ -64,6 +64,11 @@ class Issue extends Model
         return $this->hasMany(CustomFieldValue::class);
     }
 
+    public function timeEntries(): HasMany
+    {
+        return $this->hasMany(TimeEntry::class);
+    }
+
     public function reporter(): BelongsTo
     {
         return $this->belongsTo(User::class, 'reporter_id');

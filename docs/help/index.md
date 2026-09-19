@@ -29,11 +29,12 @@ else. See [Billing and plans](billing.md) and [Self-hosting](self-hosting.md).
 8. [Labels, priorities, types and assignees](labels-and-fields.md).
 9. [Clients](clients.md) — inviting them and controlling what they see.
 10. [Custom fields](custom-fields.md) — extra fields on an issue, per project.
-11. [White-labelling](branding.md) — putting your client's name on what they see.
-12. [Releases and versions](releases.md) — what a bug was found in, and fixed in.
-13. [Email](email.md) and [Notifications](notifications.md).
-14. [Keyboard shortcuts](keyboard.md).
-15. [Billing and plans](billing.md), [Self-hosting](self-hosting.md),
+11. [Time tracking](time-tracking.md) — hours against issues, and what they add up to.
+12. [White-labelling](branding.md) — putting your client's name on what they see.
+13. [Releases and versions](releases.md) — what a bug was found in, and fixed in.
+14. [Email](email.md) and [Notifications](notifications.md).
+15. [Keyboard shortcuts](keyboard.md).
+16. [Billing and plans](billing.md), [Self-hosting](self-hosting.md),
     [Privacy and security](privacy-and-security.md).
 
 ## If you were invited to a workspace as a client

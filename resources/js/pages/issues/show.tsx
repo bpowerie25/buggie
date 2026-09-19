@@ -1,4 +1,5 @@
 import { Attachments, type AttachmentRow } from '@/components/attachments';
+import { formatDuration, parseDuration } from '@/lib/duration';
 import {
     CustomFieldInput,
     CustomFieldValueText,
@@ -117,6 +118,194 @@ function eventSentence(event: Event): string {
     }
 }
 
+/**
+ * Logging time, and what has been logged.
+ *
+ * Staff only — this whole component is absent from a client's payload rather than
+ * hidden by it. The duration box shows what it understood before anything is saved,
+ * because "90" meaning ninety minutes is a guess somebody will get wrong otherwise.
+ */
+interface TimeEntryRow {
+    id: number;
+    duration: string;
+    spent_on: string;
+    note: string | null;
+    billable: boolean;
+    user: string;
+    can_delete: boolean;
+}
+
+interface TimeSummary {
+    entries: TimeEntryRow[];
+    total: string;
+    total_minutes: number;
+    estimate: string;
+    estimate_minutes: number | null;
+    over_by: string | null;
+    can_log: boolean;
+}
+
+function TimePanel({
+    issueKey,
+    time,
+    canEstimate,
+}: {
+    issueKey: string;
+    time: TimeSummary;
+    canEstimate: boolean;
+}) {
+    const [duration, setDuration] = useState('');
+    const [note, setNote] = useState('');
+    const [spentOn, setSpentOn] = useState(() => new Date().toISOString().slice(0, 10));
+    const [billable, setBillable] = useState(true);
+    const [estimate, setEstimate] = useState(time.estimate_minutes === null ? '' : time.estimate);
+
+    return (
+        <section className="mt-8">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <h2 className="text-xs font-semibold tracking-wide text-ink-subtle uppercase">
+                    Time
+                </h2>
+                <span className="text-xs text-ink-subtle">
+                    {time.total} logged
+                    {time.estimate_minutes !== null && ` · ${time.estimate} estimated`}
+                    {time.over_by && ` · ${time.over_by} over`}
+                </span>
+            </div>
+
+            {time.entries.length > 0 && (
+                <ul className="mt-3 divide-y divide-border rounded-xl border border-border">
+                    {time.entries.map((entry) => (
+                        <li key={entry.id} className="flex items-center gap-3 px-3 py-2 text-sm">
+                            <span className="w-24 shrink-0 text-xs text-ink-subtle">
+                                {entry.spent_on}
+                            </span>
+                            <span className="w-28 shrink-0 truncate text-ink-muted">
+                                {entry.user}
+                            </span>
+                            <span className="min-w-0 flex-1 truncate text-ink-muted">
+                                {entry.note}
+                            </span>
+                            <span className="shrink-0 text-ink">
+                                {entry.duration}
+                                {!entry.billable && (
+                                    <span className="ml-1.5 text-xs text-ink-subtle">unbilled</span>
+                                )}
+                            </span>
+                            {entry.can_delete && (
+                                <button
+                                    type="button"
+                                    aria-label="Remove entry"
+                                    className="shrink-0 rounded p-1 text-ink-subtle transition hover:text-danger"
+                                    onClick={() =>
+                                        router.delete(`/time/${entry.id}`, { preserveScroll: true })
+                                    }
+                                >
+                                    <Trash2 className="size-3.5" />
+                                </button>
+                            )}
+                        </li>
+                    ))}
+                </ul>
+            )}
+
+            {time.can_log && (
+                <form
+                    className="mt-3 flex flex-wrap items-end gap-2"
+                    onSubmit={(e) => {
+                        e.preventDefault();
+                        router.post(
+                            `/issues/${issueKey}/time`,
+                            { duration, spent_on: spentOn, note, billable },
+                            {
+                                preserveScroll: true,
+                                onSuccess: () => {
+                                    setDuration('');
+                                    setNote('');
+                                },
+                            },
+                        );
+                    }}
+                >
+                    <div>
+                        <input
+                            value={duration}
+                            onChange={(e) => setDuration(e.target.value)}
+                            placeholder="1h 30m"
+                            aria-label="How long"
+                            className="w-24 rounded-lg border border-border bg-surface px-2 py-1.5 text-sm text-ink"
+                        />
+                        {/* What it understood, before it is saved. */}
+                        <span className="mt-0.5 block h-4 text-xs text-ink-subtle">
+                            {duration === ''
+                                ? ''
+                                : parseDuration(duration) === null
+                                  ? 'not a length of time'
+                                  : `= ${formatDuration(parseDuration(duration))}`}
+                        </span>
+                    </div>
+
+                    <input
+                        type="date"
+                        value={spentOn}
+                        max={new Date().toISOString().slice(0, 10)}
+                        aria-label="Day the work happened"
+                        onChange={(e) => setSpentOn(e.target.value)}
+                        className="mb-4 rounded-lg border border-border bg-surface px-2 py-1.5 text-sm text-ink"
+                    />
+
+                    <input
+                        value={note}
+                        onChange={(e) => setNote(e.target.value)}
+                        placeholder="What you did (optional)"
+                        aria-label="Note"
+                        className="mb-4 min-w-48 flex-1 rounded-lg border border-border bg-surface px-2 py-1.5 text-sm text-ink"
+                    />
+
+                    <label className="mb-4 flex items-center gap-1.5 text-xs text-ink-muted">
+                        <input
+                            type="checkbox"
+                            checked={billable}
+                            onChange={(e) => setBillable(e.target.checked)}
+                        />
+                        Billable
+                    </label>
+
+                    <Button type="submit" size="sm" className="mb-4" disabled={!duration}>
+                        Log
+                    </Button>
+                </form>
+            )}
+
+            {canEstimate && (
+                <form
+                    className="mt-1 flex items-center gap-2"
+                    onSubmit={(e) => {
+                        e.preventDefault();
+                        router.patch(
+                            `/issues/${issueKey}/estimate`,
+                            { estimate },
+                            { preserveScroll: true },
+                        );
+                    }}
+                >
+                    <span className="text-xs text-ink-subtle">Estimate</span>
+                    <input
+                        value={estimate}
+                        onChange={(e) => setEstimate(e.target.value)}
+                        placeholder="none"
+                        aria-label="Estimate"
+                        className="w-24 rounded-lg border border-border bg-surface px-2 py-1 text-sm text-ink"
+                    />
+                    <Button type="submit" size="sm" variant="secondary">
+                        Save
+                    </Button>
+                </form>
+            )}
+        </section>
+    );
+}
+
 function SidebarRow({
     label,
     children,
@@ -144,6 +333,7 @@ export default function ShowIssue({
     relationTypes = [],
     versions = [],
     customFields = [],
+    time = null,
 }: {
     issue: Issue;
     comments: Comment[];
@@ -156,6 +346,7 @@ export default function ShowIssue({
     relationTypes?: { value: string; label: string }[];
     versions?: { id: number; name: string; released: boolean }[];
     customFields?: CustomFieldWithValue[];
+    time?: TimeSummary | null;
     can: {
         update: boolean;
         comment_internally: boolean;
@@ -327,6 +518,8 @@ export default function ShowIssue({
                             />
                         </div>
                     )}
+
+                    {time && <TimePanel issueKey={issue.key} time={time} canEstimate={can.update} />}
 
                     <section className="mt-8">
                         <h2 className="text-xs font-semibold tracking-wide text-ink-subtle uppercase">
@@ -772,6 +965,28 @@ export default function ShowIssue({
                             )}
                         </SidebarRow>
                     ))}
+
+                    {time && (
+                        <SidebarRow label="Time">
+                            <div className="space-y-1">
+                                <div className="flex items-baseline gap-2">
+                                    <span className="text-sm text-ink">{time.total}</span>
+                                    {time.estimate_minutes !== null && (
+                                        <span className="text-xs text-ink-subtle">
+                                            of {time.estimate}
+                                        </span>
+                                    )}
+                                </div>
+                                {/* Only when it is over. "You are under your estimate"
+                                    is not news. */}
+                                {time.over_by && (
+                                    <span className="text-xs text-danger">
+                                        {time.over_by} over
+                                    </span>
+                                )}
+                            </div>
+                        </SidebarRow>
+                    )}
 
                     <SidebarRow label="Watching">
                         <div className="flex flex-wrap items-center gap-2">

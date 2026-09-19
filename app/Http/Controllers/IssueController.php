@@ -141,6 +141,40 @@ class IssueController extends Controller
             // would still put "Internal estimate: 3 days" in the page source.
             'customFields' => app(\App\Support\CustomFields\FieldValues::class)
                 ->forIssue($issue, clientOnly: ! $staff),
+
+            /*
+             * Time, for staff only and absent otherwise.
+             *
+             * Not a prop the page hides: a client's payload does not contain the
+             * hours at all. How long something took is an input to an invoice, not
+             * a status update.
+             */
+            'time' => $staff ? [
+                'entries' => $issue->timeEntries()->with('user:id,name')->orderByDesc('spent_on')
+                    ->orderByDesc('id')->get()
+                    ->map(fn (\App\Models\TimeEntry $entry) => [
+                        'id' => $entry->id,
+                        'duration' => $entry->formatted(),
+                        'minutes' => $entry->minutes,
+                        'spent_on' => $entry->spent_on->toDateString(),
+                        'note' => $entry->note,
+                        'billable' => $entry->billable,
+                        'user' => $entry->user?->name ?? 'Someone who has left',
+                        'can_delete' => request()->user()->can('delete', $entry),
+                    ]),
+                'total' => \App\Support\Time\Duration::format(
+                    $total = (int) $issue->timeEntries()->sum('minutes'),
+                ),
+                'total_minutes' => $total,
+                'estimate' => \App\Support\Time\Duration::format($issue->estimate_minutes),
+                'estimate_minutes' => $issue->estimate_minutes,
+                // Only meaningful with both numbers, and only interesting when it is
+                // over: "you are under your estimate" is not news.
+                'over_by' => $issue->estimate_minutes !== null && $total > $issue->estimate_minutes
+                    ? \App\Support\Time\Duration::format($total - $issue->estimate_minutes)
+                    : null,
+                'can_log' => request()->user()->can('create', \App\Models\TimeEntry::class),
+            ] : null,
             'issue' => [
                 ...$this->summary($issue),
                 'description' => $issue->description,

@@ -26,7 +26,7 @@ class IssueExportController extends Controller
     private const COLUMNS = [
         'key', 'title', 'status', 'state', 'type', 'priority', 'project',
         'assignee', 'reporter', 'labels', 'visible_to_client', 'occurrences',
-        'created_at', 'updated_at', 'closed_at', 'due_on', 'url',
+        'created_at', 'updated_at', 'closed_at', 'due_on', 'estimate', 'time_spent', 'url',
     ];
 
     public function __invoke(Request $request): StreamedResponse
@@ -72,6 +72,10 @@ class IssueExportController extends Controller
                 'customFieldValues' => fn ($q) => $q->whereIn('custom_field_id', $fields->pluck('id')),
                 'customFieldValues.field:id,key',
             ])
+            // Summed in the query, not per row: reading $issue->timeEntries inside
+            // the loop is an N+1 and a lazy-loading violation, which strict mode
+            // turns into an exception after the headers have gone — a truncated file.
+            ->withSum('timeEntries as time_spent_minutes', 'minutes')
             ->orderBy('id');
 
         $filename = 'buggie-issues-'.now()->format('Y-m-d').'.csv';

@@ -19,6 +19,7 @@ import {
     LogOut,
     Server,
     Settings,
+    Clock,
     Tag,
     Users,
 } from 'lucide-react';
@@ -167,6 +168,11 @@ export function AppLayout({
                                 active={path.startsWith('/labels')}
                             >
                                 Labels
+                            </NavLink>
+                            {/* Staff only, like everything in this block: how long
+                                something took is not a client's business. */}
+                            <NavLink href="/time" icon={Clock} active={path.startsWith('/time')}>
+                                Time
                             </NavLink>
                             <NavLink
                                 href="/settings/members"
