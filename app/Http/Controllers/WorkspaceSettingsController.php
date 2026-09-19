@@ -27,6 +27,23 @@ class WorkspaceSettingsController extends Controller
             ],
             'domain' => config('buggie.domain'),
             'can_delete' => request()->user()->can('delete', $workspace),
+
+            // Only this person's own tokens. An admin seeing a colleague's token
+            // names is a small thing, but there is no reason for it.
+            'tokens' => \App\Models\ApiToken::query()
+                ->where('workspace_id', $workspace->id)
+                ->where('tokenable_id', request()->user()->id)
+                ->latest()
+                ->get()
+                ->map(fn (\App\Models\ApiToken $token) => [
+                    'id' => $token->id,
+                    'name' => $token->name,
+                    'abilities' => $token->abilities,
+                    'last_used_at' => $token->last_used_at?->toIso8601String(),
+                    'expires_at' => $token->expires_at?->toDateString(),
+                    'created_at' => $token->created_at->toDateString(),
+                ]),
+            'abilities' => \App\Http\Controllers\ApiTokenController::ABILITIES,
         ]);
     }
 

@@ -225,4 +225,84 @@ class ApiTest extends TestCase
 
         $this->api($token, 'GET', $this->apiUrl($workspace, 'issues'))->assertNotFound();
     }
+
+    #[Test]
+    public function a_token_can_be_created_and_revoked_from_settings(): void
+    {
+        [$workspace, $owner] = $this->workspaceWithMember(slug: 'acme');
+
+        $this->actingAs($owner)
+            ->post($this->workspaceUrl($workspace, '/settings/tokens'), [
+                'name' => 'Deploy script',
+                'abilities' => ['read'],
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('token');
+
+        $token = ApiToken::firstOrFail();
+
+        $this->assertSame($workspace->id, $token->workspace_id);
+        $this->assertSame(['read'], $token->abilities);
+
+        $this->actingAs($owner)
+            ->delete($this->workspaceUrl($workspace, "/settings/tokens/{$token->id}"))
+            ->assertRedirect();
+
+        $this->assertSame(0, ApiToken::count());
+    }
+
+    #[Test]
+    public function a_client_cannot_mint_a_token(): void
+    {
+        [$workspace] = $this->workspaceWithMember(slug: 'acme');
+
+        $client = User::factory()->create();
+        $workspace->members()->attach($client->id, [
+            'role' => WorkspaceRole::Client->value,
+            'joined_at' => now(),
+        ]);
+
+        $this->actingAs($client)
+            ->post($this->workspaceUrl($workspace, '/settings/tokens'), [
+                'name' => 'Sneaky',
+                'abilities' => ['write'],
+            ])
+            ->assertForbidden();
+    }
+
+    #[Test]
+    public function nobody_can_revoke_somebody_elses_token(): void
+    {
+        [$workspace, $owner] = $this->workspaceWithMember(slug: 'acme');
+
+        $colleague = User::factory()->create();
+        $workspace->members()->attach($colleague->id, [
+            'role' => WorkspaceRole::Member->value,
+            'joined_at' => now(),
+        ]);
+
+        $theirs = $colleague->createTokenForWorkspace($workspace, 'Theirs')->accessToken;
+
+        // 404, not 403: the owner has no business learning it exists either.
+        $this->actingAs($owner)
+            ->delete($this->workspaceUrl($workspace, "/settings/tokens/{$theirs->id}"))
+            ->assertNotFound();
+
+        $this->assertSame(1, ApiToken::count());
+    }
+
+    #[Test]
+    public function the_plain_token_is_never_stored(): void
+    {
+        // It is shown once, on the response that creates it. A token you can read
+        // back later is a password written on the wall.
+        [$workspace, $owner] = $this->workspaceWithMember(slug: 'acme');
+
+        $plain = $owner->createTokenForWorkspace($workspace, 'Once')->plainTextToken;
+
+        [, $secret] = explode('|', $plain, 2);
+
+        $this->assertDatabaseMissing('personal_access_tokens', ['token' => $secret]);
+        $this->assertDatabaseHas('personal_access_tokens', ['token' => hash('sha256', $secret)]);
+    }
 }

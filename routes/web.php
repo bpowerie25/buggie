@@ -201,6 +201,12 @@ Route::domain('{workspace}.'.$host)
         Route::delete('widget-keys/{widgetKey}', [WidgetKeyController::class, 'destroy'])
             ->name('widget-keys.destroy');
 
+        // API tokens. Created and revoked here; the API itself lives in routes/api.php.
+        Route::post('settings/tokens', [\App\Http\Controllers\ApiTokenController::class, 'store'])
+            ->name('tokens.store');
+        Route::delete('settings/tokens/{apiToken}', [\App\Http\Controllers\ApiTokenController::class, 'destroy'])
+            ->name('tokens.destroy');
+
         Route::get('settings/workspace', [WorkspaceSettingsController::class, 'edit'])
             ->name('workspace.edit');
         Route::patch('settings/workspace', [WorkspaceSettingsController::class, 'update'])
