@@ -25,7 +25,10 @@ class BillingController extends Controller
         return Inertia::render('settings/billing', [
             'plan' => $workspace->plan()->toArray(),
             'usage' => $workspace->usage(),
-            'plans' => array_map(fn (Plan $plan) => $plan->toArray(), Plan::all()),
+            'plans' => array_map(
+                fn (Plan $plan) => $plan->toArray(\App\Support\Billing\Currency::resolve($request)),
+                Plan::all(),
+            ),
             'subscription' => $subscription ? [
                 'status' => $subscription->stripe_status,
                 'on_grace_period' => $subscription->onGracePeriod(),
@@ -60,11 +63,27 @@ class BillingController extends Controller
 
         abort_unless($plan->isSubscribable(), 422, 'That plan cannot be subscribed to.');
 
+        // The currency they were quoted in, carried through to what they are charged.
+        // Being shown $19 and billed €19 is the kind of surprise that generates a
+        // chargeback rather than an email.
+        $currency = \App\Support\Billing\Currency::resolve($request);
+
         return $workspace
-            ->newSubscription('default', $plan->priceId())
+            ->newSubscription('default', $plan->priceId($currency))
             ->checkout([
                 'success_url' => workspace_url($workspace->slug, 'settings/billing?checkout=done'),
                 'cancel_url' => workspace_url($workspace->slug, 'settings/billing'),
+
+                // Prices are quoted excluding tax, so Stripe Tax adds it: Irish VAT
+                // domestically, the customer's own rate for EU consumers, UK or US
+                // rules for those.
+                'automatic_tax' => ['enabled' => true],
+
+                // And collect a VAT number, which is what lets an EU business be
+                // zero-rated under the reverse charge. Without this every EU company
+                // pays Irish VAT they should not be paying and has to claim it back.
+                'tax_id_collection' => ['enabled' => true],
+                'customer_update' => ['name' => 'auto', 'address' => 'auto'],
             ]);
     }
 

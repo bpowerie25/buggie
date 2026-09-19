@@ -27,6 +27,33 @@ return [
     'warn_at' => 0.8,
 
     /*
+     * Currencies a visitor can be quoted in.
+     *
+     * Euro is the default: the company is Irish, so it is the currency the books are
+     * kept in and the one that avoids conversion on most sales. Sterling and dollars
+     * are real local prices rather than a conversion of the euro one — a price ending
+     * in 47 looks like arithmetic rather than a decision.
+     */
+    'default_currency' => env('BUGGIE_DEFAULT_CURRENCY', 'EUR'),
+
+    'currencies' => [
+        'EUR' => ['symbol' => '€', 'label' => 'EUR'],
+        'GBP' => ['symbol' => '£', 'label' => 'GBP'],
+        'USD' => ['symbol' => '$', 'label' => 'USD'],
+    ],
+
+    /*
+     * Every price here is quoted EXCLUDING tax.
+     *
+     * These are sold to businesses, which expect ex-VAT pricing, and the tax due
+     * depends entirely on where the customer is and whether they have a VAT number.
+     * Stripe Tax works it out at checkout: Irish VAT domestically, the customer's own
+     * rate for EU consumers, nothing for EU businesses that supply a valid VAT number
+     * under the reverse charge, and UK or US rules for those.
+     */
+    'prices_exclude_tax' => true,
+
+    /*
      * How many reports of the same bug are metered before the rest are free.
      *
      * Duplicates collapse into one issue, which is the point of the product, so
@@ -49,7 +76,7 @@ return [
          */
         'self_hosted' => [
             'name' => 'Self-hosted',
-            'price_id' => null,
+            'prices' => null,
             'price' => 'Free',
             'interval' => 'month',
             'blurb' => 'Your server, your rules.',
@@ -62,8 +89,8 @@ return [
 
         'free' => [
             'name' => 'Free',
-            'price_id' => null,
-            'price' => '£0',
+            'prices' => null,
+            'price' => '0',
             'interval' => 'month',
             'blurb' => 'Enough to run one project properly.',
             'limits' => [
@@ -84,8 +111,11 @@ return [
          */
         'studio' => [
             'name' => 'Studio',
-            'price_id' => env('STRIPE_PRICE_STUDIO'),
-            'price' => '£19',
+            'prices' => [
+                'EUR' => ['display' => '€19', 'price_id' => env('STRIPE_PRICE_STUDIO_EUR')],
+                'GBP' => ['display' => '£16', 'price_id' => env('STRIPE_PRICE_STUDIO_GBP')],
+                'USD' => ['display' => '$19', 'price_id' => env('STRIPE_PRICE_STUDIO_USD')],
+            ],
             'interval' => 'month',
             'blurb' => 'For a freelancer or small studio. Every client, every project.',
             'limits' => [
@@ -97,8 +127,11 @@ return [
 
         'agency' => [
             'name' => 'Agency',
-            'price_id' => env('STRIPE_PRICE_AGENCY'),
-            'price' => '£49',
+            'prices' => [
+                'EUR' => ['display' => '€49', 'price_id' => env('STRIPE_PRICE_AGENCY_EUR')],
+                'GBP' => ['display' => '£42', 'price_id' => env('STRIPE_PRICE_AGENCY_GBP')],
+                'USD' => ['display' => '$49', 'price_id' => env('STRIPE_PRICE_AGENCY_USD')],
+            ],
             'interval' => 'month',
             'blurb' => 'For a busy agency, or anyone whose reports outgrew Studio.',
             'limits' => [

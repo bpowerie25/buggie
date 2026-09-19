@@ -7,6 +7,7 @@ interface Plan {
     key: string;
     name: string;
     price: string;
+    currency: string;
     blurb: string;
     limits: Record<string, number | null>;
     subscribable: boolean;
@@ -53,10 +54,16 @@ export default function Welcome({
     plans = [],
     hosted = false,
     repository,
+    currency = 'EUR',
+    currencies = [],
+    pricesExcludeTax = true,
 }: {
     plans?: Plan[];
     hosted?: boolean;
     repository?: string;
+    currency?: string;
+    currencies?: { code: string; symbol: string }[];
+    pricesExcludeTax?: boolean;
 }) {
     // self_hosted is shown alongside the paid plans rather than hidden: it is the
     // honest comparison, and a visitor who would rather run it themselves is not a
@@ -189,6 +196,26 @@ export default function Welcome({
                                 client to every project — that is what it is for.
                             </p>
 
+                            {currencies.length > 1 && (
+                                <div className="mt-5 inline-flex rounded-lg border border-border p-0.5">
+                                    {currencies.map((option) => (
+                                        // A plain link, so the choice survives a reload and
+                                        // search engines see every currency's page.
+                                        <a
+                                            key={option.code}
+                                            href={`?currency=${option.code}#pricing`}
+                                            className={`rounded-md px-2.5 py-1 text-xs transition ${
+                                                option.code === currency
+                                                    ? 'bg-accent-soft font-medium text-accent'
+                                                    : 'text-ink-muted hover:text-ink'
+                                            }`}
+                                        >
+                                            {option.symbol} {option.code}
+                                        </a>
+                                    ))}
+                                </div>
+                            )}
+
                             <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                                 {sellable.map((plan) => (
                                     <div
@@ -206,6 +233,11 @@ export default function Welcome({
                                                 <span className="text-sm text-ink-subtle">
                                                     {' '}
                                                     / month
+                                                </span>
+                                            )}
+                                            {plan.subscribable && pricesExcludeTax && (
+                                                <span className="block text-xs text-ink-subtle">
+                                                    excluding VAT
                                                 </span>
                                             )}
                                         </p>
@@ -250,7 +282,15 @@ export default function Welcome({
                                 )}
                             </div>
 
-                            <p className="mt-6 max-w-xl text-pretty text-ink-muted">
+                            {pricesExcludeTax && (
+                                <p className="mt-6 max-w-xl text-sm text-pretty text-ink-subtle">
+                                    Prices exclude VAT, which is added at checkout according to
+                                    where you are. EU businesses supplying a valid VAT number are
+                                    zero-rated under the reverse charge.
+                                </p>
+                            )}
+
+                            <p className="mt-4 max-w-xl text-pretty text-ink-muted">
                                 Repeat reports of a bug already seen stop counting after the
                                 first few — forty people hitting one broken checkout costs a
                                 handful, not forty. Running out stops new bugs being accepted,

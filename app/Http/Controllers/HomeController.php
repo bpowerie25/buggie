@@ -20,15 +20,26 @@ class HomeController extends Controller
         $user = $request->user();
 
         if ($user === null) {
+            $currency = \App\Support\Billing\Currency::resolve($request);
+
             return Inertia::render('welcome', [
                 // Read from config rather than written into the page, so the prices
                 // a visitor is shown can never drift from the limits actually
                 // enforced. self_hosted is included deliberately: it is the honest
                 // comparison, and hiding it would be the wrong kind of selling.
                 'plans' => array_map(
-                    fn (\App\Support\Billing\Plan $plan) => $plan->toArray(),
+                    fn (\App\Support\Billing\Plan $plan) => $plan->toArray($currency),
                     \App\Support\Billing\Plan::all(),
                 ),
+                'currency' => $currency,
+                'currencies' => array_map(
+                    fn (string $code) => [
+                        'code' => $code,
+                        'symbol' => \App\Support\Billing\Currency::symbol($code),
+                    ],
+                    array_keys(\App\Support\Billing\Currency::all()),
+                ),
+                'pricesExcludeTax' => (bool) config('plans.prices_exclude_tax'),
                 'hosted' => (bool) config('buggie.hosted'),
                 'repository' => 'https://github.com/bpowerie25/buggie',
             ]);
