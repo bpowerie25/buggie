@@ -29,6 +29,7 @@ Values containing spaces are quoted: `label:"needs repro"`.
 | `project` | a project slug | `project:marketing-site` |
 | `assignee` | `@me`, `me`, a name, a user id, or `none` | |
 | `reporter` | the same values | Who filed it. |
+| `version` | a release name | `version:2.4.1`. Names are unique per project, so two projects may each have a 2.4.1. |
 | `label` | a label name | Repeatable. |
 | `type` | `bug`, `feature`, `task`, `question` | |
 | `priority` | `none`, `low`, `medium`, `high`, `urgent`, or `0`–`4` | |

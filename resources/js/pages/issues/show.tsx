@@ -50,6 +50,7 @@ interface Issue extends IssueRow {
     reporter: Person | null;
     visibility: VisibilityValue;
     due_on: string | null;
+    version: { id: number; name: string } | null;
     created_at: string;
     watchers: Person[];
     watching: boolean;
@@ -89,6 +90,10 @@ function eventSentence(event: Event): string {
             return d.to === 'client'
                 ? `${actor} made this visible to the client`
                 : `${actor} made this internal only`;
+        case 'version_changed':
+            return d.to
+                ? `${actor} put this in ${d.to}`
+                : `${actor} took this out of ${d.from}`;
         case 'closed':
             return `${actor} closed this issue`;
         case 'reopened':
@@ -132,6 +137,7 @@ export default function ShowIssue({
     can,
     diagnostics,
     relationTypes = [],
+    versions = [],
 }: {
     issue: Issue;
     comments: Comment[];
@@ -142,6 +148,7 @@ export default function ShowIssue({
     /** Null for clients, and for issues with no captured context. */
     diagnostics: DiagnosticsData | null;
     relationTypes?: { value: string; label: string }[];
+    versions?: { id: number; name: string; released: boolean }[];
     can: {
         update: boolean;
         comment_internally: boolean;
@@ -678,6 +685,40 @@ export default function ShowIssue({
                             </button>
                         </SidebarRow>
                     )}
+
+                    <SidebarRow label="Release">
+                        {can.update ? (
+                            <select
+                                value={issue.version?.id ?? ''}
+                                aria-label="Release"
+                                onChange={(e) =>
+                                    router.patch(
+                                        `/issues/${issue.key}`,
+                                        { version_id: e.target.value ? Number(e.target.value) : null },
+                                        { preserveScroll: true },
+                                    )
+                                }
+                                className="w-full rounded-md border border-transparent bg-transparent px-1.5 py-1 text-sm text-ink transition hover:border-border"
+                            >
+                                <option value="">Not in a release</option>
+                                {versions.map((version) => (
+                                    <option key={version.id} value={version.id}>
+                                        {version.name}
+                                        {version.released ? ' (released)' : ''}
+                                    </option>
+                                ))}
+                            </select>
+                        ) : issue.version ? (
+                            <Link
+                                href={`/projects/${issue.project.slug}/versions/${issue.version.id}`}
+                                className="text-sm text-accent hover:underline"
+                            >
+                                {issue.version.name}
+                            </Link>
+                        ) : (
+                            <span className="text-sm text-ink-subtle">Not in a release</span>
+                        )}
+                    </SidebarRow>
 
                     <SidebarRow label="Due">
                         {can.update ? (

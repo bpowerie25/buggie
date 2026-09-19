@@ -67,6 +67,17 @@ class ProjectController extends Controller
                 'open' => $s->category->isOpen(),
             ]),
             'categories' => StatusCategory::options(),
+
+            // Unreleased first: what people are working towards matters more than
+            // what already shipped.
+            'versions' => $project->versions()->inWorkingOrder()->withCount('issues')->get()
+                ->map(fn (\App\Models\Version $version) => [
+                    'id' => $version->id,
+                    'name' => $version->name,
+                    'description' => $version->description,
+                    'released_at' => $version->released_at?->toDateString(),
+                    'issues_count' => $version->issues_count,
+                ]),
         ]);
     }
 
@@ -88,6 +99,17 @@ class ProjectController extends Controller
                     'issues_count' => $status->issues_count,
                 ]),
             'categories' => StatusCategory::options(),
+
+            // Unreleased first: what people are working towards matters more than
+            // what already shipped.
+            'versions' => $project->versions()->inWorkingOrder()->withCount('issues')->get()
+                ->map(fn (\App\Models\Version $version) => [
+                    'id' => $version->id,
+                    'name' => $version->name,
+                    'description' => $version->description,
+                    'released_at' => $version->released_at?->toDateString(),
+                    'issues_count' => $version->issues_count,
+                ]),
             // Generated since M5 and never once displayed, which made filing by email
             // impossible without database access.
             'inboundAddress' => $project->inboundAddress(),

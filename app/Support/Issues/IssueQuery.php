@@ -19,7 +19,9 @@ use Stringable;
 final class IssueQuery implements Stringable
 {
     /** Keys that accept a value, with the ones that may repeat. */
-    public const KEYS = ['is', 'project', 'assignee', 'reporter', 'label', 'type', 'priority', 'no'];
+    public const KEYS = [
+        'is', 'project', 'assignee', 'reporter', 'label', 'type', 'priority', 'version', 'no',
+    ];
 
     private const MULTI = ['label'];
 

@@ -115,7 +115,7 @@ class IssueController extends Controller
         $this->authorize('view', $issue);
 
         $issue->load([
-            'status', 'project', 'assignee', 'reporter', 'labels',
+            'status', 'project', 'assignee', 'reporter', 'labels', 'version',
             'attachments.uploadedBy:id,name',
             'watchers:id,name',
             'relations.relatedIssue:id,key,title,status_id',
@@ -131,6 +131,7 @@ class IssueController extends Controller
                 'reporter' => $issue->reporter?->only(['id', 'name']),
                 'visibility' => $issue->visibility->value,
                 'due_on' => $issue->due_on?->toDateString(),
+                'version' => $issue->version?->only(['id', 'name']),
                 'created_at' => $issue->created_at->toIso8601String(),
                 'watchers' => $issue->watchers->map->only(['id', 'name']),
                 'watching' => $issue->watchers->contains('id', request()->user()->id),
@@ -152,6 +153,17 @@ class IssueController extends Controller
             // own users. Clients never see the triage inbox either.
             'diagnostics' => $staff ? $this->diagnostics($issue) : null,
             'relationTypes' => \App\Enums\RelationType::options(),
+
+            // The releases this issue could belong to: its own project's, and the
+            // unreleased ones first, because that is what anybody is choosing between.
+            'versions' => \App\Models\Version::where('project_id', $issue->project_id)
+                ->inWorkingOrder()
+                ->get()
+                ->map(fn (\App\Models\Version $v) => [
+                    'id' => $v->id,
+                    'name' => $v->name,
+                    'released' => $v->isReleased(),
+                ]),
 
             // The one place the client visibility plane is enforced for reading.
             'comments' => $issue->comments()

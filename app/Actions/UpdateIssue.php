@@ -39,6 +39,7 @@ class UpdateIssue
                     'visibility' => $this->simple($issue, 'visibility', $value, IssueEventType::VisibilityChanged, $actor),
                     'labels' => $this->labels($issue, $value, $actor),
                     'due_on' => $issue->fill(['due_on' => $value]),
+                    'version_id' => $this->version($issue, $value === null ? null : (int) $value, $actor),
                     default => null,
                 };
             }
@@ -183,6 +184,35 @@ class UpdateIssue
                 'because' => 'assigned to a client',
             ], $actor, isInternal: false);
         }
+    }
+
+    /**
+     * Put an issue in a release, or take it out of one.
+     *
+     * Refused if the version belongs to another project: "2.4.1" is a release of one
+     * thing, and an issue on the marketing site has no business being in the mobile
+     * app's release notes.
+     */
+    private function version(Issue $issue, ?int $versionId, ?User $actor): void
+    {
+        if ($issue->version_id === $versionId) {
+            return;
+        }
+
+        $next = $versionId === null ? null : \App\Models\Version::find($versionId);
+
+        if ($versionId !== null && $next?->project_id !== $issue->project_id) {
+            throw ValidationException::withMessages([
+                'version_id' => 'That release belongs to another project.',
+            ]);
+        }
+
+        $issue->recordEvent(IssueEventType::VersionChanged, [
+            'from' => $issue->version?->name,
+            'to' => $next?->name,
+        ], $actor);
+
+        $issue->version_id = $next?->id;
     }
 
     private function priority(Issue $issue, int $priority, ?User $actor): void

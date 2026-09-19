@@ -27,6 +27,13 @@ class UpdateIssueRequest extends FormRequest
             'priority' => ['sometimes', Rule::in(array_column(IssuePriority::cases(), 'value'))],
             'visibility' => ['sometimes', new Enum(IssueVisibility::class)],
             'due_on' => ['sometimes', 'nullable', 'date'],
+            // Scoped to the workspace, so a version id from another tenant is not a
+            // version at all. Whether it belongs to the issue's project is checked
+            // in the action, which knows the issue.
+            'version_id' => [
+                'sometimes', 'nullable',
+                Rule::exists('versions', 'id')->where('workspace_id', $workspaceId),
+            ],
             'status_id' => [
                 'sometimes', 'required',
                 Rule::exists('statuses', 'id')->where('workspace_id', $workspaceId),

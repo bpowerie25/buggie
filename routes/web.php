@@ -217,6 +217,16 @@ Route::domain('{workspace}.'.$host)
 
         // The whole install, not this workspace: mail, and whatever else an operator
         // needs to change without editing .env and redeploying.
+        // Releases live under their project: "2.4.1" means nothing on its own.
+        Route::get('projects/{project}/versions/{version}', [\App\Http\Controllers\VersionController::class, 'show'])
+            ->name('versions.show');
+        Route::post('projects/{project}/versions', [\App\Http\Controllers\VersionController::class, 'store'])
+            ->name('versions.store');
+        Route::patch('projects/{project}/versions/{version}', [\App\Http\Controllers\VersionController::class, 'update'])
+            ->name('versions.update');
+        Route::delete('projects/{project}/versions/{version}', [\App\Http\Controllers\VersionController::class, 'destroy'])
+            ->name('versions.destroy');
+
         Route::get('settings/instance', [\App\Http\Controllers\InstanceSettingsController::class, 'edit'])
             ->name('instance.edit');
         Route::patch('settings/instance', [\App\Http\Controllers\InstanceSettingsController::class, 'update'])

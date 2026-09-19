@@ -100,6 +100,11 @@ class Project extends Model
         return array_values(array_unique($origins));
     }
 
+    public function versions(): HasMany
+    {
+        return $this->hasMany(Version::class);
+    }
+
     public function widgetKeys(): HasMany
     {
         return $this->hasMany(WidgetKey::class);

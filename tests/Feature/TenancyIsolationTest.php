@@ -9,6 +9,7 @@ use App\Models\Status;
 use App\Models\Workspace;
 use App\Support\Tenancy\MissingWorkspaceContext;
 use App\Support\Tenancy\Tenancy;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\Test;
@@ -165,25 +166,32 @@ class TenancyIsolationTest extends TestCase
                 ->where('projects.0.name', 'Ours'));
     }
 
-    /** @return array<int, class-string> */
+    /**
+     * Every model in app/Models, read off disk.
+     *
+     * A hand-written list was here and drifted: adding a workspace-scoped model
+     * without remembering to list it made this test fail for its own incompleteness
+     * rather than for a real omission, which teaches people to edit the test until
+     * it passes. Reading the directory means the only way to fail is to actually
+     * forget the trait.
+     *
+     * @return array<int, class-string>
+     */
     private function tenantModels(): array
     {
-        return [
-            \App\Models\Attachment::class,
-            \App\Models\Comment::class,
-            \App\Models\Issue::class,
-            \App\Models\IssueEvent::class,
-            \App\Models\IssueRelation::class,
-            \App\Models\Invitation::class,
-            \App\Models\Label::class,
-            \App\Models\PendingNotification::class,
-            \App\Models\PortalToken::class,
-            \App\Models\SavedView::class,
-            Project::class,
-            \App\Models\Report::class,
-            Status::class,
-            \App\Models\WidgetKey::class,
-        ];
+        $models = [];
+
+        foreach (glob(app_path('Models/*.php')) ?: [] as $file) {
+            $class = 'App\\Models\\'.basename($file, '.php');
+
+            if (! class_exists($class) || ! is_subclass_of($class, Model::class)) {
+                continue;
+            }
+
+            $models[] = $class;
+        }
+
+        return $models;
     }
 
     #[Test]

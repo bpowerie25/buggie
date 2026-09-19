@@ -3,7 +3,7 @@ import { Field, Input, Textarea } from '@/components/field';
 import { WorkflowEditor } from '@/components/workflow-editor';
 import { AppLayout } from '@/layouts/app-layout';
 import type { ProjectSummary } from '@/types';
-import { Head, router, useForm } from '@inertiajs/react';
+import { Head, Link, router, useForm } from '@inertiajs/react';
 import { Check, Copy, Plus, Trash2 } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 
@@ -17,6 +17,14 @@ interface WidgetKeyRow {
     is_active: boolean;
     last_used_at: string | null;
     snippet: string;
+}
+
+interface VersionRow {
+    id: number;
+    name: string;
+    description: string | null;
+    released_at: string | null;
+    issues_count: number;
 }
 
 interface StatusRow {
@@ -36,12 +44,14 @@ export default function EditProject({
     statuses,
     categories,
     inboundAddress,
+    versions = [],
 }: {
     project: ProjectSummary;
     widgetKeys: WidgetKeyRow[];
     statuses: StatusRow[];
     categories: { value: StatusRow['category']; label: string; open: boolean }[];
     inboundAddress: string;
+    versions?: VersionRow[];
 }) {
     const { data, setData, put, processing, errors } = useForm({
         name: project.name,
@@ -147,6 +157,8 @@ export default function EditProject({
                     </div>
                 )}
             </section>
+
+            <Versions versions={versions} project={project} />
 
             <section className="mt-12 max-w-2xl">
                 <h2 className="text-sm font-semibold text-ink">File issues by email</h2>
@@ -329,5 +341,111 @@ function WidgetKeyCard({ widgetKey }: { widgetKey: WidgetKeyRow }) {
                 reporter sees the image before it is sent.
             </p>
         </div>
+    );
+}
+
+/**
+ * Releases for this project.
+ *
+ * Marking one released stamps today rather than asking for a date: a date typed by
+ * hand is a date somebody gets wrong, and "released" almost always means "now".
+ */
+function Versions({
+    versions,
+    project,
+}: {
+    versions: VersionRow[];
+    project: ProjectSummary;
+}) {
+    const { data, setData, post, processing, errors, reset } = useForm({
+        name: '',
+        description: '',
+    });
+
+    function submit(e: FormEvent) {
+        e.preventDefault();
+        post(`/projects/${project.slug}/versions`, {
+            preserveScroll: true,
+            onSuccess: () => reset(),
+        });
+    }
+
+    return (
+        <section className="mt-12 max-w-2xl">
+            <h2 className="text-sm font-semibold text-ink">Releases</h2>
+            <p className="mt-1 text-sm text-ink-muted">
+                Group issues into a release so you can tell a client what changed. Issues
+                are put in one from their own page.
+            </p>
+
+            {versions.length > 0 && (
+                <ul className="mt-4 divide-y divide-border rounded-xl border border-border bg-raised">
+                    {versions.map((version) => (
+                        <li key={version.id} className="flex items-center gap-3 px-4 py-3">
+                            <Link
+                                href={`/projects/${project.slug}/versions/${version.id}`}
+                                className="min-w-0 flex-1"
+                            >
+                                <span className="block truncate text-sm text-ink">
+                                    {version.name}
+                                </span>
+                                <span className="text-xs text-ink-subtle">
+                                    {version.issues_count} issue
+                                    {version.issues_count === 1 ? '' : 's'}
+                                    {version.released_at
+                                        ? ` · released ${version.released_at}`
+                                        : ' · unreleased'}
+                                </span>
+                            </Link>
+
+                            <button
+                                type="button"
+                                onClick={() =>
+                                    router.patch(
+                                        `/projects/${project.slug}/versions/${version.id}`,
+                                        { released: !version.released_at },
+                                        { preserveScroll: true },
+                                    )
+                                }
+                                className="shrink-0 rounded-md border border-border px-2 py-1 text-xs text-ink-muted transition hover:text-ink"
+                            >
+                                {version.released_at ? 'Unrelease' : 'Release'}
+                            </button>
+
+                            <button
+                                type="button"
+                                aria-label={`Delete ${version.name}`}
+                                onClick={() =>
+                                    router.delete(
+                                        `/projects/${project.slug}/versions/${version.id}`,
+                                        { preserveScroll: true },
+                                    )
+                                }
+                                className="shrink-0 rounded p-1 text-ink-subtle transition hover:text-danger"
+                            >
+                                <Trash2 className="size-3.5" />
+                            </button>
+                        </li>
+                    ))}
+                </ul>
+            )}
+
+            <form onSubmit={submit} className="mt-4 flex flex-wrap items-end gap-3">
+                <div className="flex-1">
+                    <Field label="New release" error={errors.name}>
+                        <Input
+                            value={data.name}
+                            placeholder="2.4.1"
+                            onChange={(e) => setData('name', e.target.value)}
+                        />
+                    </Field>
+                </div>
+
+                <Button type="submit" size="sm" disabled={processing || data.name === ''}>
+                    <Plus className="size-4" />
+                    Add
+                </Button>
+            </form>
+        </section>
     );
 }

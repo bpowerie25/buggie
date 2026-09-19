@@ -37,6 +37,7 @@ class IssueQueryFilter
         $this->labels($query, $parsed);
         $this->type($query, $parsed);
         $this->priority($query, $parsed);
+        $this->version($query, $parsed);
         $this->absence($query, $parsed);
 
         return $query;
@@ -141,6 +142,24 @@ class IssueQueryFilter
         return is_numeric($name) ? (int) $name : null;
     }
 
+    /**
+     * version:2.4.1 — by name, because that is what people say out loud.
+     *
+     * Names are unique per project rather than per workspace, so two projects may
+     * each have a 2.4.1 and `version:2.4.1` matches both. Combining it with
+     * `project:` narrows it, which is the same way every other operator here behaves.
+     */
+    private function version(Builder $query, IssueQuery $parsed): void
+    {
+        foreach ($parsed->all('version') as $name) {
+            $query->whereHas('version', fn (Builder $q) => $q->where('name', $name));
+        }
+
+        foreach ($parsed->all('version', negated: true) as $name) {
+            $query->whereDoesntHave('version', fn (Builder $q) => $q->where('name', $name));
+        }
+    }
+
     /** no:assignee, no:label, no:description — the "needs attention" filters. */
     private function absence(Builder $query, IssueQuery $parsed): void
     {
@@ -152,6 +171,9 @@ class IssueQueryFilter
                     ->whereNull('description_text')
                     ->orWhere('description_text', '')),
                 'priority' => $query->where('priority', IssuePriority::None->value),
+                // Everything not yet assigned to a release: the list you work from
+                // when deciding what goes in the next one.
+                'version' => $query->whereNull('version_id'),
                 default => null,
             };
         }

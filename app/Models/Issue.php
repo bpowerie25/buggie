@@ -20,7 +20,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 #[Fillable([
     'project_id', 'title', 'description', 'description_text', 'type', 'status_id',
-    'priority', 'severity', 'reporter_id', 'assignee_id', 'visibility', 'due_on',
+    'priority', 'severity', 'reporter_id', 'assignee_id', 'visibility', 'due_on', 'version_id',
 ])]
 class Issue extends Model
 {
@@ -85,6 +85,12 @@ class Issue extends Model
     public function reports(): HasMany
     {
         return $this->hasMany(Report::class)->latest();
+    }
+
+    /** The release this is fixed in, or planned for. */
+    public function version(): BelongsTo
+    {
+        return $this->belongsTo(Version::class);
     }
 
     public function comments(): HasMany
