@@ -117,6 +117,7 @@ export class Widget {
     private host: HTMLElement;
     private root: ShadowRoot;
     private open = false;
+    private configLoaded = false;
     private canvas: HTMLCanvasElement | null = null;
     private tool: Tool = 'box';
     private annotatorAttached = false;
@@ -160,9 +161,56 @@ export class Widget {
         }
     }
 
+    /**
+     * What the project says this widget should do.
+     *
+     * Fetched on first open rather than at page load: most visitors never report
+     * anything, and the widget's whole argument is that it costs them nothing. By
+     * the time the panel is opening, one small request is free.
+     *
+     * The `data-` attributes remain the fallback, so a blocked or slow request
+     * leaves the reporter working rather than refusing to open. The server enforces
+     * both settings at ingest regardless — this is for the form to say the right
+     * thing, not for the rule to be kept.
+     */
+    private async loadConfig(): Promise<void> {
+        if (this.configLoaded) return;
+
+        this.configLoaded = true;
+
+        try {
+            const response = await fetch(
+                `${this.config.endpoint}/api/ingest/${this.config.key}/config`,
+                { credentials: 'omit' },
+            );
+
+            if (!response.ok) return;
+
+            const settings = (await response.json()) as {
+                require_email?: boolean;
+                capture_screenshot?: boolean;
+            };
+
+            if (typeof settings.require_email === 'boolean') {
+                this.config.requireEmail = settings.require_email;
+            }
+
+            if (typeof settings.capture_screenshot === 'boolean') {
+                // The tag can switch a screenshot off, but never on: the project
+                // deciding not to collect images is not a per-page choice.
+                this.config.captureScreenshot =
+                    this.config.captureScreenshot && settings.capture_screenshot;
+            }
+        } catch {
+            // Offline, blocked by a CSP, or simply slow. The defaults stand.
+        }
+    }
+
     async show() {
         if (this.open) return;
         this.open = true;
+
+        await this.loadConfig();
 
         this.clear();
         const panel = this.buildPanel();

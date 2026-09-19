@@ -207,4 +207,57 @@ class WidgetIngestTest extends TestCase
         $unsigned = preg_replace('/\?.*$/', '', $url);
         $this->post($unsigned, [])->assertStatus(403);
     }
+
+    #[Test]
+    public function the_widget_is_told_what_the_project_decided(): void
+    {
+        // The settings used to be read only from data- attributes, so the checkboxes
+        // in project settings were stored and never consulted: the screen said one
+        // thing and the widget did another.
+        $key = $this->widgetKey();
+        $key->forceFill(['require_email' => true, 'capture_screenshot' => false])->save();
+
+        $this->getJson($this->centralUrl("/api/ingest/{$key->public_key}/config"))
+            ->assertOk()
+            ->assertJson(['require_email' => true, 'capture_screenshot' => false]);
+    }
+
+    #[Test]
+    public function an_unknown_or_retired_key_gets_no_configuration(): void
+    {
+        $key = $this->widgetKey();
+        $key->forceFill(['is_active' => false])->save();
+
+        $this->getJson($this->centralUrl("/api/ingest/{$key->public_key}/config"))->assertNotFound();
+        $this->getJson($this->centralUrl('/api/ingest/pk_nonsense/config'))->assertNotFound();
+    }
+
+    #[Test]
+    public function a_required_email_is_enforced_by_the_server(): void
+    {
+        // A rule the browser keeps is a rule anybody can decline to keep.
+        $key = $this->widgetKey();
+        $key->forceFill(['require_email' => true])->save();
+
+        $this->postJson($this->centralUrl("/api/ingest/{$key->public_key}"), [
+            'title' => 'Filed without an address',
+        ])->assertStatus(422);
+
+        $this->postJson($this->centralUrl("/api/ingest/{$key->public_key}"), [
+            'title' => 'Filed with one',
+            'reporter' => ['email' => 'ana@shopper.test'],
+        ])->assertStatus(202);
+    }
+
+    #[Test]
+    public function an_email_is_optional_unless_the_project_asks_for_one(): void
+    {
+        // The control, so the test above is about the setting rather than about
+        // reports always needing an address.
+        $key = $this->widgetKey();
+
+        $this->postJson($this->centralUrl("/api/ingest/{$key->public_key}"), [
+            'title' => 'Filed without an address',
+        ])->assertStatus(202);
+    }
 }

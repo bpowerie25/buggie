@@ -295,6 +295,9 @@ function WidgetKeyCard({ widgetKey }: { widgetKey: WidgetKeyRow }) {
                         />
                         Offer a screenshot
                     </label>
+                    <p className="pl-6 text-xs text-ink-subtle">
+                        Off means the reporter is never shown one and none is stored.
+                    </p>
                     <label className="flex items-center gap-2 text-sm text-ink-muted">
                         <input
                             type="checkbox"
@@ -304,6 +307,10 @@ function WidgetKeyCard({ widgetKey }: { widgetKey: WidgetKeyRow }) {
                         />
                         Require an email address
                     </label>
+                    <p className="pl-6 text-xs text-ink-subtle">
+                        Without one you cannot reply, and the reporter gets no link to
+                        follow their own bug.
+                    </p>
                     <label className="flex items-center gap-2 text-sm text-ink-muted">
                         <input
                             type="checkbox"

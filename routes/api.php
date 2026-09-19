@@ -19,6 +19,10 @@ use Illuminate\Support\Facades\Route;
 Route::post('ingest/{publicKey}', [IngestController::class, 'store'])
     ->name('ingest.store');
 
+// What the widget should do, per project. Fetched when the reporter opens.
+Route::get('ingest/{publicKey}/config', [IngestController::class, 'config'])
+    ->name('ingest.config');
+
 Route::post('ingest/screenshot/{report}', [IngestController::class, 'screenshot'])
     ->middleware('signed')
     ->name('ingest.screenshot');

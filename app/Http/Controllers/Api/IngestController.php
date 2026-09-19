@@ -76,6 +76,15 @@ class IngestController extends Controller
             ], 402);
         }
 
+        // Enforced here as well as asked for in the form. A rule the browser keeps
+        // is a rule anybody can decline to keep.
+        if ($key->require_email && ! filter_var((string) $request->input('reporter.email'), FILTER_VALIDATE_EMAIL)) {
+            return response()->json([
+                'message' => 'This site asks for an email address with every report.',
+                'errors' => ['reporter.email' => ['An email address is required.']],
+            ], 422);
+        }
+
         $ipHash = hash_hmac('sha256', (string) $request->ip(), (string) config('app.key'));
 
         $report = app(Tenancy::class)->run($key->project->workspace, fn () => Report::create([
@@ -118,6 +127,38 @@ class IngestController extends Controller
                 ])
                 : null,
         ], 202);
+    }
+
+    /**
+     * What the widget should do, according to the project rather than the script tag.
+     *
+     * Fetched when somebody opens the reporter, not on page load: most visitors never
+     * report anything, and the widget's whole argument is that it costs them nothing.
+     * By the time the panel is open, one small request is free.
+     *
+     * The settings were previously read only from `data-` attributes, so the
+     * checkboxes in project settings were stored and never consulted — the screen
+     * said one thing and the widget did another.
+     */
+    public function config(string $publicKey): JsonResponse
+    {
+        $key = WidgetKey::withoutGlobalScopes()
+            ->with('project')
+            ->where('public_key', $publicKey)
+            ->where('is_active', true)
+            ->first();
+
+        // The same answer for an unknown key as for a retired one, and no hint that
+        // either kind exists.
+        if ($key === null) {
+            return response()->json(['message' => 'Unknown key.'], 404);
+        }
+
+        return response()->json([
+            'require_email' => (bool) $key->require_email,
+            'capture_screenshot' => (bool) $key->capture_screenshot,
+            'mode' => $key->mode,
+        ]);
     }
 
     /**
