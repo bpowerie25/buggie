@@ -4,6 +4,7 @@ namespace App\Http\Middleware;
 
 use App\Models\Report;
 use App\Models\SavedView;
+use App\Support\Mail\Deliverability;
 use App\Support\Tenancy\Tenancy;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
@@ -97,6 +98,25 @@ class HandleInertiaRequests extends Middleware
                         ? (int) ceil(now()->diffInDays($workspace->trial_ends_at, false))
                         : 0,
                     'can_manage' => $user->can('manageBilling', $workspace),
+                ]
+                : null,
+
+            /*
+             * Warns that mail is going nowhere.
+             *
+             * Shown to anyone who can invite, not only to operators: on the hosted
+             * service a workspace owner cannot fix this, but they are the one whose
+             * invitation just silently failed, and they can still send the link by
+             * hand. Withholding it would leave them waiting on a reply that cannot
+             * come.
+             *
+             * It carries no host, no credentials and no driver name — only that mail
+             * does not work, and whether this person is the one who can fix it.
+             */
+            'mail' => fn () => $user && ! app(Deliverability::class)->isConfigured()
+                ? [
+                    'deliverable' => false,
+                    'can_fix' => \Illuminate\Support\Facades\Gate::forUser($user)->allows('operate'),
                 ]
                 : null,
 

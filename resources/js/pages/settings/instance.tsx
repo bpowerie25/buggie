@@ -54,10 +54,11 @@ export default function InstanceSettings({
                 applies to the whole install, not just this workspace.
             </p>
 
-            {data.mailer === 'log' && (
+            {(data.mailer === 'log' || (data.mailer === 'smtp' && data.host.trim() === '')) && (
                 <p className="mt-4 max-w-2xl rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-600 dark:text-amber-500">
-                    Mail is going to the log, so nothing is being delivered. Nobody can be
-                    invited and nobody can reset a password until this is set up.
+                    {data.mailer === 'log'
+                        ? 'Mail is going to the log, so nothing is being delivered. Nobody can be invited and nobody can reset a password until this is set up.'
+                        : 'No SMTP server has been given, so nothing can be sent.'}
                 </p>
             )}
 

@@ -68,6 +68,8 @@ export interface SharedProps {
         trial_days_left: number;
         can_manage: boolean;
     } | null;
+    /** Present only when mail would not actually be delivered. */
+    mail: { deliverable: false; can_fix: boolean } | null;
     flash: { success: string | null; error: string | null };
     [key: string]: unknown;
 }

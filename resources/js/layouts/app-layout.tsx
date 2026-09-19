@@ -69,7 +69,7 @@ export function AppLayout({
     activeQuery?: string;
     children: ReactNode;
 }) {
-    const { auth, workspace, workspaces, views, inboxCount, billing, docsUrl, ziggy } = usePage<
+    const { auth, workspace, workspaces, views, inboxCount, billing, mail, docsUrl, ziggy } = usePage<
         SharedProps & { ziggy: { location: string } }
     >().props;
     const [switcherOpen, setSwitcherOpen] = useState(false);
@@ -284,6 +284,7 @@ export function AppLayout({
                 </header>
 
                 <div className="p-6">
+                    <MailBanner mail={mail} path={path} />
                     <UsageBanner billing={billing} />
                     <Flash />
                     {children}
@@ -292,6 +293,40 @@ export function AppLayout({
 
             <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
             {shortcutsOpen && <ShortcutSheet onClose={() => setShortcutsOpen(false)} />}
+        </div>
+    );
+}
+
+/**
+ * Says that mail is going nowhere.
+ *
+ * Unlike the usage banner this does not go away, because the condition does not go
+ * away on its own and every hour it is true is an hour of invitations and password
+ * resets vanishing in silence. The wording differs by who is reading: an operator
+ * can fix it, and everyone else needs to know to send the link by hand instead.
+ */
+function MailBanner({ mail, path }: { mail: SharedProps['mail']; path: string }) {
+    if (!mail) return null;
+
+    // Not on the page that fixes it: the form is right there, and it carries its own
+    // warning that reacts to what is currently typed rather than what is saved.
+    if (path.startsWith('/settings/instance')) return null;
+
+    return (
+        <div className="mb-6 flex flex-wrap items-center gap-2 rounded-lg border border-danger/30 bg-danger-soft px-3 py-2 text-sm text-danger">
+            <span>
+                {mail.can_fix
+                    ? 'Email is not set up, so invitations, password resets and notifications are not being delivered.'
+                    : 'Email is not set up on this Buggie, so invitations and notifications are not being delivered. Send people their invitation link yourself.'}
+            </span>
+            {mail.can_fix && (
+                <Link
+                    href="/settings/instance"
+                    className="ml-auto font-medium underline underline-offset-2"
+                >
+                    Set up email
+                </Link>
+            )}
         </div>
     );
 }

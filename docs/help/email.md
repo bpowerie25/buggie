@@ -94,6 +94,25 @@ Three things are sent:
 Without outgoing mail configured, nobody can be invited and no reporter can follow
 their own bug. Password reset also depends on it.
 
+### When it is not configured
+
+An install that cannot send mail does not fail — it **discards**. Messages are
+accepted, written to the application log and dropped, and a broken install looks
+exactly like a working one. So Buggie says so instead:
+
+- **A banner on every page**, for as long as the condition lasts. It does not
+  dismiss, because the problem does not go away on its own. Operators get a link to
+  the settings page; everybody else is told to send invitation links by hand.
+- **Inviting somebody says what actually happened.** "Invitation sent" is a lie on an
+  install that cannot send, so the message says the invitation was created and to
+  copy the link. The link is on the members page beside the pending invitation.
+- **The test button** on **Settings → Instance**, which sends one message to your own
+  address and reports the provider's own error if it fails.
+
+The banner watches the configuration, not individual sends: it appears for the `log`,
+`array` and `null` drivers, and for SMTP with no server set. Any other provider is
+taken at its word.
+
 There is no unsubscribe link in digest mail, and bounces are not handled.
 
 ## Related pages

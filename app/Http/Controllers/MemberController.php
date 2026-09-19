@@ -7,6 +7,7 @@ use App\Enums\WorkspaceRole;
 use App\Models\Invitation;
 use App\Models\Project;
 use App\Models\User;
+use App\Support\Mail\Deliverability;
 use App\Support\Tenancy\Tenancy;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -93,6 +94,17 @@ class MemberController extends Controller
             $validated['project_ids'] ?? [],
             $request->user(),
         );
+
+        // "Invitation sent" is a lie on an install that cannot send mail, and it is
+        // the lie that costs most: the person who invited waits, the person invited
+        // never hears, and the invitation link sitting on this very page goes unused
+        // because nobody was told to use it.
+        if (! app(Deliverability::class)->isConfigured()) {
+            return back()->with(
+                'success',
+                "Invitation created for {$validated['email']}, but this Buggie cannot send email — copy the link below and send it to them yourself.",
+            );
+        }
 
         return back()->with('success', "Invitation sent to {$validated['email']}.");
     }
