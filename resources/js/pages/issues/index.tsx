@@ -110,6 +110,64 @@ export default function IssuesIndex({
 
     const groups = useMemo(() => groupIssues(rows, groupBy), [rows, groupBy]);
 
+    /**
+     * What dropping a card in a column means, which depends entirely on what the
+     * columns are. Only the page knows that, so the board reports the column and
+     * this decides.
+     */
+    function moveToColumn(issue: IssueRow, columnName: string) {
+        if (groupBy === 'assignee') {
+            if ((issue.assignee?.name ?? 'Unassigned') === columnName) return;
+
+            const person = (facets?.members ?? []).find((m) => m.name === columnName);
+
+            // "Unassigned" is a real column and a real destination, not a failure to
+            // find somebody.
+            if (columnName === 'Unassigned') {
+                patch(issue, { assignee_id: null }, { assignee: null });
+            } else if (person) {
+                patch(issue, { assignee_id: person.id }, { assignee: person });
+            }
+
+            return;
+        }
+
+        if (groupBy === 'priority') {
+            if (issue.priority_label === columnName) return;
+
+            const priority = (facets?.priorities ?? []).find((p) => p.label === columnName);
+
+            if (priority) {
+                patch(
+                    issue,
+                    { priority: priority.value },
+                    {
+                        priority: priority.value,
+                        priority_label: priority.label,
+                        priority_color: priority.color,
+                    },
+                );
+            }
+
+            return;
+        }
+
+        if (issue.status.name === columnName) return;
+
+        // Statuses belong to projects, so a board spanning projects merges columns by
+        // name and resolves to the status with that name in the dropped issue's own
+        // project. That keeps a cross-project board usable without pretending every
+        // project shares one workflow.
+        const status = (facets?.statuses_by_project[issue.project.id] ?? []).find(
+            (s) => s.name === columnName,
+        );
+
+        if (status) {
+            patch(issue, { status_id: status.id }, { status });
+        }
+    }
+
+
     const lines = useMemo<Line[]>(() => {
         const out: Line[] = [];
 
@@ -328,16 +386,12 @@ export default function IssuesIndex({
                 <EmptyState query={query} />
             ) : layout === 'board' ? (
                 <IssueBoard
-                    issues={rows}
-                    columns={groups.map((g) => ({ name: g.name, status: g.status }))}
-                    statusesByProject={facets?.statuses_by_project ?? {}}
-                    editable={editable}
-                    onMove={(issue, statusId) => {
-                        const status = (facets?.statuses_by_project[issue.project.id] ?? []).find(
-                            (s) => s.id === statusId,
-                        );
-                        patch(issue, { status_id: statusId }, status ? { status } : {});
-                    }}
+                    columns={groups}
+                    // Dragging cannot express "move to another project": that changes
+                    // the issue's key and its number. Cards are not draggable there
+                    // rather than draggable and inert.
+                    editable={editable && groupBy !== 'project'}
+                    onDropInColumn={(issue, columnName) => moveToColumn(issue, columnName)}
                 />
             ) : (
                 <div

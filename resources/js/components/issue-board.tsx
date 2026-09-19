@@ -113,25 +113,32 @@ function Column({
 }
 
 /**
- * Kanban grouped by status name.
+ * Kanban, grouped by whatever the list is grouped by.
  *
- * Statuses belong to projects, so a board spanning projects merges columns by name and
- * a drop resolves to the status with that name *in the dropped issue's own project*.
- * That keeps a cross-project board usable without pretending every project shares one
- * workflow.
+ * The board knows nothing about what a column means. It reports which column a card
+ * was dropped on and lets the page decide what that implies — a status on a status
+ * board, an assignee on an assignee board.
+ *
+ * It used to resolve the drop to a status by name regardless of the grouping, so on
+ * an assignee or priority board the card animated back and nothing happened at all:
+ * no change, no error, no explanation. A control that silently does nothing is worse
+ * than one that is visibly unavailable, which is why `editable` now covers groupings
+ * a drag cannot express.
  */
 export function IssueBoard({
-    issues,
     columns,
-    statusesByProject,
     editable,
-    onMove,
+    onDropInColumn,
 }: {
-    issues: IssueRow[];
-    columns: { name: string; status: IssueStatus | null }[];
-    statusesByProject: Record<number, IssueStatus[]>;
+    /**
+     * Columns arrive with their own cards. The board used to be handed every issue
+     * and filter each column by `issue.status.name === column`, which is only ever
+     * true on a status board — so an assignee or priority board rendered its columns
+     * and then showed nothing in them at all.
+     */
+    columns: { name: string; status: IssueStatus | null; issues: IssueRow[] }[];
     editable: boolean;
-    onMove: (issue: IssueRow, statusId: number) => void;
+    onDropInColumn: (issue: IssueRow, columnName: string) => void;
 }) {
     const [dragging, setDragging] = useState<IssueRow | null>(null);
     const sensors = useSensors(
@@ -149,26 +156,21 @@ export function IssueBoard({
         const issue = event.active.data.current?.issue as IssueRow | undefined;
         const columnName = event.over?.id as string | undefined;
 
-        if (!issue || !columnName || issue.status.name === columnName) return;
+        if (!issue || !columnName) return;
 
-        const target = (statusesByProject[issue.project.id] ?? []).find(
-            (status) => status.name === columnName,
-        );
-
-        // A project without a status of that name simply cannot accept the drop.
-        if (target) onMove(issue, target.id);
+        onDropInColumn(issue, columnName);
     }
 
     return (
         <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd}>
             <div className="flex gap-3 overflow-x-auto pb-4">
-                {columns.map(({ name, status }) => (
+                {columns.map(({ name, status, issues }) => (
                     <Column
                         key={name}
                         name={name}
                         status={status}
                         editable={editable}
-                        issues={issues.filter((issue) => issue.status.name === name)}
+                        issues={issues}
                     />
                 ))}
             </div>
