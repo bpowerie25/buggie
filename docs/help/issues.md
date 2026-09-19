@@ -146,3 +146,25 @@ not shown on the issue page.
 - [Statuses and workflow](workflow.md)
 - [Labels, priorities, types and assignees](labels-and-fields.md)
 - [Keyboard shortcuts](keyboard.md)
+
+## Exporting
+
+**Export** on the issue list downloads what you are currently looking at as CSV. It
+carries the filter with it, so `is:open project:web -label:wontfix` exports exactly
+those issues and nothing else.
+
+The file holds the key, title, status and its category, type, priority, project,
+assignee, reporter, labels, occurrence count, the dates, and a link back to each
+issue. Staff also get a column saying whether each issue is visible to the client.
+
+A client can export too, and gets exactly what they can already see — their own
+projects, client-visible issues only. The export is built from the same query as the
+list, so it can never show more than the screen does.
+
+Two details that matter if you open it in Excel:
+
+- The file begins with a byte-order mark, or Excel reads it as Latin-1 and mangles
+  every accented name in it.
+- A title beginning `=`, `+`, `-` or `@` is prefixed with a quote. Titles are written
+  by whoever reported the bug, and a cell starting with `=` is run as a formula the
+  moment the file is opened.

@@ -17,7 +17,7 @@ import type { Facets, IssueRow, IssueStatus, SavedView, SharedProps } from '@/ty
 import type { FormDataConvertible } from '@inertiajs/core';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { Bookmark, ChevronRight, LayoutGrid, List, Plus } from 'lucide-react';
+import { Bookmark, ChevronRight, Download, LayoutGrid, List, Plus } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 // Narrower than RequestPayload, which allows FormData and so cannot be nested
@@ -241,6 +241,20 @@ export default function IssuesIndex({
 
             <QueryBar ref={searchRef} query={query} facets={facets} onChange={navigate}>
                 <SaveViewButton query={query.query} layout={layout} groupBy={groupBy} />
+
+                {/*
+                    A plain link, not a router visit: this is a file download, and
+                    Inertia would try to render the CSV as a page. It carries the
+                    current query, so what you export is what you are looking at.
+                */}
+                <a
+                    href={`/issues/export${query.query ? `?q=${encodeURIComponent(query.query)}` : ''}`}
+                    title="Download these issues as CSV"
+                    className="flex items-center gap-1.5 rounded-lg border border-border px-2 py-1 text-xs text-ink-muted transition hover:text-ink"
+                >
+                    <Download className="size-3.5" />
+                    Export
+                </a>
 
                 <span className="text-xs text-ink-subtle">
                     {rows.length} issue{rows.length === 1 ? '' : 's'}

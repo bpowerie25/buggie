@@ -150,6 +150,10 @@ Route::domain('{workspace}.'.$host)
         // Declared before the resource so /issues/bulk is not read as an issue key.
         Route::patch('issues/bulk', [IssueController::class, 'bulk'])->name('issues.bulk');
 
+        // Before the resource route, or /issues/export resolves as /issues/{issue}.
+        Route::get('issues/export', \App\Http\Controllers\IssueExportController::class)
+            ->name('issues.export');
+
         Route::resource('issues', IssueController::class)->except('edit');
 
         Route::post('issues/{issue}/attachments', [AttachmentController::class, 'store'])
