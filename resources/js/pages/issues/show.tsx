@@ -22,10 +22,10 @@ import type {
     VisibilityValue,
 } from '@/types';
 import type { RequestPayload } from '@inertiajs/core';
-import { Head, Link, router, usePage } from '@inertiajs/react';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import type { JSONContent } from '@tiptap/react';
-import { Eye, EyeOff, Lock, Tag, Trash2 } from 'lucide-react';
-import { useState } from 'react';
+import { Eye, EyeOff, Lock, Plus, Tag, Trash2, X } from 'lucide-react';
+import { useState, type FormEvent } from 'react';
 
 interface Comment {
     id: number;
@@ -52,6 +52,7 @@ interface Issue extends IssueRow {
     due_on: string | null;
     created_at: string;
     watchers: Person[];
+    watching: boolean;
     relations: {
         id: number;
         type: string;
@@ -130,6 +131,7 @@ export default function ShowIssue({
     facets,
     can,
     diagnostics,
+    relationTypes = [],
 }: {
     issue: Issue;
     comments: Comment[];
@@ -139,6 +141,7 @@ export default function ShowIssue({
     facets: Facets;
     /** Null for clients, and for issues with no captured context. */
     diagnostics: DiagnosticsData | null;
+    relationTypes?: { value: string; label: string }[];
     can: {
         update: boolean;
         comment_internally: boolean;
@@ -676,25 +679,70 @@ export default function ShowIssue({
                         </SidebarRow>
                     )}
 
-                    {issue.relations.length > 0 && (
-                        <SidebarRow label="Linked">
-                            <ul className="space-y-1">
-                                {issue.relations.map((relation) => (
-                                    <li key={relation.id} className="text-xs">
-                                        <span className="text-ink-subtle">
-                                            {relation.label}{' '}
-                                        </span>
-                                        <Link
-                                            href={`/issues/${relation.issue.key}`}
-                                            className="font-mono text-accent hover:underline"
-                                        >
-                                            {relation.issue.key}
-                                        </Link>
-                                    </li>
-                                ))}
-                            </ul>
-                        </SidebarRow>
-                    )}
+                    <SidebarRow label="Due">
+                        {can.update ? (
+                            <input
+                                type="date"
+                                value={issue.due_on ?? ''}
+                                aria-label="Due date"
+                                onChange={(e) =>
+                                    router.patch(
+                                        `/issues/${issue.key}`,
+                                        // Empty clears it. A due date you cannot remove
+                                        // is a date that stays wrong forever.
+                                        { due_on: e.target.value || null },
+                                        { preserveScroll: true },
+                                    )
+                                }
+                                className="w-full rounded-md border border-transparent bg-transparent px-1.5 py-1 text-sm text-ink transition hover:border-border"
+                            />
+                        ) : (
+                            <span className="text-sm text-ink">{issue.due_on ?? 'No date'}</span>
+                        )}
+                    </SidebarRow>
+
+                    <SidebarRow label="Watching">
+                        <div className="flex flex-wrap items-center gap-2">
+                            <button
+                                type="button"
+                                onClick={() =>
+                                    router[issue.watching ? 'delete' : 'post'](
+                                        `/issues/${issue.key}/watch`,
+                                        {},
+                                        { preserveScroll: true },
+                                    )
+                                }
+                                className="flex items-center gap-1.5 rounded-md px-1.5 py-1 text-sm text-ink transition hover:bg-surface"
+                            >
+                                {issue.watching ? (
+                                    <>
+                                        <Eye className="size-3.5 text-accent" /> Watching
+                                    </>
+                                ) : (
+                                    <>
+                                        <EyeOff className="size-3.5 text-ink-subtle" /> Not watching
+                                    </>
+                                )}
+                            </button>
+
+                            {issue.watchers.length > 0 && (
+                                <span
+                                    className="text-xs text-ink-subtle"
+                                    title={issue.watchers.map((w) => w.name).join(', ')}
+                                >
+                                    {issue.watchers.length}
+                                </span>
+                            )}
+                        </div>
+                    </SidebarRow>
+
+                    <SidebarRow label="Linked">
+                        <Relations
+                            issue={issue}
+                            types={relationTypes}
+                            editable={can.update}
+                        />
+                    </SidebarRow>
 
                     <SidebarRow label="Reporter">
                         <span className="text-sm text-ink">
@@ -706,5 +754,136 @@ export default function ShowIssue({
                 </aside>
             </div>
         </AppLayout>
+    );
+}
+
+/**
+ * Linked issues.
+ *
+ * The endpoints have existed since M3 and nothing called them, so relations could be
+ * read and never made. Keys are typed rather than picked from a list: an agency with
+ * a few thousand issues does not want a dropdown, and people know the key of the bug
+ * they are thinking of.
+ */
+function Relations({
+    issue,
+    types,
+    editable,
+}: {
+    issue: Issue;
+    types: { value: string; label: string }[];
+    editable: boolean;
+}) {
+    const [adding, setAdding] = useState(false);
+
+    const { data, setData, post, processing, errors, reset } = useForm({
+        type: types[0]?.value ?? 'relates_to',
+        key: '',
+    });
+
+    function submit(e: FormEvent) {
+        e.preventDefault();
+
+        post(`/issues/${issue.key}/relations`, {
+            preserveScroll: true,
+            onSuccess: () => {
+                reset('key');
+                setAdding(false);
+            },
+        });
+    }
+
+    return (
+        <div className="space-y-1.5">
+            {issue.relations.length > 0 && (
+                <ul className="space-y-1">
+                    {issue.relations.map((relation) => (
+                        <li key={relation.id} className="group flex items-center gap-1.5 text-xs">
+                            <span className="text-ink-subtle">{relation.label}</span>
+                            <Link
+                                href={`/issues/${relation.issue.key}`}
+                                className="font-mono text-accent hover:underline"
+                            >
+                                {relation.issue.key}
+                            </Link>
+                            {editable && (
+                                <button
+                                    type="button"
+                                    aria-label={`Unlink ${relation.issue.key}`}
+                                    onClick={() =>
+                                        router.delete(`/issues/${issue.key}/relations`, {
+                                            data: { key: relation.issue.key, type: relation.type },
+                                            preserveScroll: true,
+                                        })
+                                    }
+                                    className="ml-auto opacity-0 transition group-hover:opacity-100"
+                                >
+                                    <X className="size-3 text-ink-subtle hover:text-danger" />
+                                </button>
+                            )}
+                        </li>
+                    ))}
+                </ul>
+            )}
+
+            {editable &&
+                (adding ? (
+                    <form onSubmit={submit} className="space-y-1.5">
+                        <select
+                            value={data.type}
+                            onChange={(e) => setData('type', e.target.value)}
+                            className="w-full rounded-md border border-border bg-raised px-1.5 py-1 text-xs text-ink"
+                        >
+                            {types.map((type) => (
+                                <option key={type.value} value={type.value}>
+                                    {type.label}
+                                </option>
+                            ))}
+                        </select>
+
+                        <input
+                            value={data.key}
+                            autoFocus
+                            placeholder="WEB-42"
+                            aria-label="Issue key to link"
+                            onChange={(e) => setData('key', e.target.value.toUpperCase())}
+                            onKeyDown={(e) => e.key === 'Escape' && setAdding(false)}
+                            className="w-full rounded-md border border-border bg-raised px-1.5 py-1 font-mono text-xs text-ink"
+                        />
+
+                        {errors.key && <p className="text-xs text-danger">{errors.key}</p>}
+
+                        <div className="flex gap-1.5">
+                            <button
+                                type="submit"
+                                disabled={processing || data.key === ''}
+                                className="rounded-md bg-accent px-2 py-1 text-xs text-accent-ink disabled:opacity-50"
+                            >
+                                Link
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setAdding(false)}
+                                className="rounded-md px-2 py-1 text-xs text-ink-muted"
+                            >
+                                Cancel
+                            </button>
+                        </div>
+                    </form>
+                ) : (
+                    <button
+                        type="button"
+                        onClick={() => setAdding(true)}
+                        className="flex items-center gap-1 text-xs text-ink-subtle transition hover:text-ink"
+                    >
+                        <Plus className="size-3" />
+                        Link an issue
+                    </button>
+                ))}
+
+            {!editable && issue.relations.length === 0 && (
+                <span className="text-xs text-ink-subtle">Nothing linked</span>
+            )}
+        </div>
     );
 }

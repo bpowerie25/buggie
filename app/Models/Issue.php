@@ -152,6 +152,23 @@ class Issue extends Model
         ]);
     }
 
+    /**
+     * Stop watching.
+     *
+     * Deliberately not "unless they are the assignee": somebody who has been handed
+     * an issue and does not want the running commentary is entitled to that, and the
+     * assignment still stands.
+     */
+    public function unwatch(?User $user): void
+    {
+        $user === null || $this->watchers()->detach($user->id);
+    }
+
+    public function isWatchedBy(?User $user): bool
+    {
+        return $user !== null && $this->watchers()->whereKey($user->id)->exists();
+    }
+
     public function isOpen(): bool
     {
         return $this->status->category->isOpen();

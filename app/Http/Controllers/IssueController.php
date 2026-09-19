@@ -133,6 +133,7 @@ class IssueController extends Controller
                 'due_on' => $issue->due_on?->toDateString(),
                 'created_at' => $issue->created_at->toIso8601String(),
                 'watchers' => $issue->watchers->map->only(['id', 'name']),
+                'watching' => $issue->watchers->contains('id', request()->user()->id),
                 'relations' => $issue->relations->map(fn ($relation) => [
                     'id' => $relation->id,
                     'type' => $relation->type->value,
@@ -150,6 +151,7 @@ class IssueController extends Controller
             // happened to log, and a client should not be reading that about their
             // own users. Clients never see the triage inbox either.
             'diagnostics' => $staff ? $this->diagnostics($issue) : null,
+            'relationTypes' => \App\Enums\RelationType::options(),
 
             // The one place the client visibility plane is enforced for reading.
             'comments' => $issue->comments()

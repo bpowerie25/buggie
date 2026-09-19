@@ -29,4 +29,13 @@ enum RelationType: string
             self::Duplicates => 'Duplicates',
         };
     }
+
+    /** @return array<int, array{value: string, label: string}> */
+    public static function options(): array
+    {
+        return array_map(
+            fn (self $type) => ['value' => $type->value, 'label' => $type->label()],
+            self::cases(),
+        );
+    }
 }

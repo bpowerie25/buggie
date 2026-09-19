@@ -170,6 +170,13 @@ Route::domain('{workspace}.'.$host)
         Route::delete('comments/{comment}', [CommentController::class, 'destroy'])
             ->name('comments.destroy');
 
+        // Watching is a view-level thing, not an edit: a client following their own
+        // issue is not editing it.
+        Route::post('issues/{issue}/watch', [\App\Http\Controllers\IssueWatchController::class, 'store'])
+            ->name('issues.watch');
+        Route::delete('issues/{issue}/watch', [\App\Http\Controllers\IssueWatchController::class, 'destroy'])
+            ->name('issues.unwatch');
+
         Route::post('issues/{issue}/relations', [IssueRelationController::class, 'store'])
             ->name('relations.store');
         Route::delete('issues/{issue}/relations', [IssueRelationController::class, 'destroy'])
