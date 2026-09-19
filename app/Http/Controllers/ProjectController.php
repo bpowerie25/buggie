@@ -113,6 +113,12 @@ class ProjectController extends Controller
             // Generated since M5 and never once displayed, which made filing by email
             // impossible without database access.
             'inboundAddress' => $project->inboundAddress(),
+            'branding' => [
+                'name' => $project->brand_name,
+                'color' => $project->brand_color,
+                'logo' => $project->branding()['logo'],
+                'placeholder' => $project->name,
+            ],
             'widgetKeys' => $project->widgetKeys()->latest()->get()->map(fn ($key) => [
                 'id' => $key->id,
                 'public_key' => $key->public_key,

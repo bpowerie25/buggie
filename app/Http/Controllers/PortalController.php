@@ -36,6 +36,9 @@ class PortalController extends Controller
             $portal->forceFill(['last_used_at' => now()])->saveQuietly();
 
             return Inertia::render('portal/show', [
+                // What the reporter should see this as. They were using a shop, not
+                // a bug tracker, and the agency that built it is not their concern.
+                'brand' => $issue->project->branding(),
                 'issue' => [
                     'key' => $issue->key,
                     'title' => $issue->title,

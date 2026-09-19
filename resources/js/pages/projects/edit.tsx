@@ -45,6 +45,7 @@ export default function EditProject({
     categories,
     inboundAddress,
     versions = [],
+    branding,
 }: {
     project: ProjectSummary;
     widgetKeys: WidgetKeyRow[];
@@ -52,6 +53,7 @@ export default function EditProject({
     categories: { value: StatusRow['category']; label: string; open: boolean }[];
     inboundAddress: string;
     versions?: VersionRow[];
+    branding: { name: string | null; color: string | null; logo: string | null; placeholder: string };
 }) {
     const { data, setData, put, processing, errors } = useForm({
         name: project.name,
@@ -159,6 +161,8 @@ export default function EditProject({
             </section>
 
             <Versions versions={versions} project={project} />
+
+            <Branding project={project} branding={branding} />
 
             <ImportSection project={project} />
 
@@ -488,6 +492,111 @@ function ImportSection({ project }: { project: ProjectSummary }) {
 
                 <Button type="submit" size="sm" disabled={processing || !data.file}>
                     Upload
+                </Button>
+            </form>
+        </section>
+    );
+}
+
+/**
+ * What a client's own customers see.
+ *
+ * The person following a link about a broken checkout was using a shop. They should
+ * see the shop — not the agency that built it, and not the tracker the agency
+ * happens to use.
+ */
+function Branding({
+    project,
+    branding,
+}: {
+    project: ProjectSummary;
+    branding: { name: string | null; color: string | null; logo: string | null; placeholder: string };
+}) {
+    const { data, setData, post, processing, errors } = useForm({
+        brand_name: branding.name ?? '',
+        brand_color: branding.color ?? '',
+        logo: null as File | null,
+        remove_logo: false as boolean,
+    });
+
+    function submit(e: FormEvent) {
+        e.preventDefault();
+        post(`/projects/${project.slug}/branding`, { forceFormData: true, preserveScroll: true });
+    }
+
+    return (
+        <section className="mt-12 max-w-2xl">
+            <h2 className="text-sm font-semibold text-ink">How this looks to a reporter</h2>
+            <p className="mt-1 text-sm text-ink-muted">
+                Whoever reports a bug sees this on the reporter panel and on the page where
+                they follow their own report. Leave it blank and the project name is used.
+            </p>
+
+            <form onSubmit={submit} className="mt-4 space-y-4">
+                <div className="grid gap-4 sm:grid-cols-2">
+                    <Field
+                        label="Name"
+                        error={errors.brand_name}
+                        hint="Usually your client's name, not yours."
+                    >
+                        <Input
+                            value={data.brand_name}
+                            placeholder={branding.placeholder}
+                            onChange={(e) => setData('brand_name', e.target.value)}
+                        />
+                    </Field>
+
+                    <Field label="Accent colour" error={errors.brand_color}>
+                        <div className="flex items-center gap-2">
+                            <input
+                                type="color"
+                                value={data.brand_color || '#6366f1'}
+                                aria-label="Accent colour"
+                                onChange={(e) => setData('brand_color', e.target.value)}
+                                className="h-9 w-12 cursor-pointer rounded-lg border border-border bg-raised"
+                            />
+                            <Input
+                                value={data.brand_color}
+                                placeholder="#6366f1"
+                                className="font-mono"
+                                onChange={(e) => setData('brand_color', e.target.value)}
+                            />
+                        </div>
+                    </Field>
+                </div>
+
+                <Field label="Logo" error={errors.logo} hint="PNG, JPG, WebP or SVG. Up to 512KB.">
+                    <div className="flex flex-wrap items-center gap-3">
+                        {branding.logo && !data.remove_logo && (
+                            <img
+                                src={branding.logo}
+                                alt="Current logo"
+                                className="h-8 w-auto max-w-[8rem] rounded bg-surface object-contain p-1"
+                            />
+                        )}
+
+                        <input
+                            type="file"
+                            accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                            onChange={(e) => setData('logo', e.target.files?.[0] ?? null)}
+                            className="flex-1 rounded-lg border border-border bg-raised px-3 py-2 text-sm text-ink-muted file:mr-3 file:rounded-md file:border-0 file:bg-surface file:px-2 file:py-1 file:text-xs file:text-ink"
+                        />
+
+                        {branding.logo && (
+                            <label className="flex items-center gap-1.5 text-xs text-ink-muted">
+                                <input
+                                    type="checkbox"
+                                    checked={data.remove_logo}
+                                    onChange={(e) => setData('remove_logo', e.target.checked)}
+                                />
+                                Remove
+                            </label>
+                        )}
+                    </div>
+                </Field>
+
+                <Button type="submit" size="sm" disabled={processing}>
+                    Save branding
                 </Button>
             </form>
         </section>

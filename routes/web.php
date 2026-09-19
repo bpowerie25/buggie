@@ -52,6 +52,12 @@ Route::domain($host)->group(function () {
         ->where('page', '[a-z0-9-]+')
         ->name('docs');
 
+    // Served from the central domain because the portal is, and a reporter has no
+    // workspace context — only a token.
+    Route::get('brand/{project}/logo', [\App\Http\Controllers\BrandingController::class, 'logo'])
+        ->whereNumber('project')
+        ->name('brand.logo');
+
     Route::get('w/{key}.js', WidgetScriptController::class)
         ->where('key', '[A-Za-z0-9_]+')
         ->name('widget.script');
@@ -226,6 +232,9 @@ Route::domain('{workspace}.'.$host)
             ->name('webhooks.destroy');
         Route::post('settings/webhooks/{webhook}/test', [\App\Http\Controllers\WebhookController::class, 'test'])
             ->name('webhooks.test');
+
+        Route::post('projects/{project}/branding', [\App\Http\Controllers\BrandingController::class, 'update'])
+            ->name('branding.update');
 
         // Bringing a backlog over from another tracker.
         Route::post('projects/{project}/imports', [\App\Http\Controllers\ImportController::class, 'store'])

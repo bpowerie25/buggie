@@ -163,6 +163,9 @@ class IngestController extends Controller
             'require_email' => (bool) $key->require_email,
             'capture_screenshot' => (bool) $key->capture_screenshot,
             'mode' => $key->mode,
+            // The reporter is looking at their own application, so the panel should
+            // look like it belongs to it.
+            'brand' => $key->project->branding(),
         ]);
     }
 

@@ -14,7 +14,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 #[Fillable([
     'name', 'key', 'slug', 'description', 'site_url', 'default_assignee_id', 'is_archived',
-    'settings',
+    'settings', 'brand_name', 'brand_color',
 ])]
 class Project extends Model
 {
@@ -98,6 +98,25 @@ class Project extends Model
         $origins[] = $scheme.'://'.$sibling.$port;
 
         return array_values(array_unique($origins));
+    }
+
+    /**
+     * How this project presents itself to somebody outside the team.
+     *
+     * Falls back to the project's own name and the default accent, so a project that
+     * has never been branded still looks deliberate rather than half-configured.
+     *
+     * @return array{name: string, logo: string|null, color: string|null}
+     */
+    public function branding(): array
+    {
+        return [
+            'name' => $this->brand_name ?: $this->name,
+            'logo' => $this->brand_logo_path
+                ? central_url("brand/{$this->id}/logo")
+                : null,
+            'color' => $this->brand_color,
+        ];
     }
 
     public function versions(): HasMany

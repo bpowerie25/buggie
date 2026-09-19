@@ -27,6 +27,7 @@ export default function PortalShow({
     comments,
     token,
     email,
+    brand,
 }: {
     issue: {
         key: string;
@@ -40,8 +41,13 @@ export default function PortalShow({
     comments: PortalComment[];
     token: string;
     email: string;
+    brand?: { name: string; logo: string | null; color: string | null };
 }) {
     const { flash } = usePage<{ flash: { success: string | null } }>().props;
+
+    // A colour, applied inline. The value is validated as a six-digit hex on the way
+    // in, because anything looser here is a style attribute somebody else writes.
+    const accent = brand?.color ? { color: brand.color } : undefined;
 
     const { data, setData, post, processing, errors, reset } = useForm({ body: '' });
 
@@ -59,9 +65,24 @@ export default function PortalShow({
 
             <div className="min-h-screen bg-surface py-10">
                 <div className="mx-auto w-full max-w-2xl px-4">
+                    {/*
+                        The reporter was using a shop, not a bug tracker. They see the
+                        shop's name and logo; the agency that built it, and the tracker
+                        the agency happens to use, are not their concern.
+                    */}
                     <div className="mb-6 flex items-center gap-2 text-ink-muted">
-                        <Bug className="size-5 text-accent" />
-                        <span className="text-sm font-medium">Your bug report</span>
+                        {brand?.logo ? (
+                            <img
+                                src={brand.logo}
+                                alt={brand.name}
+                                className="h-6 w-auto max-w-[10rem] object-contain"
+                            />
+                        ) : (
+                            <Bug className="size-5 text-accent" style={accent} />
+                        )}
+                        <span className="text-sm font-medium">
+                            {brand?.logo ? 'Your bug report' : `${brand?.name ?? 'Your'} bug report`}
+                        </span>
                     </div>
 
                     <div className="rounded-xl border border-border bg-raised p-6">
