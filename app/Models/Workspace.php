@@ -103,10 +103,19 @@ class Workspace extends Model
     }
 
     /** Reports this calendar month — the metered quantity. */
+    /**
+     * Metered reports since the 1st.
+     *
+     * Duplicates past `plans.collapse_after` are not metered: they keep no payload,
+     * so they cost nothing to store, and billing for them would contradict the one
+     * thing this product promises loudest — that forty people hitting one broken
+     * checkout is one issue rather than forty tickets.
+     */
     public function reportsThisMonth(): int
     {
         return Report::withoutGlobalScopes()
             ->where('workspace_id', $this->id)
+            ->where('metered', true)
             ->where('created_at', '>=', now()->startOfMonth())
             ->count();
     }

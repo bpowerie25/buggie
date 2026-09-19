@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\IngestReportRequest;
 use App\Jobs\ProcessIncomingReport;
 use App\Models\Report;
+use App\Support\Reports\Fingerprint;
+use App\Models\Workspace;
 use App\Models\WidgetKey;
 use App\Support\Tenancy\Tenancy;
 use Illuminate\Http\JsonResponse;
@@ -50,7 +52,21 @@ class IngestController extends Controller
 
         $workspace = $key->project->workspace;
 
-        if (! $workspace->isWithinLimit('reports_per_month')) {
+        // Fingerprinted here rather than on the queue, because whether this report
+        // is a duplicate decides whether it is metered, and that has to be settled
+        // before the allowance is checked. It is string normalisation and a sha1;
+        // the person who just hit a bug is not waiting on anything expensive.
+        $fingerprint = Fingerprint::for(
+            $request->input('error') ?: null,
+            $request->input('environment.url'),
+        );
+
+        $metered = $this->isMetered($key->project_id, $fingerprint, $workspace);
+
+        // Only metered reports are refused when the allowance is gone. A duplicate
+        // that costs nothing to store still gets through, so one bug going round a
+        // client's testers cannot switch reporting off for everybody.
+        if ($metered && ! $workspace->isWithinLimit('reports_per_month')) {
             // 402 rather than 429: this is not "slow down", it is "this account has
             // run out". The widget shows the message, so the person who hit the bug
             // is told something true rather than "could not send".
@@ -71,11 +87,17 @@ class IngestController extends Controller
             'reporter_email' => $request->input('reporter.email'),
             'reporter_ref' => $request->input('reporter.ref'),
             'environment' => $this->environment($request),
-            'console' => array_slice((array) $request->input('console', []), -50),
-            'network' => array_slice((array) $request->input('network', []), -30),
+
+            // An unmetered duplicate keeps what makes it an occurrence — the error,
+            // the page, who hit it — and drops the bulk. The console and network of
+            // the sixth identical report tell nobody anything the first five did not.
+            'console' => $metered ? array_slice((array) $request->input('console', []), -50) : [],
+            'network' => $metered ? array_slice((array) $request->input('network', []), -30) : [],
             'error' => $request->input('error') ?: null,
             'ip_hash' => $ipHash,
         ]));
+
+        $report->forceFill(['fingerprint' => $fingerprint, 'metered' => $metered])->saveQuietly();
 
         $key->forceFill(['last_used_at' => now()])->saveQuietly();
 
@@ -88,12 +110,37 @@ class IngestController extends Controller
             'reference' => 'R-'.$report->id,
             // A short-lived, single-purpose URL for the screenshot, so large binaries
             // never pass through this endpoint.
-            'upload_url' => $request->boolean('screenshot') && $key->capture_screenshot
+            // No upload URL for an unmetered duplicate: refusing the image is what
+            // makes it free to store, and therefore fair to give away.
+            'upload_url' => $metered && $request->boolean('screenshot') && $key->capture_screenshot
                 ? URL::temporarySignedRoute('ingest.screenshot', now()->addMinutes(5), [
                     'report' => $report->id,
                 ])
                 : null,
         ], 202);
+    }
+
+    /**
+     * Whether this report counts against the monthly allowance.
+     *
+     * Anything without a fingerprint always counts: no error means no grouping, so
+     * it goes to a human individually and is a real unit of work. Otherwise the
+     * first few of a given bug each month are metered and the rest are not.
+     */
+    private function isMetered(int $projectId, ?string $fingerprint, Workspace $workspace): bool
+    {
+        if ($fingerprint === null) {
+            return true;
+        }
+
+        $already = Report::withoutGlobalScopes()
+            ->where('project_id', $projectId)
+            ->where('fingerprint', $fingerprint)
+            ->where('metered', true)
+            ->where('created_at', '>=', now()->startOfMonth())
+            ->count();
+
+        return $already < (int) config('plans.collapse_after');
     }
 
     /** Accepts exactly one image for a report, once, within five minutes. */

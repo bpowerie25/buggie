@@ -78,3 +78,29 @@ rather than showing a checkout button that cannot work.
 
 - [Self-hosting](self-hosting.md)
 - [The reporter widget](widget.md) — where the `402` is displayed
+
+## What counts as a report
+
+One submission into the triage inbox: someone using the reporter widget, a native
+SDK call, or an email to a project's address. Issues you or a client create inside
+Buggie are not reports and are never metered.
+
+The count runs from the 1st of the calendar month and resets on the 1st.
+
+### Duplicates are mostly free
+
+Reports of a bug already seen this month stop being metered after the first few.
+Past that point the report keeps its error and its page — enough to count as another
+occurrence — and drops the console, the network table and the screenshot. Nobody
+needs the sixth screenshot of the same broken button, so it is not stored, and what
+is not stored is not charged for.
+
+Two consequences worth knowing:
+
+- **Forty people hitting one broken checkout costs a handful of reports, not forty.**
+  That is the same promise triage makes, kept in the billing as well.
+- **One bug going round cannot switch reporting off.** Running out of allowance stops
+  new bugs being accepted, not further reports of a bug already known.
+
+A report with no error attached always counts. There is nothing to group it by, so a
+person reads it individually, and that is real work however many arrive.

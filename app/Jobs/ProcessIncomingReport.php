@@ -48,7 +48,10 @@ class ProcessIncomingReport implements ShouldQueue
                 return;
             }
 
-            $fingerprint = Fingerprint::for(
+            // Widget ingest fingerprints before it saves, because the answer decides
+            // whether the report is metered. Anything arriving another way — email,
+            // the seeder — is fingerprinted here.
+            $fingerprint = $report->fingerprint ?? Fingerprint::for(
                 $report->error,
                 $report->environment['url'] ?? null,
             );
@@ -58,7 +61,9 @@ class ProcessIncomingReport implements ShouldQueue
                 return;
             }
 
-            $report->forceFill(['fingerprint' => $fingerprint])->save();
+            if ($report->fingerprint !== $fingerprint) {
+                $report->forceFill(['fingerprint' => $fingerprint])->save();
+            }
 
             $issue = Issue::where('project_id', $report->project_id)
                 ->where('fingerprint', $fingerprint)

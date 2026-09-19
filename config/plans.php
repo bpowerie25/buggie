@@ -26,6 +26,20 @@ return [
     // Warn in-app once usage passes this fraction of the monthly allowance.
     'warn_at' => 0.8,
 
+    /*
+     * How many reports of the same bug are metered before the rest are free.
+     *
+     * Duplicates collapse into one issue, which is the point of the product, so
+     * billing forty reports for one bug contradicted the pitch. Past this many in a
+     * month, a report sharing a fingerprint keeps its occurrence but drops its
+     * payload — nobody needs the sixth screenshot of the same broken button — and a
+     * report that costs nothing to store should cost nothing to send.
+     *
+     * It also means one viral bug cannot exhaust the month's allowance and switch
+     * reporting off for everybody.
+     */
+    'collapse_after' => (int) env('BUGGIE_COLLAPSE_AFTER', 5),
+
     'plans' => [
 
         /*

@@ -250,7 +250,14 @@ export default function Welcome({
                                 )}
                             </div>
 
-                            <p className="mt-6 max-w-xl text-sm text-pretty text-ink-subtle">
+                            <p className="mt-6 max-w-xl text-pretty text-ink-muted">
+                                Repeat reports of a bug already seen stop counting after the
+                                first few — forty people hitting one broken checkout costs a
+                                handful, not forty. Running out stops new bugs being accepted,
+                                never further reports of one you already know about.
+                            </p>
+
+                            <p className="mt-4 max-w-xl text-sm text-pretty text-ink-subtle">
                                 The hosted service exists so you do not have to run a server. It
                                 is the same software either way — buggie.eu runs the identical
                                 image you would install yourself.
