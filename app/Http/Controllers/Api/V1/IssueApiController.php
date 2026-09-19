@@ -134,6 +134,19 @@ class IssueApiController extends Controller
             'visibility' => $issue->visibility->value,
             'due_on' => $issue->due_on?->toDateString(),
             'closed_at' => $issue->closed_at?->toIso8601String(),
+
+            /*
+             * Keyed by the field's key, so a client can read and write the same
+             * shape: {"custom_fields": {"environment": "Production"}}.
+             *
+             * A token belonging to a client is subject to the same visibility rule as
+             * the screens — the API disagreeing with the UI about who may see what is
+             * a mistake this codebase has already made once.
+             */
+            'custom_fields' => collect(
+                app(\App\Support\CustomFields\FieldValues::class)
+                    ->forIssue($issue, clientOnly: ! $this->isStaff(request()))
+            )->mapWithKeys(fn (array $field) => [$field['key'] => $field['value']]),
         ];
     }
 

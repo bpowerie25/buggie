@@ -1,4 +1,9 @@
 import { Attachments, type AttachmentRow } from '@/components/attachments';
+import {
+    CustomFieldInput,
+    CustomFieldValueText,
+    type CustomFieldWithValue,
+} from '@/components/custom-field-input';
 import { Button } from '@/components/button';
 import {
     Avatar,
@@ -138,6 +143,7 @@ export default function ShowIssue({
     diagnostics,
     relationTypes = [],
     versions = [],
+    customFields = [],
 }: {
     issue: Issue;
     comments: Comment[];
@@ -149,6 +155,7 @@ export default function ShowIssue({
     diagnostics: DiagnosticsData | null;
     relationTypes?: { value: string; label: string }[];
     versions?: { id: number; name: string; released: boolean }[];
+    customFields?: CustomFieldWithValue[];
     can: {
         update: boolean;
         comment_internally: boolean;
@@ -741,6 +748,30 @@ export default function ShowIssue({
                             <span className="text-sm text-ink">{issue.due_on ?? 'No date'}</span>
                         )}
                     </SidebarRow>
+
+                    {customFields.map((field) => (
+                        <SidebarRow key={field.id} label={field.name}>
+                            {can.update ? (
+                                <CustomFieldInput
+                                    field={field}
+                                    value={field.value}
+                                    compact
+                                    onChange={(value) =>
+                                        patch({
+                                            // Only this field is sent. The whole map
+                                            // would mean every other field's value
+                                            // making a round trip it did not need to,
+                                            // and a stale one overwriting an edit made
+                                            // in another tab.
+                                            custom_fields: { [field.key]: value },
+                                        })
+                                    }
+                                />
+                            ) : (
+                                <CustomFieldValueText field={field} />
+                            )}
+                        </SidebarRow>
+                    ))}
 
                     <SidebarRow label="Watching">
                         <div className="flex flex-wrap items-center gap-2">

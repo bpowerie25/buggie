@@ -6,6 +6,10 @@ import { RichTextEditor } from '@/components/rich-text';
 import { AppLayout } from '@/layouts/app-layout';
 import type { Facets, IssueStatus, IssueTypeValue, SharedProps } from '@/types';
 import { Head, useForm, usePage } from '@inertiajs/react';
+import {
+    CustomFieldInput,
+    type CustomFieldDefinition,
+} from '@/components/custom-field-input';
 import type { JSONContent } from '@tiptap/react';
 import { Eye, EyeOff } from 'lucide-react';
 import type { FormEvent } from 'react';
@@ -14,10 +18,12 @@ export default function CreateIssue({
     project,
     facets,
     statuses,
+    customFields = [],
 }: {
     project: { id: number; key: string; name: string; slug: string };
     facets: Facets;
     statuses: IssueStatus[];
+    customFields?: CustomFieldDefinition[];
 }) {
     const { auth } = usePage<SharedProps>().props;
     const isStaff = auth.role !== 'client';
@@ -32,6 +38,7 @@ export default function CreateIssue({
         status_id: number | null;
         visibility: 'internal' | 'client';
         labels: number[];
+        custom_fields: Record<string, string | null>;
     }>({
         project_id: project.id,
         title: '',
@@ -42,6 +49,7 @@ export default function CreateIssue({
         status_id: null,
         visibility: isStaff ? 'internal' : 'client',
         labels: [],
+        custom_fields: {},
     });
 
     function submit(e: FormEvent) {
@@ -189,6 +197,29 @@ export default function CreateIssue({
                         <span className="text-xs text-danger">{errors.description}</span>
                     )}
                 </div>
+
+                {customFields.length > 0 && (
+                    <div className="space-y-4 rounded-xl border border-border p-4">
+                        {customFields.map((field) => (
+                            <Field
+                                key={field.key}
+                                label={field.name + (field.required ? ' *' : '')}
+                                error={errors[`custom_fields.${field.key}` as keyof typeof errors]}
+                            >
+                                <CustomFieldInput
+                                    field={field}
+                                    value={data.custom_fields[field.key] ?? null}
+                                    onChange={(value) =>
+                                        setData('custom_fields', {
+                                            ...data.custom_fields,
+                                            [field.key]: value,
+                                        })
+                                    }
+                                />
+                            </Field>
+                        ))}
+                    </div>
+                )}
 
                 {isStaff && statuses.length > 0 && (
                     <Field label="Starting status">

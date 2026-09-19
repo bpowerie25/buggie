@@ -110,6 +110,25 @@ class ProjectController extends Controller
                     'released_at' => $version->released_at?->toDateString(),
                     'issues_count' => $version->issues_count,
                 ]),
+            'customFields' => \App\Models\CustomField::where('project_id', $project->id)
+                ->inOrder()->get()
+                ->map(fn (\App\Models\CustomField $field) => [
+                    'id' => $field->id,
+                    'name' => $field->name,
+                    'key' => $field->key,
+                    'type' => $field->type->value,
+                    'options' => $field->options ?? [],
+                    'required' => $field->required,
+                    'visible_to_client' => $field->visible_to_client,
+                ]),
+            'fieldTypes' => array_map(
+                fn (\App\Enums\CustomFieldType $type) => [
+                    'value' => $type->value,
+                    'label' => $type->label(),
+                    'has_options' => $type->hasOptions(),
+                ],
+                \App\Enums\CustomFieldType::cases(),
+            ),
             // Generated since M5 and never once displayed, which made filing by email
             // impossible without database access.
             'inboundAddress' => $project->inboundAddress(),

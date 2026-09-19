@@ -22,12 +22,29 @@ use Illuminate\Validation\ValidationException;
  */
 class UpdateIssue
 {
-    public function __construct(private Notifier $notifier) {}
+    public function __construct(
+        private Notifier $notifier,
+        private \App\Support\CustomFields\FieldValues $fields,
+    ) {}
 
     /** @param array<string, mixed> $attributes */
     public function handle(Issue $issue, array $attributes, ?User $actor = null): Issue
     {
-        return DB::transaction(function () use ($issue, $attributes, $actor) {
+        // Validated outside the transaction, and only when the caller actually sent
+        // them: a bulk status change must not fail because some issue's project has
+        // a required field that was never filled in. Required is enforced where a
+        // person is filling the form in, not where a status is being dragged.
+        $customFields = array_key_exists('custom_fields', $attributes)
+            ? $this->fields->validate(
+                $issue->loadMissing('project')->project,
+                $attributes['custom_fields'] ?? [],
+                enforceRequired: false,
+                // A PATCH changes what it names and leaves the rest alone.
+                partial: true,
+            )
+            : null;
+
+        return DB::transaction(function () use ($issue, $attributes, $actor, $customFields) {
             // loadMissing, not a plain read: a bulk update hands us issues without
             // their status, and strict mode turns that into an exception rather than
             // a quiet extra query.
@@ -49,6 +66,10 @@ class UpdateIssue
             }
 
             $issue->save();
+
+            if ($customFields !== null) {
+                $this->fields->store($issue, $customFields);
+            }
 
             $fresh = $issue->refresh()->load(['status', 'project', 'assignee']);
 

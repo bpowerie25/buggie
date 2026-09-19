@@ -256,6 +256,13 @@ Route::domain('{workspace}.'.$host)
         Route::delete('projects/{project}/versions/{version}', [\App\Http\Controllers\VersionController::class, 'destroy'])
             ->name('versions.destroy');
 
+        Route::post('projects/{project}/fields', [\App\Http\Controllers\CustomFieldController::class, 'store'])
+            ->name('fields.store');
+        Route::patch('projects/{project}/fields/{field}', [\App\Http\Controllers\CustomFieldController::class, 'update'])
+            ->name('fields.update');
+        Route::delete('projects/{project}/fields/{field}', [\App\Http\Controllers\CustomFieldController::class, 'destroy'])
+            ->name('fields.destroy');
+
         Route::get('settings/instance', [\App\Http\Controllers\InstanceSettingsController::class, 'edit'])
             ->name('instance.edit');
         Route::patch('settings/instance', [\App\Http\Controllers\InstanceSettingsController::class, 'update'])

@@ -92,6 +92,17 @@ class IssueController extends Controller
             'project' => ['id' => $project->id, 'key' => $project->key, 'name' => $project->name, 'slug' => $project->slug],
             'facets' => $this->facets(),
             'statuses' => $this->statusesFor($project),
+            // A client filing an issue is only offered the fields they can see; the
+            // internal ones are not rendered blank-and-disabled, they are absent.
+            'customFields' => app(\App\Support\CustomFields\FieldValues::class)
+                ->definitions($project, clientOnly: ! $this->isStaff($request->user()))
+                ->map(fn ($field) => [
+                    'key' => $field->key,
+                    'name' => $field->name,
+                    'type' => $field->type->value,
+                    'options' => $field->options ?? [],
+                    'required' => $field->required,
+                ])->values(),
         ]);
     }
 
@@ -125,6 +136,11 @@ class IssueController extends Controller
         $staff = $this->isStaff(request()->user());
 
         return Inertia::render('issues/show', [
+            // Filtered in the query, not in the template: a field marked internal
+            // must not reach a client's browser at all. Rendering conditionally
+            // would still put "Internal estimate: 3 days" in the page source.
+            'customFields' => app(\App\Support\CustomFields\FieldValues::class)
+                ->forIssue($issue, clientOnly: ! $staff),
             'issue' => [
                 ...$this->summary($issue),
                 'description' => $issue->description,

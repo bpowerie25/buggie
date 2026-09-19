@@ -9,12 +9,16 @@ use App\Models\Project;
 use App\Models\User;
 use App\Enums\NotificationReason;
 use App\Support\Notifications\Notifier;
+use App\Support\CustomFields\FieldValues;
 use App\Support\RichText\TiptapDocument;
 use Illuminate\Support\Facades\DB;
 
 class CreateIssue
 {
-    public function __construct(private Notifier $notifier) {}
+    public function __construct(
+        private Notifier $notifier,
+        private FieldValues $fields,
+    ) {}
 
     /**
      * @param  array{
@@ -26,6 +30,7 @@ class CreateIssue
      *     assignee_id?: int|null,
      *     visibility?: string,
      *     labels?: array<int, int>,
+     *     custom_fields?: array<string, mixed>,
      * }  $attributes
      */
     public function handle(Project $project, array $attributes, ?User $reporter = null): Issue
@@ -42,7 +47,13 @@ class CreateIssue
             $attributes['assignee_id'] = null;
         }
 
-        return DB::transaction(function () use ($project, $attributes, $reporter) {
+        // Validated before the transaction opens rather than inside it: a rejected
+        // value should never have consumed an issue number, and the numbers are
+        // handed out by the project rather than by a sequence, so a rolled-back
+        // insert leaves a visible gap.
+        $customFields = $this->fields->validate($project, $attributes['custom_fields'] ?? []);
+
+        return DB::transaction(function () use ($project, $attributes, $reporter, $customFields) {
             $status = $attributes['status_id'] ?? $project->defaultStatus()?->id;
 
             abort_if($status === null, 422, 'This project has no statuses configured.');
@@ -79,6 +90,8 @@ class CreateIssue
             if ($labels = $attributes['labels'] ?? []) {
                 $issue->labels()->sync($labels);
             }
+
+            $this->fields->store($issue, $customFields);
 
             $issue->recordEvent(IssueEventType::Created, [], $reporter);
 

@@ -55,8 +55,23 @@ returns an empty list. A filter that quietly does nothing is the dangerous failu
 ```
 -assignee:sam -assignee:jo      neither Sam nor Jo
 assignee:sam assignee:jo        Jo — an issue has one assignee, and the chip is a single choice
-label:a label:b                 both labels — labels are the one repeatable key
+label:a label:b                 both labels — labels and fields are the repeatable keys
 ```
+
+**Custom fields** are filtered with a `field:` prefix:
+
+```
+field:environment=Production            that value
+field:environment=Production field:browser=Safari   both, at once
+-field:environment=Staging              anything but
+field:client_ref                        the field has some value
+```
+
+Values match case-insensitively. The prefix is not decoration: a project may name a
+field "type" or "label", and a bare key would shadow the built-in filter. A client can
+only filter on fields marked visible to clients — filtering on an internal one matches
+nothing, because otherwise its value could be recovered by trying values and watching
+the count. See [Custom fields](custom-fields.md).
 
 **Every query has a canonical form.** Operators are written first, in the order
 `is`, `project`, `assignee`, `reporter`, `label`, `type`, `priority`, `no`, then the

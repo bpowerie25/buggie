@@ -19,6 +19,16 @@ interface WidgetKeyRow {
     snippet: string;
 }
 
+interface CustomFieldRow {
+    id: number;
+    name: string;
+    key: string;
+    type: string;
+    options: string[];
+    required: boolean;
+    visible_to_client: boolean;
+}
+
 interface VersionRow {
     id: number;
     name: string;
@@ -45,6 +55,8 @@ export default function EditProject({
     categories,
     inboundAddress,
     versions = [],
+    customFields = [],
+    fieldTypes = [],
     branding,
 }: {
     project: ProjectSummary;
@@ -53,6 +65,8 @@ export default function EditProject({
     categories: { value: StatusRow['category']; label: string; open: boolean }[];
     inboundAddress: string;
     versions?: VersionRow[];
+    customFields?: CustomFieldRow[];
+    fieldTypes?: { value: string; label: string; has_options: boolean }[];
     branding: { name: string | null; color: string | null; logo: string | null; placeholder: string };
 }) {
     const { data, setData, put, processing, errors } = useForm({
@@ -161,6 +175,8 @@ export default function EditProject({
             </section>
 
             <Versions versions={versions} project={project} />
+
+            <CustomFields fields={customFields} types={fieldTypes} project={project} />
 
             <Branding project={project} branding={branding} />
 
@@ -505,6 +521,193 @@ function ImportSection({ project }: { project: ProjectSummary }) {
  * see the shop — not the agency that built it, and not the tracker the agency
  * happens to use.
  */
+/**
+ * Per-project custom fields.
+ *
+ * The key is shown but never editable: it is what a saved view filters on and what
+ * the CSV header says, so letting it drift behind a rename would break both quietly.
+ */
+function CustomFields({
+    fields,
+    types,
+    project,
+}: {
+    fields: CustomFieldRow[];
+    types: { value: string; label: string; has_options: boolean }[];
+    project: ProjectSummary;
+}) {
+    const { data, setData, processing, errors, reset } = useForm({
+        name: '',
+        type: 'text',
+        options: '',
+        required: false,
+        visible_to_client: false,
+    });
+
+    const needsOptions = types.find((t) => t.value === data.type)?.has_options ?? false;
+
+    function submit(e: FormEvent) {
+        e.preventDefault();
+
+        router.post(
+            `/projects/${project.slug}/fields`,
+            {
+                name: data.name,
+                type: data.type,
+                required: data.required,
+                visible_to_client: data.visible_to_client,
+                // Split here rather than server-side: the server takes a list, and a
+                // textarea is the least annoying way for a person to type one.
+                options: needsOptions
+                    ? data.options
+                          .split('\n')
+                          .map((line) => line.trim())
+                          .filter(Boolean)
+                    : [],
+            },
+            { preserveScroll: true, onSuccess: () => reset() },
+        );
+    }
+
+    return (
+        <section className="mt-12 max-w-2xl">
+            <h2 className="text-sm font-semibold text-ink">Custom fields</h2>
+            <p className="mt-1 text-sm text-ink-muted">
+                Extra fields on every issue in this project — a client reference, an
+                environment, a browser. Filter on one with{' '}
+                <code className="rounded bg-raised px-1 font-mono text-xs">
+                    field:key=value
+                </code>
+                .
+            </p>
+
+            {fields.length > 0 && (
+                <ul className="mt-4 divide-y divide-border rounded-xl border border-border bg-raised">
+                    {fields.map((field) => (
+                        <li key={field.id} className="flex items-center gap-3 px-4 py-3">
+                            <div className="min-w-0 flex-1">
+                                <span className="block truncate text-sm text-ink">
+                                    {field.name}
+                                    {field.required && (
+                                        <span className="ml-1.5 text-xs text-ink-subtle">
+                                            required
+                                        </span>
+                                    )}
+                                </span>
+                                <span className="font-mono text-xs text-ink-subtle">
+                                    {field.key}
+                                </span>
+                            </div>
+
+                            <span className="shrink-0 text-xs text-ink-subtle">
+                                {types.find((t) => t.value === field.type)?.label ?? field.type}
+                            </span>
+
+                            <span
+                                className={`shrink-0 rounded-full px-2 py-0.5 text-xs ${
+                                    field.visible_to_client
+                                        ? 'bg-accent-soft text-accent'
+                                        : 'text-ink-subtle'
+                                }`}
+                            >
+                                {field.visible_to_client ? 'Clients see it' : 'Internal'}
+                            </span>
+
+                            <button
+                                type="button"
+                                aria-label={`Delete ${field.name}`}
+                                className="shrink-0 rounded p-1 text-ink-subtle transition hover:text-danger"
+                                onClick={() => {
+                                    // Said plainly: the values go too, and they do not
+                                    // come back.
+                                    if (
+                                        !confirm(
+                                            `Delete “${field.name}”? Every value recorded on an issue in this project goes with it, permanently.`,
+                                        )
+                                    ) {
+                                        return;
+                                    }
+
+                                    router.delete(
+                                        `/projects/${project.slug}/fields/${field.id}`,
+                                        { preserveScroll: true },
+                                    );
+                                }}
+                            >
+                                <Trash2 className="size-4" />
+                            </button>
+                        </li>
+                    ))}
+                </ul>
+            )}
+
+            <form onSubmit={submit} className="mt-4 space-y-3 rounded-xl border border-border p-4">
+                <div className="grid gap-3 sm:grid-cols-2">
+                    <Field label="Name" error={errors.name}>
+                        <Input
+                            value={data.name}
+                            onChange={(e) => setData('name', e.target.value)}
+                            placeholder="Client reference"
+                        />
+                    </Field>
+
+                    <Field label="Type" error={errors.type}>
+                        <select
+                            value={data.type}
+                            onChange={(e) => setData('type', e.target.value)}
+                            className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink"
+                        >
+                            {types.map((type) => (
+                                <option key={type.value} value={type.value}>
+                                    {type.label}
+                                </option>
+                            ))}
+                        </select>
+                    </Field>
+                </div>
+
+                {needsOptions && (
+                    <Field
+                        label="Choices"
+                        error={errors.options}
+                        hint="One per line."
+                    >
+                        <Textarea
+                            rows={4}
+                            value={data.options}
+                            onChange={(e) => setData('options', e.target.value)}
+                            placeholder={'Production\nStaging\nLocal'}
+                        />
+                    </Field>
+                )}
+
+                <label className="flex items-center gap-2 text-sm text-ink-muted">
+                    <input
+                        type="checkbox"
+                        checked={data.required}
+                        onChange={(e) => setData('required', e.target.checked)}
+                    />
+                    Required when filing an issue
+                </label>
+
+                <label className="flex items-center gap-2 text-sm text-ink-muted">
+                    <input
+                        type="checkbox"
+                        checked={data.visible_to_client}
+                        onChange={(e) => setData('visible_to_client', e.target.checked)}
+                    />
+                    Clients can see it
+                </label>
+
+                <Button type="submit" size="sm" disabled={processing}>
+                    <Plus className="size-3.5" />
+                    Add field
+                </Button>
+            </form>
+        </section>
+    );
+}
+
 function Branding({
     project,
     branding,

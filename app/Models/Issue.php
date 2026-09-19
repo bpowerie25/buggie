@@ -59,6 +59,11 @@ class Issue extends Model
         return $this->belongsTo(Status::class);
     }
 
+    public function customFieldValues(): HasMany
+    {
+        return $this->hasMany(CustomFieldValue::class);
+    }
+
     public function reporter(): BelongsTo
     {
         return $this->belongsTo(User::class, 'reporter_id');

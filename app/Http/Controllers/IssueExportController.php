@@ -46,6 +46,20 @@ class IssueExportController extends Controller
             fn (Builder $q) => $q->visibleToClient($user),
         );
 
+        /*
+         * The custom field columns, resolved once before anything is written.
+         *
+         * Keyed by `key` rather than by id, so two projects that both define
+         * "browser" share one column instead of producing two half-empty ones. The
+         * export can span projects; the header cannot depend on the first row.
+         */
+        $fields = \App\Models\CustomField::query()
+            ->unless($staff, fn (Builder $q) => $q->where('visible_to_client', true))
+            ->inOrder()
+            ->get()
+            ->unique('key')
+            ->values();
+
         $builder = $this->filter->apply($builder, $query, $user)
             ->with([
                 'status:id,name,category',
@@ -53,6 +67,10 @@ class IssueExportController extends Controller
                 'reporter:id,name',
                 'labels:id,name',
                 'project:id,key,slug,name',
+                // Constrained rather than filtered afterwards: an internal field's
+                // value must not be read into memory on a client's export at all.
+                'customFieldValues' => fn ($q) => $q->whereIn('custom_field_id', $fields->pluck('id')),
+                'customFieldValues.field:id,key',
             ])
             ->orderBy('id');
 
@@ -64,20 +82,25 @@ class IssueExportController extends Controller
         // after the headers have gone, so it surfaces as a truncated file.
         $slug = $this->tenancy->currentOrFail()->slug;
 
-        return response()->streamDownload(function () use ($builder, $staff, $slug) {
+        return response()->streamDownload(function () use ($builder, $staff, $slug, $fields) {
             $out = fopen('php://output', 'w');
 
             // Excel reads a file without this as Latin-1 and mangles every accented
             // name in it. A byte-order mark is ugly and the alternative is worse.
             fwrite($out, "\u{FEFF}");
 
-            fputcsv($out, self::COLUMNS);
+            fputcsv($out, [
+                ...self::COLUMNS,
+                // Prefixed for the same reason the query language prefixes them: a
+                // project is free to name a field "title".
+                ...$fields->map(fn ($field) => 'field:'.$field->key),
+            ]);
 
             // Chunked, so exporting a workspace with fifty thousand issues does not
             // load fifty thousand models into memory to write them out one at a time.
-            $builder->chunk(500, function ($issues) use ($out, $staff, $slug) {
+            $builder->chunk(500, function ($issues) use ($out, $staff, $slug, $fields) {
                 foreach ($issues as $issue) {
-                    fputcsv($out, $this->row($issue, $staff, $slug));
+                    fputcsv($out, $this->row($issue, $staff, $slug, $fields));
                 }
             });
 
@@ -89,8 +112,10 @@ class IssueExportController extends Controller
     }
 
     /** @return array<int, string|int|null> */
-    private function row(Issue $issue, bool $staff, string $slug): array
+    private function row(Issue $issue, bool $staff, string $slug, \Illuminate\Support\Collection $fields): array
     {
+        $values = $issue->customFieldValues->keyBy(fn ($value) => $value->field?->key);
+
         return [
             $issue->key,
             $this->safe($issue->title),
@@ -111,6 +136,9 @@ class IssueExportController extends Controller
             $issue->closed_at?->toIso8601String(),
             $issue->due_on?->toDateString(),
             workspace_url($slug, "issues/{$issue->key}"),
+            // Through safe() like every other free-text column: a custom field value
+            // is typed by a person, and "=1+1" in a spreadsheet is a formula.
+            ...$fields->map(fn ($field) => $this->safe($values[$field->key]?->value)),
         ];
     }
 

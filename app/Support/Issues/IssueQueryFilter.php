@@ -38,6 +38,7 @@ class IssueQueryFilter
         $this->type($query, $parsed);
         $this->priority($query, $parsed);
         $this->version($query, $parsed);
+        $this->customFields($query, $parsed, $viewer);
         $this->absence($query, $parsed);
 
         return $query;
@@ -101,6 +102,70 @@ class IssueQueryFilter
         foreach ($parsed->all('label', negated: true) as $name) {
             $query->whereDoesntHave('labels', fn (Builder $q) => $q->where('name', $name));
         }
+    }
+
+    /**
+     * `field:key=value`, and `-field:key=value` for the negation.
+     *
+     * Prefixed rather than letting a custom field claim a bare key of its own: a
+     * project is free to name a field "type" or "label", and a bare key would then
+     * mean different things in different workspaces — or silently shadow the built-in
+     * one, which is worse than being verbose.
+     *
+     * A client only ever filters on fields they are allowed to see. Without that, a
+     * client could binary-search the value of an internal field by trying values and
+     * watching the result count, which leaks it just as surely as printing it.
+     */
+    private function customFields(Builder $query, IssueQuery $parsed, User $viewer): void
+    {
+        foreach ([false, true] as $negated) {
+            foreach ($parsed->all('field', negated: $negated) as $term) {
+                if (! str_contains($term, '=')) {
+                    // No value given: treat it as "this field is filled in at all".
+                    $this->fieldPresence($query, $term, $viewer, $negated);
+
+                    continue;
+                }
+
+                [$key, $value] = explode('=', $term, 2);
+
+                $constraint = fn (Builder $q) => $q
+                    ->whereHas('field', fn (Builder $f) => $this->fieldsVisibleTo($f, $viewer)
+                        ->where('key', strtolower(trim($key))))
+                    ->whereRaw('lower(value) = ?', [strtolower(trim($value))]);
+
+                $negated
+                    ? $query->whereDoesntHave('customFieldValues', $constraint)
+                    : $query->whereHas('customFieldValues', $constraint);
+            }
+        }
+    }
+
+    private function fieldPresence(Builder $query, string $key, User $viewer, bool $negated): void
+    {
+        $constraint = fn (Builder $q) => $q
+            ->whereHas('field', fn (Builder $f) => $this->fieldsVisibleTo($f, $viewer)
+                ->where('key', strtolower(trim($key))))
+            ->whereNotNull('value')
+            ->where('value', '!=', '');
+
+        $negated
+            ? $query->whereDoesntHave('customFieldValues', $constraint)
+            : $query->whereHas('customFieldValues', $constraint);
+    }
+
+    /**
+     * @param  Builder<\App\Models\CustomField>  $query
+     * @return Builder<\App\Models\CustomField>
+     */
+    private function fieldsVisibleTo(Builder $query, User $viewer): Builder
+    {
+        $workspace = app(\App\Support\Tenancy\Tenancy::class)->current();
+
+        $staff = $workspace !== null
+            && ($viewer->membershipIn($workspace)?->isStaff() ?? false);
+
+        return $staff ? $query : $query->where('visible_to_client', true);
     }
 
     private function type(Builder $query, IssueQuery $parsed): void

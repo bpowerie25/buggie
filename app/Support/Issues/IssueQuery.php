@@ -20,10 +20,17 @@ final class IssueQuery implements Stringable
 {
     /** Keys that accept a value, with the ones that may repeat. */
     public const KEYS = [
-        'is', 'project', 'assignee', 'reporter', 'label', 'type', 'priority', 'version', 'no',
+        'is', 'project', 'assignee', 'reporter', 'label', 'type', 'priority', 'version', 'no', 'field',
     ];
 
-    private const MULTI = ['label'];
+    /**
+     * Keys that may appear more than once.
+     *
+     * `field` is multi because filtering on two custom fields at once is the obvious
+     * thing to want — `field:environment=production field:browser=safari` — and a
+     * single-valued key would silently keep only the last one.
+     */
+    private const MULTI = ['label', 'field'];
 
     /**
      * @param  array<string, array<int, string>>  $include

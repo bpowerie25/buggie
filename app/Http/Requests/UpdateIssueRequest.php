@@ -44,6 +44,10 @@ class UpdateIssueRequest extends FormRequest
             ],
             'labels' => ['sometimes', 'array'],
             'labels.*' => [Rule::exists('labels', 'id')->where('workspace_id', $workspaceId)],
+
+            // "sometimes", so that a bulk status change does not arrive looking like
+            // a request to clear every custom field on every issue it touches.
+            'custom_fields' => ['sometimes', 'array'],
         ];
     }
 }

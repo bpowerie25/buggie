@@ -37,6 +37,12 @@ class StoreIssueRequest extends FormRequest
             'visibility' => ['required', new Enum(IssueVisibility::class)],
             'labels' => ['array'],
             'labels.*' => [Rule::exists('labels', 'id')->where('workspace_id', $workspaceId)],
+
+            // Shape only. What each value has to be depends on the project's field
+            // definitions, which this request has no business knowing — CreateIssue
+            // validates them against the project so the API and the form cannot
+            // disagree about it.
+            'custom_fields' => ['array'],
         ];
     }
 
