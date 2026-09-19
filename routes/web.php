@@ -217,6 +217,16 @@ Route::domain('{workspace}.'.$host)
 
         // The whole install, not this workspace: mail, and whatever else an operator
         // needs to change without editing .env and redeploying.
+        // Webhooks belong to the workspace; each may watch one project or all of them.
+        Route::post('settings/webhooks', [\App\Http\Controllers\WebhookController::class, 'store'])
+            ->name('webhooks.store');
+        Route::patch('settings/webhooks/{webhook}', [\App\Http\Controllers\WebhookController::class, 'update'])
+            ->name('webhooks.update');
+        Route::delete('settings/webhooks/{webhook}', [\App\Http\Controllers\WebhookController::class, 'destroy'])
+            ->name('webhooks.destroy');
+        Route::post('settings/webhooks/{webhook}/test', [\App\Http\Controllers\WebhookController::class, 'test'])
+            ->name('webhooks.test');
+
         // Releases live under their project: "2.4.1" means nothing on its own.
         Route::get('projects/{project}/versions/{version}', [\App\Http\Controllers\VersionController::class, 'show'])
             ->name('versions.show');

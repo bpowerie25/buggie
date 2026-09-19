@@ -49,7 +49,8 @@ You do not need an account. See
 
 There is a Swift package for iOS and a Kotlin one for Android, both posting to the
 same endpoint as the web widget. See [Native SDKs](native-sdks.md)
-- [The API](api.md) — token-authenticated HTTP access to a workspace.
+- [The API](api.md)
+- [Webhooks](webhooks.md) — calling a URL when something happens — token-authenticated HTTP access to a workspace.
 
 ---
 

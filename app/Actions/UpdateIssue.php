@@ -28,6 +28,10 @@ class UpdateIssue
     public function handle(Issue $issue, array $attributes, ?User $actor = null): Issue
     {
         return DB::transaction(function () use ($issue, $attributes, $actor) {
+            // loadMissing, not a plain read: a bulk update hands us issues without
+            // their status, and strict mode turns that into an exception rather than
+            // a quiet extra query.
+            $wasOpen = $issue->loadMissing('status')->isOpen();
             foreach ($attributes as $field => $value) {
                 match ($field) {
                     'title' => $this->title($issue, $value, $actor),
@@ -46,7 +50,17 @@ class UpdateIssue
 
             $issue->save();
 
-            return $issue->refresh();
+            $fresh = $issue->refresh()->load(['status', 'project', 'assignee']);
+
+            // Closed is its own event as well as an update: "tell me when something
+            // ships" is a different subscription from "tell me when anything moves".
+            \App\Support\Webhooks\Webhooks::issue(\App\Enums\WebhookEvent::IssueUpdated, $fresh);
+
+            if ($wasOpen && ! $fresh->isOpen()) {
+                \App\Support\Webhooks\Webhooks::issue(\App\Enums\WebhookEvent::IssueClosed, $fresh);
+            }
+
+            return $fresh;
         });
     }
 

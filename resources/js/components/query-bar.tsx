@@ -6,8 +6,9 @@ import {
     withoutTerm,
     type ParsedQuery,
 } from '@/lib/issue-query';
-import type { Facets } from '@/types';
-import { Search, X } from 'lucide-react';
+import type { Facets, SharedProps } from '@/types';
+import { usePage } from '@inertiajs/react';
+import { CircleQuestionMark, Search, X } from 'lucide-react';
 import { forwardRef, useEffect, useState, type ReactNode } from 'react';
 
 /**
@@ -25,6 +26,7 @@ export const QueryBar = forwardRef<
         children?: ReactNode;
     }
 >(function QueryBar({ query, facets, onChange, children }, ref) {
+    const { docsUrl } = usePage<SharedProps>().props;
     const [raw, setRaw] = useState(query.query);
     const [editing, setEditing] = useState(false);
 
@@ -63,6 +65,22 @@ export const QueryBar = forwardRef<
                     spellCheck={false}
                     className="h-[30px] w-80 rounded-lg border border-border bg-raised pr-2 pl-8 font-mono text-xs text-ink placeholder:text-ink-subtle focus:border-accent focus:outline-none"
                 />
+
+                {/*
+                    Next to the box rather than in a menu: the query language is the
+                    least discoverable thing here, and somebody staring at
+                    `is:open assignee:@me` is exactly who needs the page explaining it.
+                */}
+                <a
+                    href={`${docsUrl}/query-language`}
+                    target="_blank"
+                    rel="noreferrer"
+                    title="Query language"
+                    aria-label="How the query language works"
+                    className="text-ink-subtle transition hover:text-ink"
+                >
+                    <CircleQuestionMark className="size-3.5" />
+                </a>
             </form>
 
             <Chip label="Status" value={query.state === 'open' ? null : query.state}>

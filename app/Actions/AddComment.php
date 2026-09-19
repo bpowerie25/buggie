@@ -43,6 +43,8 @@ class AddComment
 
             $internal = $comment->is_internal;
 
+            \App\Support\Webhooks\Webhooks::comment($issue, $author->name, $internal);
+
             $this->notifier->watchers($issue, NotificationReason::Commented, $author, [
                 'excerpt' => $comment->body_text,
                 // Clients watching this issue must not be told about internal notes.

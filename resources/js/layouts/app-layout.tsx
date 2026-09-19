@@ -8,6 +8,7 @@ import {
     Bell,
     Bookmark,
     Bug,
+    CircleQuestionMark,
     ChevronsUpDown,
     CircleDot,
     CreditCard,
@@ -68,7 +69,7 @@ export function AppLayout({
     activeQuery?: string;
     children: ReactNode;
 }) {
-    const { auth, workspace, workspaces, views, inboxCount, billing, ziggy } = usePage<
+    const { auth, workspace, workspaces, views, inboxCount, billing, docsUrl, ziggy } = usePage<
         SharedProps & { ziggy: { location: string } }
     >().props;
     const [switcherOpen, setSwitcherOpen] = useState(false);
@@ -241,6 +242,22 @@ export function AppLayout({
                                 {auth.role}
                             </p>
                         </div>
+                        {/*
+                            A plain anchor, and a new tab: the guide is on the central
+                            domain, so an Inertia visit would leave the workspace, and
+                            somebody reading how to do a thing usually wants to keep
+                            the thing on screen.
+                        */}
+                        <a
+                            href={docsUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            aria-label="Help"
+                            title="Help"
+                            className="rounded-md p-1.5 text-ink-subtle transition hover:bg-raised hover:text-ink"
+                        >
+                            <CircleQuestionMark className="size-4" />
+                        </a>
                         <button
                             onClick={() => setShortcutsOpen(true)}
                             aria-label="Keyboard shortcuts"

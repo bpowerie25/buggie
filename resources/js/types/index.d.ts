@@ -56,6 +56,8 @@ export interface SharedProps {
         operator: boolean;
     };
     workspace: WorkspaceSummary | null;
+    /** Absolute: the guide is served from the central domain, not a workspace. */
+    docsUrl: string;
     workspaces: WorkspaceListing[];
     views: SavedView[];
     inboxCount: number;

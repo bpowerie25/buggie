@@ -114,6 +114,11 @@ class IngestController extends Controller
         // waiting on this response.
         ProcessIncomingReport::dispatch($report->id, $key->project->workspace_id);
 
+        app(Tenancy::class)->run(
+            $key->project->workspace,
+            fn () => \App\Support\Webhooks\Webhooks::report($report->load('project')),
+        );
+
         return response()->json([
             'id' => $report->id,
             'reference' => 'R-'.$report->id,

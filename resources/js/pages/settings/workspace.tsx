@@ -5,6 +5,23 @@ import { Head, router, useForm, usePage } from '@inertiajs/react';
 import { Check, Copy, Trash2 } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 
+interface WebhookRow {
+    id: number;
+    name: string;
+    url: string;
+    project: string | null;
+    events: string[];
+    is_active: boolean;
+    last_delivered_at: string | null;
+    deliveries: {
+        event: string;
+        status: number | null;
+        error: string | null;
+        ok: boolean;
+        at: string | null;
+    }[];
+}
+
 interface TokenRow {
     id: number;
     name: string;
@@ -20,12 +37,18 @@ export default function WorkspaceSettings({
     can_delete,
     tokens = [],
     abilities = [],
+    webhooks = [],
+    webhookEvents = [],
+    projects = [],
 }: {
     workspace: { name: string; slug: string; created_at: string };
     domain: string;
     can_delete: boolean;
     tokens?: TokenRow[];
     abilities?: string[];
+    webhooks?: WebhookRow[];
+    webhookEvents?: { value: string; label: string }[];
+    projects?: { id: number; name: string }[];
 }) {
     const { data, setData, patch, processing, errors } = useForm({ name: workspace.name });
     const [confirm, setConfirm] = useState('');
@@ -65,6 +88,8 @@ export default function WorkspaceSettings({
             </form>
 
             <ApiTokens tokens={tokens} abilities={abilities} workspace={workspace} domain={domain} />
+
+            <Webhooks webhooks={webhooks} events={webhookEvents} projects={projects} />
 
             {can_delete && (
                 <section className="mt-12 max-w-lg rounded-xl border border-danger/30 bg-danger-soft p-4">
@@ -232,6 +257,227 @@ function ApiTokens({
                         </li>
                     ))}
                 </ul>
+            )}
+        </section>
+    );
+}
+
+/**
+ * Webhooks, and whether they are working.
+ *
+ * The delivery list is the point. "It isn't working" with nothing to look at is the
+ * usual experience of webhooks, and the status of the last few calls answers it.
+ */
+function Webhooks({
+    webhooks,
+    events,
+    projects,
+}: {
+    webhooks: WebhookRow[];
+    events: { value: string; label: string }[];
+    projects: { id: number; name: string }[];
+}) {
+    const [adding, setAdding] = useState(false);
+
+    const { data, setData, post, processing, errors, reset } = useForm({
+        name: '',
+        url: '',
+        project_id: '' as string | number,
+        events: [] as string[],
+    });
+
+    function submit(e: FormEvent) {
+        e.preventDefault();
+
+        post('/settings/webhooks', {
+            preserveScroll: true,
+            onSuccess: () => {
+                reset();
+                setAdding(false);
+            },
+        });
+    }
+
+    return (
+        <section className="mt-12 max-w-2xl">
+            <h2 className="text-sm font-semibold text-ink">Webhooks</h2>
+            <p className="mt-1 text-sm text-ink-muted">
+                Call a URL when something happens — Slack, Teams, or anything of your
+                own. Every delivery is signed so the receiver can tell it came from here.
+            </p>
+
+            {webhooks.length > 0 && (
+                <ul className="mt-4 space-y-3">
+                    {webhooks.map((webhook) => (
+                        <li
+                            key={webhook.id}
+                            className="rounded-xl border border-border bg-raised p-4"
+                        >
+                            <div className="flex items-start gap-3">
+                                <span className="min-w-0 flex-1">
+                                    <span className="block truncate text-sm text-ink">
+                                        {webhook.name}
+                                        {!webhook.is_active && (
+                                            <span className="ml-1.5 text-xs text-ink-subtle">
+                                                disabled
+                                            </span>
+                                        )}
+                                    </span>
+                                    <span className="block truncate font-mono text-[11px] text-ink-subtle">
+                                        {webhook.url}
+                                    </span>
+                                    <span className="text-xs text-ink-subtle">
+                                        {webhook.project ?? 'Every project'} ·{' '}
+                                        {webhook.events.length} event
+                                        {webhook.events.length === 1 ? '' : 's'}
+                                    </span>
+                                </span>
+
+                                <button
+                                    type="button"
+                                    onClick={() =>
+                                        router.post(
+                                            `/settings/webhooks/${webhook.id}/test`,
+                                            {},
+                                            { preserveScroll: true },
+                                        )
+                                    }
+                                    className="shrink-0 rounded-md border border-border px-2 py-1 text-xs text-ink-muted transition hover:text-ink"
+                                >
+                                    Test
+                                </button>
+
+                                <button
+                                    type="button"
+                                    aria-label={`Delete ${webhook.name}`}
+                                    onClick={() =>
+                                        router.delete(`/settings/webhooks/${webhook.id}`, {
+                                            preserveScroll: true,
+                                        })
+                                    }
+                                    className="shrink-0 rounded p-1 text-ink-subtle transition hover:text-danger"
+                                >
+                                    <Trash2 className="size-3.5" />
+                                </button>
+                            </div>
+
+                            {webhook.deliveries.length > 0 && (
+                                <ul className="mt-3 space-y-0.5 border-t border-border pt-2">
+                                    {webhook.deliveries.map((delivery, i) => (
+                                        <li
+                                            key={i}
+                                            className="flex items-center gap-2 font-mono text-[11px]"
+                                        >
+                                            <span
+                                                className={
+                                                    delivery.ok ? 'text-success' : 'text-danger'
+                                                }
+                                            >
+                                                {delivery.status ?? 'failed'}
+                                            </span>
+                                            <span className="text-ink-subtle">{delivery.event}</span>
+                                            {delivery.error && (
+                                                <span className="min-w-0 truncate text-ink-subtle">
+                                                    {delivery.error}
+                                                </span>
+                                            )}
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
+                        </li>
+                    ))}
+                </ul>
+            )}
+
+            {adding ? (
+                <form onSubmit={submit} className="mt-4 space-y-3 rounded-xl border border-border p-4">
+                    <Field label="Name" error={errors.name}>
+                        <Input
+                            value={data.name}
+                            placeholder="Slack — #bugs"
+                            onChange={(e) => setData('name', e.target.value)}
+                        />
+                    </Field>
+
+                    <Field
+                        label="URL"
+                        error={errors.url}
+                        hint="Must be a public address. Private and internal networks are refused."
+                    >
+                        <Input
+                            value={data.url}
+                            placeholder="https://hooks.slack.com/services/..."
+                            onChange={(e) => setData('url', e.target.value)}
+                        />
+                    </Field>
+
+                    <Field label="Project" error={errors.project_id}>
+                        <select
+                            value={data.project_id}
+                            onChange={(e) => setData('project_id', e.target.value)}
+                            className="w-full rounded-lg border border-border bg-raised px-3 py-2 text-sm text-ink"
+                        >
+                            <option value="">Every project</option>
+                            {projects.map((project) => (
+                                <option key={project.id} value={project.id}>
+                                    {project.name}
+                                </option>
+                            ))}
+                        </select>
+                    </Field>
+
+                    <div>
+                        <p className="text-sm text-ink">Send when</p>
+                        {errors.events && (
+                            <p className="text-xs text-danger">{errors.events}</p>
+                        )}
+                        <div className="mt-1 space-y-1">
+                            {events.map((event) => (
+                                <label
+                                    key={event.value}
+                                    className="flex items-center gap-2 text-sm text-ink-muted"
+                                >
+                                    <input
+                                        type="checkbox"
+                                        checked={data.events.includes(event.value)}
+                                        onChange={(e) =>
+                                            setData(
+                                                'events',
+                                                e.target.checked
+                                                    ? [...data.events, event.value]
+                                                    : data.events.filter((v) => v !== event.value),
+                                            )
+                                        }
+                                    />
+                                    {event.label}
+                                </label>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="flex gap-2">
+                        <Button
+                            type="submit"
+                            size="sm"
+                            disabled={processing || data.events.length === 0}
+                        >
+                            Create
+                        </Button>
+                        <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setAdding(false)}
+                        >
+                            Cancel
+                        </Button>
+                    </div>
+                </form>
+            ) : (
+                <Button size="sm" variant="ghost" className="mt-4" onClick={() => setAdding(true)}>
+                    Add a webhook
+                </Button>
             )}
         </section>
     );

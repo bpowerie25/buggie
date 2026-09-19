@@ -93,6 +93,11 @@ class CreateIssue
                 $this->notifier->record($issue->assignee, $issue, NotificationReason::Assigned, $reporter);
             }
 
+            \App\Support\Webhooks\Webhooks::issue(
+                \App\Enums\WebhookEvent::IssueCreated,
+                $issue->load(['status', 'project', 'assignee']),
+            );
+
             return $issue;
         });
     }

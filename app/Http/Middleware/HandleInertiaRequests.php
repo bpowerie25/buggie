@@ -46,6 +46,11 @@ class HandleInertiaRequests extends Middleware
                 'operator' => $user ? \Illuminate\Support\Facades\Gate::forUser($user)->allows('operate') : false,
             ],
 
+            // The help guide lives on the central domain, so the app needs the whole
+            // URL rather than a path: a link to /docs from acme.buggie.eu would look
+            // for a workspace route that does not exist.
+            'docsUrl' => central_url('docs'),
+
             'workspace' => $workspace ? [
                 'id' => $workspace->id,
                 'name' => $workspace->name,

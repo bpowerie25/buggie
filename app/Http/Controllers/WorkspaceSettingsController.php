@@ -44,6 +44,32 @@ class WorkspaceSettingsController extends Controller
                     'created_at' => $token->created_at->toDateString(),
                 ]),
             'abilities' => \App\Http\Controllers\ApiTokenController::ABILITIES,
+
+            'webhooks' => \App\Models\Webhook::with(['project:id,name'])
+                ->withCount('deliveries')
+                ->latest()
+                ->get()
+                ->map(fn (\App\Models\Webhook $webhook) => [
+                    'id' => $webhook->id,
+                    'name' => $webhook->name,
+                    'url' => $webhook->url,
+                    'project' => $webhook->project?->name,
+                    'events' => $webhook->events,
+                    'is_active' => $webhook->is_active,
+                    'last_delivered_at' => $webhook->last_delivered_at?->toIso8601String(),
+                    // The last handful only: enough to answer "is it working?"
+                    // without turning a settings page into a log viewer.
+                    'deliveries' => $webhook->deliveries()->limit(5)->get()
+                        ->map(fn ($delivery) => [
+                            'event' => $delivery->event,
+                            'status' => $delivery->status,
+                            'error' => $delivery->error,
+                            'ok' => $delivery->succeeded(),
+                            'at' => $delivery->created_at?->toIso8601String(),
+                        ]),
+                ]),
+            'webhookEvents' => \App\Enums\WebhookEvent::options(),
+            'projects' => \App\Models\Project::active()->orderBy('name')->get(['id', 'name']),
         ]);
     }
 
