@@ -160,6 +160,8 @@ export default function EditProject({
 
             <Versions versions={versions} project={project} />
 
+            <ImportSection project={project} />
+
             <section className="mt-12 max-w-2xl">
                 <h2 className="text-sm font-semibold text-ink">File issues by email</h2>
                 <p className="mt-1 text-sm text-ink-muted">
@@ -444,6 +446,48 @@ function Versions({
                 <Button type="submit" size="sm" disabled={processing || data.name === ''}>
                     <Plus className="size-4" />
                     Add
+                </Button>
+            </form>
+        </section>
+    );
+}
+
+/**
+ * Bringing a backlog over from another tracker.
+ *
+ * Nobody moves tracker without their history, so this is less a feature than the
+ * thing that makes moving possible at all.
+ */
+function ImportSection({ project }: { project: ProjectSummary }) {
+    const { data, setData, post, processing, errors } = useForm({ file: null as File | null });
+
+    function submit(e: FormEvent) {
+        e.preventDefault();
+        post(`/projects/${project.slug}/imports`, { forceFormData: true });
+    }
+
+    return (
+        <section className="mt-12 max-w-2xl">
+            <h2 className="text-sm font-semibold text-ink">Import from another tracker</h2>
+            <p className="mt-1 text-sm text-ink-muted">
+                A CSV export from Jira or MantisBT, or a spreadsheet of your own. You will
+                see what it is going to create before anything is created.
+            </p>
+
+            <form onSubmit={submit} className="mt-4 flex flex-wrap items-end gap-3">
+                <div className="flex-1">
+                    <Field label="CSV file" error={errors.file}>
+                        <input
+                            type="file"
+                            accept=".csv,text/csv"
+                            onChange={(e) => setData('file', e.target.files?.[0] ?? null)}
+                            className="w-full rounded-lg border border-border bg-raised px-3 py-2 text-sm text-ink-muted file:mr-3 file:rounded-md file:border-0 file:bg-surface file:px-2 file:py-1 file:text-xs file:text-ink"
+                        />
+                    </Field>
+                </div>
+
+                <Button type="submit" size="sm" disabled={processing || !data.file}>
+                    Upload
                 </Button>
             </form>
         </section>

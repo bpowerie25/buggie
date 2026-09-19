@@ -59,3 +59,4 @@ worth reading alongside them: [`../DESIGN.md`](../DESIGN.md) records why Buggie 
 built the way it is, including the mistakes, and [`../SELF_HOSTING.md`](../SELF_HOSTING.md)
 is the operator's reference.
 - [Releases](releases.md) — grouping issues into a release, and the changelog
+- [Importing](importing.md) — bringing a backlog over from Jira, MantisBT or a spreadsheet

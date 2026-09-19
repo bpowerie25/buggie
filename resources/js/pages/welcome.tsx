@@ -11,6 +11,7 @@ import {
     Server,
     Smartphone,
     Tag,
+    Upload,
     Users,
     Webhook,
 } from 'lucide-react';
@@ -78,6 +79,11 @@ const alsoDoes = [
         icon: Mail,
         title: 'Email in and out',
         body: 'File issues by emailing a project. Reply to a notification to comment. One digest per issue rather than nine.',
+    },
+    {
+        icon: Upload,
+        title: 'Bring your backlog',
+        body: 'Import a CSV export from Jira or MantisBT, or a spreadsheet you have been keeping. You see what it will create before anything is created.',
     },
     {
         icon: Webhook,

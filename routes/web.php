@@ -227,6 +227,16 @@ Route::domain('{workspace}.'.$host)
         Route::post('settings/webhooks/{webhook}/test', [\App\Http\Controllers\WebhookController::class, 'test'])
             ->name('webhooks.test');
 
+        // Bringing a backlog over from another tracker.
+        Route::post('projects/{project}/imports', [\App\Http\Controllers\ImportController::class, 'store'])
+            ->name('imports.store');
+        Route::get('projects/{project}/imports/{import}', [\App\Http\Controllers\ImportController::class, 'show'])
+            ->name('imports.show');
+        Route::patch('projects/{project}/imports/{import}', [\App\Http\Controllers\ImportController::class, 'update'])
+            ->name('imports.update');
+        Route::delete('projects/{project}/imports/{import}', [\App\Http\Controllers\ImportController::class, 'destroy'])
+            ->name('imports.destroy');
+
         // Releases live under their project: "2.4.1" means nothing on its own.
         Route::get('projects/{project}/versions/{version}', [\App\Http\Controllers\VersionController::class, 'show'])
             ->name('versions.show');
