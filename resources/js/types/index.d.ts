@@ -49,7 +49,12 @@ export interface Status {
 }
 
 export interface SharedProps {
-    auth: { user: AuthUser | null; role: WorkspaceRole | null };
+    auth: {
+        user: AuthUser | null;
+        role: WorkspaceRole | null;
+        /** Operates the whole install, not just this workspace. */
+        operator: boolean;
+    };
     workspace: WorkspaceSummary | null;
     workspaces: WorkspaceListing[];
     views: SavedView[];

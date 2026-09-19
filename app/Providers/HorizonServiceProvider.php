@@ -31,6 +31,28 @@ class HorizonServiceProvider extends HorizonApplicationServiceProvider
      */
     protected function gate(): void
     {
+        // Who operates this install, as opposed to who owns a workspace in it.
+        //
+        // On the hosted service that is whoever is named in BUGGIE_OPERATORS, and an
+        // empty list means nobody — failing closed. A self-hosted install with nobody
+        // named falls back to the first account created: it is somebody's own server,
+        // and making them edit .env before they can configure mail is exactly the
+        // friction worth removing.
+        Gate::define('operate', function (?\App\Models\User $user = null) {
+            if ($user === null) {
+                return false;
+            }
+
+            $operators = array_map('strtolower', (array) config('buggie.operators'));
+
+            if ($operators !== []) {
+                return in_array(strtolower($user->email), $operators, true);
+            }
+
+            return ! config('buggie.hosted')
+                && $user->id === \App\Models\User::query()->min('id');
+        });
+
         Gate::define('viewHorizon', function ($user = null) {
             $operators = (array) config('buggie.operators');
 

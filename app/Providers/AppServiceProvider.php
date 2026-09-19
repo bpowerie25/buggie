@@ -18,6 +18,8 @@ class AppServiceProvider extends ServiceProvider
     {
         // One tenant per request/job. Everything workspace-scoped reads from here.
         $this->app->scoped(Tenancy::class);
+
+        $this->app->singleton(\App\Support\Settings\Settings::class);
     }
 
     /**
@@ -26,6 +28,8 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Vite::prefetch(concurrency: 3);
+
+        $this->app->make(\App\Support\Settings\MailConfiguration::class)->apply();
 
         // Workspaces pay, not users: one person may belong to several workspaces and
         // only one of them may be subscribed.

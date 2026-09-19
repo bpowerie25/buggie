@@ -40,6 +40,10 @@ class HandleInertiaRequests extends Middleware
                 'role' => $user && $workspace
                     ? $user->membershipIn($workspace)?->value
                     : null,
+
+                // Operates the install, as opposed to owning a workspace in it. Used
+                // only to decide whether to show the link; the gate does the real work.
+                'operator' => $user ? \Illuminate\Support\Facades\Gate::forUser($user)->allows('operate') : false,
             ],
 
             'workspace' => $workspace ? [

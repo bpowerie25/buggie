@@ -129,3 +129,25 @@ editing is needed.
 - [`../SELF_HOSTING.md`](../SELF_HOSTING.md) — TLS, email, backups, upgrades, troubleshooting
 - [Privacy and security](privacy-and-security.md)
 - [Billing and plans](billing.md) — which is to say, none of it
+
+## Sending mail
+
+Mail is configured in the application, not in `.env`: **Settings → Instance**. Changing
+an SMTP password should be a form, not an edit to a file on the server followed by a
+redeploy.
+
+The screen is reachable only by an operator. On a self-hosted install with nobody named
+in `BUGGIE_OPERATORS`, that is the first account created — it is your server. On the
+hosted service it is whoever is named there, and an empty list means nobody rather than
+everybody.
+
+Anything set here overrides the environment, which stays as the fallback, so an install
+that would rather configure mail the traditional way can carry on doing so.
+
+The password is encrypted at rest and never sent back to the browser. Leaving the field
+blank keeps the stored one, so changing the from-name does not wipe your credentials.
+
+**Send yourself a test before trusting it.** Mail failure is completely silent —
+invitations, password resets and every notification simply never arrive, with nothing on
+screen and nothing a user could report. The button reports the provider's own error,
+which is the difference between "could not send" and knowing the port is wrong.

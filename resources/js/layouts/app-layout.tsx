@@ -15,6 +15,7 @@ import {
     Keyboard,
     LayoutDashboard,
     LogOut,
+    Server,
     Settings,
     Tag,
     Users,
@@ -172,6 +173,15 @@ export function AppLayout({
                             >
                                 Settings
                             </NavLink>
+                            {auth.operator && (
+                                <NavLink
+                                    href="/settings/instance"
+                                    icon={Server}
+                                    active={path.startsWith('/settings/instance')}
+                                >
+                                    Instance
+                                </NavLink>
+                            )}
                             {billing?.can_manage && (
                                 <NavLink
                                     href="/settings/billing"

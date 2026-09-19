@@ -201,6 +201,15 @@ Route::domain('{workspace}.'.$host)
         Route::delete('widget-keys/{widgetKey}', [WidgetKeyController::class, 'destroy'])
             ->name('widget-keys.destroy');
 
+        // The whole install, not this workspace: mail, and whatever else an operator
+        // needs to change without editing .env and redeploying.
+        Route::get('settings/instance', [\App\Http\Controllers\InstanceSettingsController::class, 'edit'])
+            ->name('instance.edit');
+        Route::patch('settings/instance', [\App\Http\Controllers\InstanceSettingsController::class, 'update'])
+            ->name('instance.update');
+        Route::post('settings/instance/test-mail', [\App\Http\Controllers\InstanceSettingsController::class, 'test'])
+            ->name('instance.test-mail');
+
         // API tokens. Created and revoked here; the API itself lives in routes/api.php.
         Route::post('settings/tokens', [\App\Http\Controllers\ApiTokenController::class, 'store'])
             ->name('tokens.store');
