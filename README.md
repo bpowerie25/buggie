@@ -69,6 +69,22 @@ Both are built from source for now; neither is published yet.
 
 ## What it does
 
+Buggie is for people who build things for clients. Three reasons to use it:
+
+**Reports arrive complete.** Your client clicks a button; you get the screenshot, the
+console, the failing request, the route, the browser and whoever was signed in —
+captured at the moment it happened rather than remembered afterwards.
+
+**Clients, without the mess.** Invite a client to their own projects only. Share the
+issues you choose, keep internal notes internal, and let whoever reported a bug follow
+it through a private link without an account. No per-seat bill for letting a client
+tell you something is broken.
+
+**It stays yours.** AGPL, self-hostable, with an API and CSV export. Your clients'
+history is not hostage to anybody's pricing page, including mine.
+
+---
+
 - **Reports arrive complete** — screenshot with annotation and redaction, console ring
   buffer, failing requests, route, browser, release, and whoever was signed in.
 - **Reports are not issues.** Intake lands in a triage inbox, not your backlog, and is
@@ -84,6 +100,12 @@ Both are built from source for now; neither is published yet.
 - **Email in and out** — file issues by email, reply to a notification to comment, and
   get one digest per issue rather than nine.
 - **Attachments** — drag, drop or paste screenshots and logs onto an issue.
+- **Releases and changelogs** — group issues into a release, mark it shipped, and hand
+  the client a list of what changed rather than writing one.
+- **API and webhooks** — a token-authenticated API scoped to one workspace, and signed
+  webhooks so bugs reach Slack or whatever you have already built.
+- **Export** — CSV of whatever the filter is showing, because "you can leave whenever
+  you like" is not true unless the data comes out.
 - **Data ages out** — screenshots and reporter identities are pruned on a schedule you
   control. Issues and comments are never touched.
 

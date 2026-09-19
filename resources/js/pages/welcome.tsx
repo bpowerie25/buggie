@@ -1,6 +1,19 @@
 import { Button } from '@/components/button';
 import { Head, Link } from '@inertiajs/react';
-import { Bug, Camera, Check, Code2, Inbox, Layers, Server } from 'lucide-react';
+import {
+    Bug,
+    Camera,
+    Check,
+    Code2,
+    Inbox,
+    Layers,
+    Mail,
+    Server,
+    Smartphone,
+    Tag,
+    Users,
+    Webhook,
+} from 'lucide-react';
 import type { ReactNode } from 'react';
 
 interface Plan {
@@ -13,21 +26,63 @@ interface Plan {
     subscribable: boolean;
 }
 
+/**
+ * Three reasons, not a list of everything.
+ *
+ * The page sold only the first of these for a long while, which is the weakest of
+ * the three: capturing a good report is the visible feature, but being able to put a
+ * client in a tracker without putting them in your backlog is the one that decides
+ * whether an agency can use this at all.
+ */
 const features = [
     {
         icon: Camera,
         title: 'Reports arrive complete',
-        body: 'A script tag in your app captures the screenshot, console, failing request, route and signed-in user — so nobody has to ask "what browser?" again.',
+        body: 'A script tag captures the screenshot, console, failing request, route and signed-in user at the moment the bug happens — so nobody has to ask "what browser?" again.',
     },
+    {
+        icon: Users,
+        title: 'Clients, without the mess',
+        body: 'Invite a client to their own projects only. Share the issues you choose, keep internal notes internal, and let whoever reported a bug follow it through a private link without an account.',
+    },
+    {
+        icon: Server,
+        title: 'It stays yours',
+        body: 'Open source and self-hostable, with an API and CSV export. Your clients’ history is not hostage to anybody’s pricing page — including mine.',
+    },
+];
+
+/** The rest, once somebody is still reading. */
+const alsoDoes = [
     {
         icon: Inbox,
         title: 'Triage, then backlog',
-        body: 'Incoming reports land in an inbox, not your backlog. Accept, merge or discard in one keystroke each.',
+        body: 'Reports land in an inbox, not your backlog. Accept, merge, spam or discard in one keystroke each.',
     },
     {
         icon: Layers,
         title: 'Duplicates collapse',
-        body: 'Forty people hitting one broken checkout is one issue with a count of forty, not forty tickets.',
+        body: 'Forty people hitting one broken checkout is one issue with a count of forty, not forty tickets — and you are not billed for the other thirty-nine.',
+    },
+    {
+        icon: Smartphone,
+        title: 'Web, iOS and Android',
+        body: 'The same reporting from a native app, with the same redaction rules and the same inbox at the other end.',
+    },
+    {
+        icon: Tag,
+        title: 'Releases and changelogs',
+        body: 'Group issues into a release, mark it shipped, and hand the client a list of what changed rather than writing one.',
+    },
+    {
+        icon: Mail,
+        title: 'Email in and out',
+        body: 'File issues by emailing a project. Reply to a notification to comment. One digest per issue rather than nine.',
+    },
+    {
+        icon: Webhook,
+        title: 'API and webhooks',
+        body: 'A token-authenticated API and signed webhooks, so bugs reach Slack, or whatever you have already built.',
     },
 ];
 
@@ -132,9 +187,9 @@ export default function Welcome({
                             Bug tracking that starts with a good report.
                         </h1>
                         <p className="mt-5 max-w-xl text-lg text-pretty text-ink-muted">
-                            Most of the work in a bug tracker is turning a bad report into a
-                            useful one. Buggie captures the context at the moment the bug
-                            happens, so the report arrives ready to act on.
+                            For people who build things for clients. Your client clicks a
+                            button; you get the screenshot, the console and the failing
+                            request. No more "it's broken" at nine o'clock on a Friday.
                         </p>
 
                         <div className="mt-8 flex flex-wrap items-center gap-3">
@@ -152,11 +207,11 @@ export default function Welcome({
                         </div>
                     </Section>
 
-                    <Section className="grid gap-6 border-t border-border py-16 sm:grid-cols-3">
+                    <Section className="grid gap-8 border-t border-border py-16 sm:grid-cols-3">
                         {features.map(({ icon: Icon, title, body }) => (
                             <div key={title}>
                                 <Icon className="size-5 text-accent" />
-                                <h2 className="mt-3 text-sm font-semibold text-ink">{title}</h2>
+                                <h2 className="mt-3 text-base font-semibold text-ink">{title}</h2>
                                 <p className="mt-1.5 text-sm text-pretty text-ink-muted">{body}</p>
                             </div>
                         ))}
@@ -164,11 +219,34 @@ export default function Welcome({
 
                     <Section className="border-t border-border py-16">
                         <h2 className="text-2xl font-semibold tracking-tight text-ink">
+                            And the rest of it
+                        </h2>
+
+                        <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+                            {alsoDoes.map(({ icon: Icon, title, body }) => (
+                                <div key={title}>
+                                    <Icon className="size-4 text-accent" />
+                                    <h3 className="mt-2 text-sm font-semibold text-ink">{title}</h3>
+                                    <p className="mt-1 text-sm text-pretty text-ink-muted">{body}</p>
+                                </div>
+                            ))}
+                        </div>
+
+                        <p className="mt-8 max-w-xl text-sm text-pretty text-ink-subtle">
+                            No custom field builder and no workflow designer. Those are the
+                            two things that make a tracker feel like tax software, and they
+                            are missing on purpose.
+                        </p>
+                    </Section>
+
+                    <Section className="border-t border-border py-16">
+                        <h2 className="text-2xl font-semibold tracking-tight text-ink">
                             One tag on your staging site.
                         </h2>
                         <p className="mt-3 max-w-xl text-pretty text-ink-muted">
-                            That is the whole install. Everyone testing sees a report button;
-                            their own customers never do.
+                            That is the whole install, and it belongs on your client's staging
+                            site rather than their live one. Everyone testing sees a report
+                            button; their own customers never do.
                         </p>
 
                         <pre className="mt-6 overflow-x-auto rounded-xl border border-border bg-surface p-4 font-mono text-xs text-ink-muted">
