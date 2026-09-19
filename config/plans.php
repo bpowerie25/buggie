@@ -43,6 +43,23 @@ return [
     ],
 
     /*
+     * How often a subscription is charged.
+     *
+     * Monthly is the default because it is the smaller commitment and the one an
+     * agency will try first. Annual exists because these customers have lumpy
+     * workloads: the ones who drift away in month four are the same ones who would
+     * not have, had they bought a year. `months` is what a year is billed as, and is
+     * what the saving is worked out from — so pricing a year at ten months' money
+     * means changing one number, not editing six prices and a marketing line.
+     */
+    'default_interval' => env('BUGGIE_DEFAULT_INTERVAL', 'month'),
+
+    'intervals' => [
+        'month' => ['label' => 'Monthly', 'suffix' => '/ month', 'months' => 1],
+        'year' => ['label' => 'Annual', 'suffix' => '/ year', 'months' => 12],
+    ],
+
+    /*
      * Every price here is quoted EXCLUDING tax.
      *
      * These are sold to businesses, which expect ex-VAT pricing, and the tax due
@@ -78,7 +95,6 @@ return [
             'name' => 'Self-hosted',
             'prices' => null,
             'price' => 'Free',
-            'interval' => 'month',
             'blurb' => 'Your server, your rules.',
             'limits' => [
                 'projects' => null,
@@ -91,7 +107,6 @@ return [
             'name' => 'Free',
             'prices' => null,
             'price' => '0',
-            'interval' => 'month',
             'blurb' => 'Enough to run one project properly.',
             'limits' => [
                 'projects' => 3,
@@ -108,15 +123,27 @@ return [
          * one with three busy ones, and capping projects punishes exactly the person
          * this was built for. Charging per seat is worse still: clients are seats, and
          * inviting clients is the entire point of the product.
+         *
+         * Amounts are numbers, not strings, because the annual saving is worked out
+         * from them. A display string alongside them would be a second copy of the
+         * price, free to drift from the one that is charged.
          */
         'studio' => [
             'name' => 'Studio',
             'prices' => [
-                'EUR' => ['display' => '€19', 'price_id' => env('STRIPE_PRICE_STUDIO_EUR')],
-                'GBP' => ['display' => '£16', 'price_id' => env('STRIPE_PRICE_STUDIO_GBP')],
-                'USD' => ['display' => '$19', 'price_id' => env('STRIPE_PRICE_STUDIO_USD')],
+                'EUR' => [
+                    'month' => ['amount' => 19, 'price_id' => env('STRIPE_PRICE_STUDIO_EUR')],
+                    'year' => ['amount' => 190, 'price_id' => env('STRIPE_PRICE_STUDIO_EUR_YEAR')],
+                ],
+                'GBP' => [
+                    'month' => ['amount' => 16, 'price_id' => env('STRIPE_PRICE_STUDIO_GBP')],
+                    'year' => ['amount' => 160, 'price_id' => env('STRIPE_PRICE_STUDIO_GBP_YEAR')],
+                ],
+                'USD' => [
+                    'month' => ['amount' => 19, 'price_id' => env('STRIPE_PRICE_STUDIO_USD')],
+                    'year' => ['amount' => 190, 'price_id' => env('STRIPE_PRICE_STUDIO_USD_YEAR')],
+                ],
             ],
-            'interval' => 'month',
             'blurb' => 'For a freelancer or small studio. Every client, every project.',
             'limits' => [
                 'projects' => null,
@@ -128,11 +155,19 @@ return [
         'agency' => [
             'name' => 'Agency',
             'prices' => [
-                'EUR' => ['display' => '€49', 'price_id' => env('STRIPE_PRICE_AGENCY_EUR')],
-                'GBP' => ['display' => '£42', 'price_id' => env('STRIPE_PRICE_AGENCY_GBP')],
-                'USD' => ['display' => '$49', 'price_id' => env('STRIPE_PRICE_AGENCY_USD')],
+                'EUR' => [
+                    'month' => ['amount' => 49, 'price_id' => env('STRIPE_PRICE_AGENCY_EUR')],
+                    'year' => ['amount' => 490, 'price_id' => env('STRIPE_PRICE_AGENCY_EUR_YEAR')],
+                ],
+                'GBP' => [
+                    'month' => ['amount' => 42, 'price_id' => env('STRIPE_PRICE_AGENCY_GBP')],
+                    'year' => ['amount' => 420, 'price_id' => env('STRIPE_PRICE_AGENCY_GBP_YEAR')],
+                ],
+                'USD' => [
+                    'month' => ['amount' => 49, 'price_id' => env('STRIPE_PRICE_AGENCY_USD')],
+                    'year' => ['amount' => 490, 'price_id' => env('STRIPE_PRICE_AGENCY_USD_YEAR')],
+                ],
             ],
-            'interval' => 'month',
             'blurb' => 'For a busy agency, or anyone whose reports outgrew Studio.',
             'limits' => [
                 'projects' => null,

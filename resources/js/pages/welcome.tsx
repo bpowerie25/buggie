@@ -22,8 +22,12 @@ interface Plan {
     name: string;
     price: string;
     currency: string;
+    interval: string;
+    interval_suffix: string;
+    saving: string | null;
     blurb: string;
     limits: Record<string, number | null>;
+    priced: boolean;
     subscribable: boolean;
 }
 
@@ -117,6 +121,8 @@ export default function Welcome({
     repository,
     currency = 'EUR',
     currencies = [],
+    interval = 'month',
+    intervals = [],
     pricesExcludeTax = true,
 }: {
     plans?: Plan[];
@@ -124,6 +130,8 @@ export default function Welcome({
     repository?: string;
     currency?: string;
     currencies?: { code: string; symbol: string }[];
+    interval?: string;
+    intervals?: { key: string; label: string }[];
     pricesExcludeTax?: boolean;
 }) {
     // self_hosted is shown alongside the paid plans rather than hidden: it is the
@@ -280,25 +288,48 @@ export default function Welcome({
                                 client to every project — that is what it is for.
                             </p>
 
-                            {currencies.length > 1 && (
-                                <div className="mt-5 inline-flex rounded-lg border border-border p-0.5">
-                                    {currencies.map((option) => (
-                                        // A plain link, so the choice survives a reload and
-                                        // search engines see every currency's page.
-                                        <a
-                                            key={option.code}
-                                            href={`?currency=${option.code}#pricing`}
-                                            className={`rounded-md px-2.5 py-1 text-xs transition ${
-                                                option.code === currency
-                                                    ? 'bg-accent-soft font-medium text-accent'
-                                                    : 'text-ink-muted hover:text-ink'
-                                            }`}
-                                        >
-                                            {option.symbol} {option.code}
-                                        </a>
-                                    ))}
-                                </div>
-                            )}
+                            <div className="mt-5 flex flex-wrap items-center gap-2">
+                                {intervals.length > 1 && (
+                                    <div className="inline-flex rounded-lg border border-border p-0.5">
+                                        {intervals.map((option) => (
+                                            // Both switchers carry the other's current value,
+                                            // so changing the term does not silently reset a
+                                            // visitor back to euro.
+                                            <a
+                                                key={option.key}
+                                                href={`?currency=${currency}&interval=${option.key}#pricing`}
+                                                className={`rounded-md px-2.5 py-1 text-xs transition ${
+                                                    option.key === interval
+                                                        ? 'bg-accent-soft font-medium text-accent'
+                                                        : 'text-ink-muted hover:text-ink'
+                                                }`}
+                                            >
+                                                {option.label}
+                                            </a>
+                                        ))}
+                                    </div>
+                                )}
+
+                                {currencies.length > 1 && (
+                                    <div className="inline-flex rounded-lg border border-border p-0.5">
+                                        {currencies.map((option) => (
+                                            // A plain link, so the choice survives a reload and
+                                            // search engines see every currency's page.
+                                            <a
+                                                key={option.code}
+                                                href={`?currency=${option.code}&interval=${interval}#pricing`}
+                                                className={`rounded-md px-2.5 py-1 text-xs transition ${
+                                                    option.code === currency
+                                                        ? 'bg-accent-soft font-medium text-accent'
+                                                        : 'text-ink-muted hover:text-ink'
+                                                }`}
+                                            >
+                                                {option.symbol} {option.code}
+                                            </a>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
 
                             <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                                 {sellable.map((plan) => (
@@ -313,15 +344,20 @@ export default function Welcome({
                                             <span className="text-2xl font-semibold text-ink">
                                                 {plan.price}
                                             </span>
-                                            {plan.subscribable && (
+                                            {plan.priced && (
                                                 <span className="text-sm text-ink-subtle">
                                                     {' '}
-                                                    / month
+                                                    {plan.interval_suffix}
                                                 </span>
                                             )}
-                                            {plan.subscribable && pricesExcludeTax && (
+                                            {plan.priced && pricesExcludeTax && (
                                                 <span className="block text-xs text-ink-subtle">
                                                     excluding VAT
+                                                </span>
+                                            )}
+                                            {plan.priced && plan.saving && (
+                                                <span className="mt-1.5 inline-block rounded-full bg-success/10 px-2 py-0.5 text-xs font-medium text-success">
+                                                    Save {plan.saving} a year
                                                 </span>
                                             )}
                                         </p>

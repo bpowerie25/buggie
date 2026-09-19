@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Support\Billing\Currency;
+use App\Support\Billing\Interval;
 use App\Support\Billing\Plan;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\Test;
@@ -59,11 +60,11 @@ class PricingCurrencyTest extends TestCase
     }
 
     #[Test]
-    public function every_paid_plan_is_priced_in_every_currency(): void
+    public function every_paid_plan_is_priced_in_every_currency_and_term(): void
     {
-        // A paid plan missing a price in one currency means a visitor sees a button
-        // that cannot work. Checked against what is actually configured rather than
-        // by forcing prices onto the free tiers, which have none by design.
+        // A paid plan missing a price in one currency or term means a visitor sees a
+        // button that cannot work. Checked against what is actually configured rather
+        // than by forcing prices onto the free tiers, which have none by design.
         foreach (Plan::all() as $plan) {
             $configured = config("plans.plans.{$plan->key}.prices");
 
@@ -78,24 +79,44 @@ class PricingCurrencyTest extends TestCase
                     "Plan [{$plan->key}] has no price in [{$code}].",
                 );
 
-                $this->assertNotSame('', (string) ($configured[$code]['display'] ?? ''));
+                foreach (array_keys(Interval::all()) as $term) {
+                    $this->assertArrayHasKey(
+                        $term,
+                        $configured[$code],
+                        "Plan [{$plan->key}] has no [{$term}] price in [{$code}].",
+                    );
+
+                    $this->assertGreaterThan(
+                        0,
+                        (int) ($configured[$code][$term]['amount'] ?? 0),
+                        "Plan [{$plan->key}] has no [{$term}] amount in [{$code}].",
+                    );
+                }
             }
         }
     }
 
     #[Test]
-    public function a_stripe_price_is_recognised_whatever_currency_it_was_sold_in(): void
+    public function a_stripe_price_is_recognised_whatever_currency_or_term_it_was_sold_in(): void
     {
         // Webhooks arrive with a price id and nothing else. Matching only the default
-        // currency would silently fail to recognise every non-euro subscriber — they
-        // would pay and get nothing.
+        // currency and term would silently fail to recognise every non-euro subscriber
+        // and everyone who bought a year — they would pay and get nothing.
         config([
-            'plans.plans.studio.prices.EUR.price_id' => 'price_eur',
-            'plans.plans.studio.prices.GBP.price_id' => 'price_gbp',
-            'plans.plans.studio.prices.USD.price_id' => 'price_usd',
+            'plans.plans.studio.prices.EUR.month.price_id' => 'price_eur',
+            'plans.plans.studio.prices.GBP.month.price_id' => 'price_gbp',
+            'plans.plans.studio.prices.USD.month.price_id' => 'price_usd',
+            'plans.plans.studio.prices.EUR.year.price_id' => 'price_eur_year',
+            'plans.plans.studio.prices.GBP.year.price_id' => 'price_gbp_year',
+            'plans.plans.studio.prices.USD.year.price_id' => 'price_usd_year',
         ]);
 
-        foreach (['price_eur', 'price_gbp', 'price_usd'] as $priceId) {
+        $ids = [
+            'price_eur', 'price_gbp', 'price_usd',
+            'price_eur_year', 'price_gbp_year', 'price_usd_year',
+        ];
+
+        foreach ($ids as $priceId) {
             $this->assertSame('studio', Plan::forPriceId($priceId)?->key);
         }
     }

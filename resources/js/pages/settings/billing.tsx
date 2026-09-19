@@ -1,14 +1,18 @@
 import { Button } from '@/components/button';
 import { AppLayout } from '@/layouts/app-layout';
-import { Head, router } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
 import { Check, CreditCard, ExternalLink } from 'lucide-react';
 
 interface PlanRow {
     key: string;
     name: string;
     price: string;
+    interval: string;
+    interval_suffix: string;
+    saving: string | null;
     blurb: string;
     limits: Record<string, number | null>;
+    priced: boolean;
     subscribable: boolean;
 }
 
@@ -60,6 +64,8 @@ export default function Billing({
     plan,
     usage,
     plans,
+    interval = 'month',
+    intervals = [],
     subscription,
     trial_ends_at,
     on_trial,
@@ -69,6 +75,8 @@ export default function Billing({
     plan: PlanRow;
     usage: Record<string, UsageRow>;
     plans: PlanRow[];
+    interval?: string;
+    intervals?: { key: string; label: string }[];
     subscription: {
         status: string;
         on_grace_period: boolean;
@@ -147,7 +155,31 @@ export default function Billing({
                 )}
 
                 <section>
-                    <h2 className="text-sm font-semibold text-ink">Plans</h2>
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                        <h2 className="text-sm font-semibold text-ink">Plans</h2>
+
+                        {intervals.length > 1 && (
+                            // A plain link rather than local state: the prices are
+                            // rendered server-side from config, so switching the term
+                            // has to go and ask for them.
+                            <div className="inline-flex rounded-lg border border-border p-0.5">
+                                {intervals.map((option) => (
+                                    <Link
+                                        key={option.key}
+                                        href={`/settings/billing?interval=${option.key}`}
+                                        preserveScroll
+                                        className={`rounded-md px-2.5 py-1 text-xs transition ${
+                                            option.key === interval
+                                                ? 'bg-accent-soft font-medium text-accent'
+                                                : 'text-ink-muted hover:text-ink'
+                                        }`}
+                                    >
+                                        {option.label}
+                                    </Link>
+                                ))}
+                            </div>
+                        )}
+                    </div>
 
                     <div className="mt-3 grid gap-3 sm:grid-cols-3">
                         {plans.map((option) => {
@@ -173,11 +205,19 @@ export default function Billing({
 
                                     <p className="mt-1 text-lg font-semibold text-ink">
                                         {option.price}
-                                        <span className="text-xs font-normal text-ink-subtle">
-                                            {' '}
-                                            / month
-                                        </span>
+                                        {option.priced && (
+                                            <span className="text-xs font-normal text-ink-subtle">
+                                                {' '}
+                                                {option.interval_suffix}
+                                            </span>
+                                        )}
                                     </p>
+
+                                    {option.priced && option.saving && (
+                                        <p className="mt-1 text-xs font-medium text-success">
+                                            Save {option.saving} a year
+                                        </p>
+                                    )}
 
                                     <p className="mt-1 text-xs text-pretty text-ink-muted">
                                         {option.blurb}
@@ -204,6 +244,10 @@ export default function Billing({
                                             onClick={() =>
                                                 router.post('/settings/billing/checkout', {
                                                     plan: option.key,
+                                                    // Sent with the button rather than
+                                                    // left to the session, so what they
+                                                    // are charged is what this card says.
+                                                    interval,
                                                 })
                                             }
                                         >

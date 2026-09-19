@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Support\Billing\Currency;
+use App\Support\Billing\Interval;
 use App\Support\Billing\Plan;
 use App\Support\Tenancy\Tenancy;
 use Illuminate\Http\RedirectResponse;
@@ -15,19 +17,27 @@ class BillingController extends Controller
 {
     public function __construct(private Tenancy $tenancy) {}
 
-    public function index(): Response
+    public function index(Request $request): Response
     {
         $this->authorize('manageBilling', $this->tenancy->currentOrFail());
 
         $workspace = $this->tenancy->currentOrFail();
         $subscription = $workspace->subscription();
 
+        $currency = Currency::resolve($request);
+        $interval = Interval::resolve($request);
+
         return Inertia::render('settings/billing', [
-            'plan' => $workspace->plan()->toArray(),
+            'plan' => $workspace->plan()->toArray($currency, $interval),
             'usage' => $workspace->usage(),
             'plans' => array_map(
-                fn (Plan $plan) => $plan->toArray(\App\Support\Billing\Currency::resolve($request)),
+                fn (Plan $plan) => $plan->toArray($currency, $interval),
                 Plan::all(),
+            ),
+            'interval' => $interval,
+            'intervals' => array_map(
+                fn (string $key) => ['key' => $key, 'label' => Interval::label($key)],
+                array_keys(Interval::all()),
             ),
             'subscription' => $subscription ? [
                 'status' => $subscription->stripe_status,
@@ -57,19 +67,29 @@ class BillingController extends Controller
 
         $validated = $request->validate([
             'plan' => ['required', Rule::in(array_keys((array) config('plans.plans')))],
+            'interval' => ['nullable', Rule::in(array_keys(Interval::all()))],
         ]);
 
         $plan = Plan::find($validated['plan']);
 
-        abort_unless($plan->isSubscribable(), 422, 'That plan cannot be subscribed to.');
+        // The currency and term they were quoted in, carried through to what they are
+        // charged. Being shown $19 and billed €19 is the kind of surprise that
+        // generates a chargeback rather than an email, and being shown a year's price
+        // and billed monthly is the same mistake wearing a different hat.
+        $currency = Currency::resolve($request);
 
-        // The currency they were quoted in, carried through to what they are charged.
-        // Being shown $19 and billed €19 is the kind of surprise that generates a
-        // chargeback rather than an email.
-        $currency = \App\Support\Billing\Currency::resolve($request);
+        // Taken from the button they pressed when it says so, because the session may
+        // remember a term they have since switched away from in another tab.
+        $interval = $validated['interval'] ?? Interval::resolve($request);
+
+        abort_unless(
+            $plan->isSubscribable($currency, $interval),
+            422,
+            'That plan cannot be subscribed to.',
+        );
 
         return $workspace
-            ->newSubscription('default', $plan->priceId($currency))
+            ->newSubscription('default', $plan->priceId($currency, $interval))
             ->checkout([
                 'success_url' => workspace_url($workspace->slug, 'settings/billing?checkout=done'),
                 'cancel_url' => workspace_url($workspace->slug, 'settings/billing'),

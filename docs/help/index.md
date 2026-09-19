@@ -28,9 +28,11 @@ else. See [Billing and plans](billing.md) and [Self-hosting](self-hosting.md).
 7. [Statuses and workflow](workflow.md) — renameable names over fixed categories.
 8. [Labels, priorities, types and assignees](labels-and-fields.md).
 9. [Clients](clients.md) — inviting them and controlling what they see.
-10. [Email](email.md) and [Notifications](notifications.md).
-11. [Keyboard shortcuts](keyboard.md).
-12. [Billing and plans](billing.md), [Self-hosting](self-hosting.md),
+10. [White-labelling](branding.md) — putting your client's name on what they see.
+11. [Releases and versions](releases.md) — what a bug was found in, and fixed in.
+12. [Email](email.md) and [Notifications](notifications.md).
+13. [Keyboard shortcuts](keyboard.md).
+14. [Billing and plans](billing.md), [Self-hosting](self-hosting.md),
     [Privacy and security](privacy-and-security.md).
 
 ## If you were invited to a workspace as a client
@@ -48,9 +50,13 @@ You do not need an account. See
 ## Native applications
 
 There is a Swift package for iOS and a Kotlin one for Android, both posting to the
-same endpoint as the web widget. See [Native SDKs](native-sdks.md)
-- [The API](api.md)
-- [Webhooks](webhooks.md) — calling a URL when something happens — token-authenticated HTTP access to a workspace.
+same endpoint as the web widget. See [Native SDKs](native-sdks.md).
+
+## Connecting Buggie to other things
+
+- [The API](api.md) — token-authenticated HTTP access to a workspace.
+- [Webhooks](webhooks.md) — calling a URL when something happens.
+- [Importing](importing.md) — bringing issues in from Mantis, Jira or a CSV.
 
 ---
 

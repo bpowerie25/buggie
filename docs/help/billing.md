@@ -10,17 +10,45 @@ The rest of this page describes the hosted service.
 
 ## Plans
 
-| | Free | Team | Business |
+| | Free | Studio | Agency |
 |---|---|---|---|
-| Projects | 3 | 15 | unlimited |
-| Members | 3 | 15 | unlimited |
+| Projects | 3 | unlimited | unlimited |
+| Members | 3 | unlimited | unlimited |
 | Reports per calendar month | 100 | 2,000 | 20,000 |
 
-Prices shown in the application are read from configuration and are cosmetic; Stripe
-is the source of truth for what is actually charged.
+Paid plans meter reports and nothing else. Projects and people cost nothing to host;
+screenshots and payloads do. Capping projects would punish an agency with twenty quiet
+client sites, and charging per seat would charge for inviting clients — which is the
+point of the product.
 
-A new workspace gets a **14-day trial on the Team plan**. When the trial ends, and
+A new workspace gets a **14-day trial on the Studio plan**. When the trial ends, and
 with no active subscription, the workspace falls back to Free.
+
+## Prices and terms
+
+Every price is quoted **excluding VAT**. These are sold to businesses, which expect
+ex-VAT pricing, and the tax due depends on where the customer is. Stripe Tax works it
+out at checkout: Irish VAT domestically, the customer's own rate for EU consumers,
+nothing for EU businesses supplying a valid VAT number under the reverse charge, and
+UK or US rules for those.
+
+| | Monthly | Annual |
+|---|---|---|
+| Studio | €19 | €190 |
+| Agency | €49 | €490 |
+
+Annual is **ten months' money for twelve months' service**. The saving shown on the
+pricing page is worked out from the two amounts rather than written down beside them,
+so changing a price cannot leave a stale "save €38" on the page.
+
+Prices are also quoted in **GBP** and **USD**. These are local prices rather than a
+conversion of the euro one — a price ending in 47 looks like arithmetic rather than a
+decision. The currency and the term are both chosen by the visitor and remembered for
+the session, and whichever pair they were quoted in is what Stripe charges.
+
+Prices shown in the application are read from configuration; Stripe is the source of
+truth for what is actually charged. Each plan needs its own Stripe price per currency
+per term — twelve in all — and each must be created with tax behaviour **exclusive**.
 
 ## What is metered
 
@@ -66,7 +94,14 @@ card on file, and the other plans. From it you can:
 - **Resume** — available while a cancelled subscription is still in its grace period.
 
 A plan with no Stripe price configured cannot be subscribed to, and the screen says so
-rather than showing a checkout button that cannot work.
+rather than showing a checkout button that cannot work. The price and its period are
+still shown — what something costs is a separate question from whether it can be
+bought this minute.
+
+Switching the screen between monthly and annual reloads it, because the prices are
+rendered from configuration on the server. The term is sent with the button you press
+rather than read from the session, so what you are charged is what the card you
+clicked said.
 
 ## Known rough edges
 

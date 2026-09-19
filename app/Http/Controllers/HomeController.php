@@ -3,6 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\Workspace;
+use App\Support\Billing\Currency;
+use App\Support\Billing\Interval;
+use App\Support\Billing\Plan;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -20,7 +23,8 @@ class HomeController extends Controller
         $user = $request->user();
 
         if ($user === null) {
-            $currency = \App\Support\Billing\Currency::resolve($request);
+            $currency = Currency::resolve($request);
+            $interval = Interval::resolve($request);
 
             return Inertia::render('welcome', [
                 // Read from config rather than written into the page, so the prices
@@ -28,16 +32,24 @@ class HomeController extends Controller
                 // enforced. self_hosted is included deliberately: it is the honest
                 // comparison, and hiding it would be the wrong kind of selling.
                 'plans' => array_map(
-                    fn (\App\Support\Billing\Plan $plan) => $plan->toArray($currency),
-                    \App\Support\Billing\Plan::all(),
+                    fn (Plan $plan) => $plan->toArray($currency, $interval),
+                    Plan::all(),
                 ),
                 'currency' => $currency,
                 'currencies' => array_map(
                     fn (string $code) => [
                         'code' => $code,
-                        'symbol' => \App\Support\Billing\Currency::symbol($code),
+                        'symbol' => Currency::symbol($code),
                     ],
-                    array_keys(\App\Support\Billing\Currency::all()),
+                    array_keys(Currency::all()),
+                ),
+                'interval' => $interval,
+                'intervals' => array_map(
+                    fn (string $key) => [
+                        'key' => $key,
+                        'label' => Interval::label($key),
+                    ],
+                    array_keys(Interval::all()),
                 ),
                 'pricesExcludeTax' => (bool) config('plans.prices_exclude_tax'),
                 'hosted' => (bool) config('buggie.hosted'),
