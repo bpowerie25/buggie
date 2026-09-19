@@ -5,6 +5,7 @@ import { useHotkeys } from '@/hooks/use-hotkeys';
 import type { SharedProps } from '@/types';
 import { Link, router, usePage } from '@inertiajs/react';
 import {
+    Bell,
     Bookmark,
     Bug,
     ChevronsUpDown,
@@ -149,6 +150,13 @@ export function AppLayout({
                         active={path.startsWith('/projects')}
                     >
                         Projects
+                    </NavLink>
+                    <NavLink
+                        href="/settings/notifications"
+                        icon={Bell}
+                        active={path.startsWith('/settings/notifications')}
+                    >
+                        Notifications
                     </NavLink>
                     {auth.role !== 'client' && (
                         <>

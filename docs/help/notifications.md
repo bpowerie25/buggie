@@ -71,3 +71,16 @@ type one.
 - [Email](email.md)
 - [Issues](issues.md)
 - [Clients](clients.md#internal-notes)
+
+## Turning them off
+
+**Notifications** in the sidebar. Every reason has its own switch, and everything is
+on until you turn it off — a tracker nobody hears from is a tracker nobody uses.
+
+The preferences belong to you, not to a workspace. Somebody invited to four client
+workspaces should not have to switch the same thing off four times, so changing them
+anywhere changes them everywhere.
+
+Turning everything off is allowed and the page says plainly what it means: you will
+not be emailed about anything, including issues assigned to you. That should be a
+choice, not something discovered a fortnight later when a client says nobody replied.

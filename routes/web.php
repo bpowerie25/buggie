@@ -201,6 +201,13 @@ Route::domain('{workspace}.'.$host)
         Route::delete('widget-keys/{widgetKey}', [WidgetKeyController::class, 'destroy'])
             ->name('widget-keys.destroy');
 
+        // Yours, not this workspace's: somebody invited to four client workspaces
+        // should not have to switch the same thing off four times.
+        Route::get('settings/notifications', [\App\Http\Controllers\NotificationPreferenceController::class, 'edit'])
+            ->name('notifications.edit');
+        Route::patch('settings/notifications', [\App\Http\Controllers\NotificationPreferenceController::class, 'update'])
+            ->name('notifications.update');
+
         // The whole install, not this workspace: mail, and whatever else an operator
         // needs to change without editing .env and redeploying.
         Route::get('settings/instance', [\App\Http\Controllers\InstanceSettingsController::class, 'edit'])
