@@ -46,7 +46,14 @@ class TenancyIsolationTest extends TestCase
             // ever reached through $workspace->subscriptions(), and Stripe webhooks
             // legitimately process it with no workspace bound, where a global scope
             // would throw. Its own tenancy is asserted separately below.
-            if (in_array($table, ['workspace_user', 'project_user', 'subscriptions'], true)) {
+            // `personal_access_tokens` carries a workspace but is deliberately not
+            // scoped either: Sanctum looks a token up to decide who is asking, which
+            // happens before any workspace has been resolved, so a global scope would
+            // make every token unfindable. The binding is enforced by
+            // EnsureTokenMatchesWorkspace and asserted in ApiTest.
+            if (in_array($table, [
+                'workspace_user', 'project_user', 'subscriptions', 'personal_access_tokens',
+            ], true)) {
                 continue;
             }
 

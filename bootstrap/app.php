@@ -47,6 +47,11 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'workspace' => \App\Http\Middleware\EnsureWorkspaceMember::class,
             'hosted' => \App\Http\Middleware\RequireHostedMode::class,
+
+            // Sanctum ships these but registers no aliases, so the API's
+            // `abilities:read` would otherwise resolve as a class name.
+            'abilities' => \Laravel\Sanctum\Http\Middleware\CheckAbilities::class,
+            'ability' => \Laravel\Sanctum\Http\Middleware\CheckForAnyAbility::class,
         ]);
 
         // The tenant must resolve before auth (an unknown subdomain is a 404, not a

@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Laravel\Sanctum\HasApiTokens;
 
 /**
  * Users are global, not workspace-owned: one account can belong to several
@@ -24,7 +25,7 @@ use Illuminate\Notifications\Notifiable;
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, Notifiable;
+    use HasApiTokens, HasFactory, Notifiable;
 
     protected function casts(): array
     {
@@ -71,6 +72,34 @@ class User extends Authenticatable
     public function wantsNotification(\App\Enums\NotificationReason $reason): bool
     {
         return (bool) ($this->notification_settings[$reason->value] ?? $reason->defaultEnabled());
+    }
+
+    /**
+     * A personal access token, scoped to one workspace.
+     *
+     * Sanctum's own createToken has nowhere to put the workspace, and setting it
+     * afterwards means inserting a row that briefly belongs to no workspace — which
+     * the NOT NULL constraint refuses, quite rightly. One insert, fully formed.
+     *
+     * @param  array<int, string>  $abilities
+     */
+    public function createTokenForWorkspace(
+        Workspace $workspace,
+        string $name,
+        array $abilities = ['read'],
+        ?\DateTimeInterface $expiresAt = null,
+    ): \Laravel\Sanctum\NewAccessToken {
+        $plainTextToken = $this->generateTokenString();
+
+        $token = $this->tokens()->create([
+            'workspace_id' => $workspace->id,
+            'name' => $name,
+            'token' => hash('sha256', $plainTextToken),
+            'abilities' => $abilities,
+            'expires_at' => $expiresAt,
+        ]);
+
+        return new \Laravel\Sanctum\NewAccessToken($token, $token->getKey().'|'.$plainTextToken);
     }
 
     public function initials(): string

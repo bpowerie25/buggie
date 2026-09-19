@@ -30,6 +30,18 @@ class CreateIssue
      */
     public function handle(Project $project, array $attributes, ?User $reporter = null): Issue
     {
+        // A client filing an issue is filing it about their own project, so it stays
+        // visible to them — otherwise they lose sight of it the moment it is created
+        // — and they do not get to hand work to a member of the team.
+        //
+        // This lives in the action rather than the controller so that every way in
+        // gets it: the screens, the API, and whatever comes next. It used to live in
+        // one controller, and the API promptly disagreed with it.
+        if ($reporter !== null && ! ($reporter->membershipIn($project->workspace)?->isStaff() ?? false)) {
+            $attributes['visibility'] = \App\Enums\IssueVisibility::Client->value;
+            $attributes['assignee_id'] = null;
+        }
+
         return DB::transaction(function () use ($project, $attributes, $reporter) {
             $status = $attributes['status_id'] ?? $project->defaultStatus()?->id;
 

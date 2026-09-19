@@ -100,16 +100,10 @@ class IssueController extends Controller
         $this->authorize('create', Issue::class);
 
         $project = Project::findOrFail($request->integer('project_id'));
-        $data = $request->validated();
 
-        // A client filing an issue is filing it about their own project, so it must
-        // stay visible to them. Otherwise they lose sight of it the moment it is created.
-        if (! $this->isStaff($request->user())) {
-            $data['visibility'] = IssueVisibility::Client->value;
-            $data['assignee_id'] = null;
-        }
-
-        $issue = $action->handle($project, $data, $request->user());
+        // Client visibility is forced inside the action, so every entry point gets
+        // it rather than only this one.
+        $issue = $action->handle($project, $request->validated(), $request->user());
 
         return redirect()
             ->route('issues.show', $issue)

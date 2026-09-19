@@ -39,6 +39,18 @@ class AppServiceProvider extends ServiceProvider
             'reset-password/'.$token.'?email='.urlencode($user->getEmailForPasswordReset()),
         ));
 
+        // Tokens carry a workspace, so Sanctum is told to use ours.
+        \Laravel\Sanctum\Sanctum::usePersonalAccessTokenModel(\App\Models\ApiToken::class);
+
+        // Per token, not per IP: one noisy script should not throttle a colleague
+        // working from the same office. Falls back to the address for anything
+        // unauthenticated, which should not reach these routes anyway.
+        \Illuminate\Support\Facades\RateLimiter::for(
+            'api',
+            fn (\Illuminate\Http\Request $request) => \Illuminate\Cache\RateLimiting\Limit::perMinute(120)
+                ->by($request->user()?->currentAccessToken()?->getKey() ?: $request->ip()),
+        );
+
         Model::shouldBeStrict(! $this->app->isProduction());
     }
 }
