@@ -14,7 +14,7 @@ interface Member {
     role: string;
     is_owner: boolean;
     is_you: boolean;
-    projects: string[];
+    projects: number[];
 }
 
 interface PendingInvitation {
@@ -155,43 +155,12 @@ export default function Members({
 
                 <ul className="mt-3 divide-y divide-border overflow-hidden rounded-xl border border-border bg-raised">
                     {members.map((member) => (
-                        <li key={member.id} className="flex items-center gap-3 px-4 py-3">
-                            <Avatar name={member.name} size="md" />
-
-                            <div className="min-w-0 flex-1">
-                                <p className="truncate text-sm text-ink">
-                                    {member.name}
-                                    {member.is_you && (
-                                        <span className="ml-1.5 text-xs text-ink-subtle">you</span>
-                                    )}
-                                </p>
-                                <p className="truncate text-xs text-ink-subtle">{member.email}</p>
-                                {member.projects.length > 0 && (
-                                    <p className="mt-0.5 truncate text-[11px] text-ink-subtle">
-                                        Sees: {member.projects.join(', ')}
-                                    </p>
-                                )}
-                            </div>
-
-                            <span className="shrink-0 rounded bg-surface px-1.5 py-0.5 text-[11px] text-ink-muted capitalize">
-                                {member.is_owner ? 'owner' : member.role}
-                            </span>
-
-                            {canManage && !member.is_owner && (
-                                <button
-                                    type="button"
-                                    aria-label={`Remove ${member.name}`}
-                                    onClick={() =>
-                                        router.delete(`/settings/members/${member.id}`, {
-                                            preserveScroll: true,
-                                        })
-                                    }
-                                    className="rounded p-1.5 text-ink-subtle transition hover:text-danger"
-                                >
-                                    <UserMinus className="size-4" />
-                                </button>
-                            )}
-                        </li>
+                        <MemberRow
+                            key={member.id}
+                            member={member}
+                            projects={projects}
+                            canManage={canManage}
+                        />
                     ))}
                 </ul>
             </section>
@@ -245,6 +214,139 @@ function InvitationRow({
                 >
                     <Trash2 className="size-4" />
                 </button>
+            )}
+        </li>
+    );
+}
+
+/**
+ * One member, and for a client the projects they can see.
+ *
+ * Grants could be given at invitation and never changed: adding one meant
+ * re-inviting somebody who was already a member, and removing one meant editing the
+ * database. A client staying on a project long after the work finished is the common
+ * case, and it was the hard one.
+ */
+function MemberRow({
+    member,
+    projects,
+    canManage,
+}: {
+    member: Member;
+    projects: { id: number; name: string; key: string }[];
+    canManage: boolean;
+}) {
+    const [editing, setEditing] = useState(false);
+    const [chosen, setChosen] = useState<number[]>(member.projects);
+
+    const isClient = member.role === 'client';
+    const names = projects
+        .filter((project) => member.projects.includes(project.id))
+        .map((project) => project.name);
+
+    function save() {
+        router.patch(
+            `/settings/members/${member.id}/projects`,
+            { project_ids: chosen },
+            { preserveScroll: true, onSuccess: () => setEditing(false) },
+        );
+    }
+
+    return (
+        <li className="px-4 py-3">
+            <div className="flex items-center gap-3">
+                <Avatar name={member.name} size="md" />
+
+                <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm text-ink">
+                        {member.name}
+                        {member.is_you && (
+                            <span className="ml-1.5 text-xs text-ink-subtle">you</span>
+                        )}
+                    </p>
+                    <p className="truncate text-xs text-ink-subtle">{member.email}</p>
+
+                    {isClient && !editing && (
+                        <p className="mt-0.5 truncate text-[11px] text-ink-subtle">
+                            Sees: {names.length > 0 ? names.join(', ') : 'nothing'}
+                            {canManage && (
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setChosen(member.projects);
+                                        setEditing(true);
+                                    }}
+                                    className="ml-1.5 text-accent hover:underline"
+                                >
+                                    Change
+                                </button>
+                            )}
+                        </p>
+                    )}
+                </div>
+
+                <span className="shrink-0 rounded bg-surface px-1.5 py-0.5 text-[11px] text-ink-muted capitalize">
+                    {member.is_owner ? 'owner' : member.role}
+                </span>
+
+                {canManage && !member.is_owner && (
+                    <button
+                        type="button"
+                        aria-label={`Remove ${member.name}`}
+                        onClick={() =>
+                            router.delete(`/settings/members/${member.id}`, { preserveScroll: true })
+                        }
+                        className="rounded p-1.5 text-ink-subtle transition hover:text-danger"
+                    >
+                        <UserMinus className="size-4" />
+                    </button>
+                )}
+            </div>
+
+            {isClient && editing && (
+                <div className="mt-3 rounded-lg border border-border bg-surface p-3">
+                    <p className="text-xs text-ink-muted">
+                        {member.name} sees only the projects ticked here, and only issues
+                        marked visible to the client within them.
+                    </p>
+
+                    <div className="mt-2 grid gap-1.5 sm:grid-cols-2">
+                        {projects.map((project) => (
+                            <label
+                                key={project.id}
+                                className="flex items-center gap-2 text-sm text-ink-muted"
+                            >
+                                <input
+                                    type="checkbox"
+                                    checked={chosen.includes(project.id)}
+                                    onChange={(e) =>
+                                        setChosen((current) =>
+                                            e.target.checked
+                                                ? [...current, project.id]
+                                                : current.filter((id) => id !== project.id),
+                                        )
+                                    }
+                                />
+                                {project.name}
+                            </label>
+                        ))}
+                    </div>
+
+                    {chosen.length === 0 && (
+                        <p className="mt-2 text-xs text-amber-600 dark:text-amber-500">
+                            A client needs at least one project. Remove them instead.
+                        </p>
+                    )}
+
+                    <div className="mt-3 flex gap-2">
+                        <Button size="sm" onClick={save} disabled={chosen.length === 0}>
+                            Save
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>
+                            Cancel
+                        </Button>
+                    </div>
+                </div>
             )}
         </li>
     );

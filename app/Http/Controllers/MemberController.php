@@ -34,8 +34,10 @@ class MemberController extends Controller
                     'role' => $user->pivot->role,
                     'is_owner' => $user->id === $workspace->owner_id,
                     'is_you' => $user->id === $request->user()->id,
+                    // Ids as well as names: the screen needs to tick boxes, not just
+                    // print a list.
                     'projects' => $user->pivot->role === WorkspaceRole::Client->value
-                        ? $user->projects()->pluck('projects.name')
+                        ? $user->projects()->pluck('projects.id')
                         : [],
                 ]),
             'invitations' => Invitation::pending()->latest()->get()
@@ -102,6 +104,56 @@ class MemberController extends Controller
         $invitation->delete();
 
         return back()->with('success', 'Invitation revoked.');
+    }
+
+    /**
+     * Change which projects a client can see.
+     *
+     * Grants could be given at invitation and never changed afterwards: adding one
+     * meant re-inviting somebody who was already a member, and removing one meant
+     * editing the database. A client staying on a project long after the work
+     * finished is the common case, and it was the hard one.
+     */
+    public function grants(Request $request, User $user): RedirectResponse
+    {
+        $this->authorize('removeMember', Invitation::class);
+
+        $workspace = $this->tenancy->currentOrFail();
+
+        // Scoped to this workspace, so a user id from elsewhere is simply not a
+        // member here and cannot be granted anything.
+        abort_unless($user->belongsToWorkspace($workspace), 404);
+
+        // Staff already see every project; granting them one would mean nothing, and
+        // silently doing nothing is how a screen starts lying.
+        abort_unless(
+            $user->membershipIn($workspace) === WorkspaceRole::Client,
+            422,
+            'Only clients are given access to particular projects.',
+        );
+
+        $validated = $request->validate([
+            'project_ids' => ['present', 'array'],
+            'project_ids.*' => [Rule::exists('projects', 'id')
+                ->where('workspace_id', $workspace->id)],
+        ]);
+
+        // A client with nothing can see nothing, which is a confusing way to leave
+        // somebody rather than a security problem — but still worth refusing, exactly
+        // as it is refused at invitation.
+        if ($validated['project_ids'] === []) {
+            return back()->withErrors([
+                'project_ids' => 'A client needs at least one project. Remove them instead.',
+            ]);
+        }
+
+        // sync, not syncWithoutDetaching: unticking a box has to take access away, or
+        // the screen offers a choice it does not honour.
+        $user->projects()->sync(
+            array_fill_keys($validated['project_ids'], ['role' => 'client']),
+        );
+
+        return back()->with('success', "Updated what {$user->name} can see.");
     }
 
     /** Remove someone from the workspace. */

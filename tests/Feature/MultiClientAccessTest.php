@@ -275,4 +275,128 @@ class MultiClientAccessTest extends TestCase
 
         $this->assertSame([], $this->issueTitlesFor($this->world['clients']['northwind']));
     }
+
+    #[Test]
+    public function a_clients_projects_can_be_changed_after_they_join(): void
+    {
+        // Grants could be given at invitation and never changed: adding one meant
+        // re-inviting somebody already a member, and removing one meant editing the
+        // database.
+        $this->agency();
+
+        $workspace = $this->world['workspace'];
+        $actor = $this->manager();
+        $client = $this->world['clients']['northwind'];
+        $northwind = $this->world['projects']['northwind'];
+        $globex = $this->world['projects']['globex'];
+
+        $this->actingAs($actor)
+            ->patch($this->workspaceUrl($workspace, "/settings/members/{$client->id}/projects"), [
+                'project_ids' => [$northwind->id, $globex->id],
+            ])
+            ->assertRedirect();
+
+        $this->assertEqualsCanonicalizing(
+            [$northwind->id, $globex->id],
+            $client->fresh()->projects()->pluck('projects.id')->all(),
+        );
+    }
+
+    #[Test]
+    public function unticking_a_project_takes_the_access_away(): void
+    {
+        // sync, not syncWithoutDetaching. A screen that offers a choice it does not
+        // honour is worse than one that offers nothing.
+        $this->agency();
+
+        $workspace = $this->world['workspace'];
+        $actor = $this->manager();
+        $client = $this->world['clients']['northwind'];
+        $northwind = $this->world['projects']['northwind'];
+        $globex = $this->world['projects']['globex'];
+
+        $client->projects()->syncWithoutDetaching([$globex->id => ['role' => 'client']]);
+
+        $this->actingAs($actor)
+            ->patch($this->workspaceUrl($workspace, "/settings/members/{$client->id}/projects"), [
+                'project_ids' => [$northwind->id],
+            ])
+            ->assertRedirect();
+
+        $this->assertSame(
+            [$northwind->id],
+            $client->fresh()->projects()->pluck('projects.id')->all(),
+        );
+
+        // And the access is really gone, not merely unlisted.
+        $this->actingAs($client)
+            ->get($this->workspaceUrl($workspace, '/issues/'.$this->world['issues']['globex_shared']->key))
+            ->assertNotFound();
+    }
+
+    #[Test]
+    public function a_client_cannot_be_left_with_nothing(): void
+    {
+        // Refused exactly as it is refused at invitation: a client who can see
+        // nothing is a confusing way to leave somebody.
+        $this->agency();
+
+        $workspace = $this->world['workspace'];
+        $actor = $this->manager();
+        $client = $this->world['clients']['northwind'];
+
+        $this->actingAs($actor)
+            ->patch($this->workspaceUrl($workspace, "/settings/members/{$client->id}/projects"), [
+                'project_ids' => [],
+            ])
+            ->assertSessionHasErrors('project_ids');
+
+        $this->assertNotSame(0, $client->fresh()->projects()->count());
+    }
+
+    #[Test]
+    public function staff_are_not_given_project_grants(): void
+    {
+        // They already see everything. Granting them a project would mean nothing,
+        // and silently doing nothing is how a screen starts lying.
+        $this->agency();
+
+        $workspace = $this->world['workspace'];
+        $actor = $this->manager();
+        $staff = $this->world['staff'];
+
+        $this->actingAs($actor)
+            ->patch($this->workspaceUrl($workspace, "/settings/members/{$staff->id}/projects"), [
+                'project_ids' => [$this->world['projects']['northwind']->id],
+            ])
+            ->assertStatus(422);
+    }
+
+    #[Test]
+    public function a_client_cannot_change_their_own_grants(): void
+    {
+        $this->agency();
+
+        $workspace = $this->world['workspace'];
+        $client = $this->world['clients']['northwind'];
+
+        $this->actingAs($client)
+            ->patch($this->workspaceUrl($workspace, "/settings/members/{$client->id}/projects"), [
+                'project_ids' => [$this->world['projects']['globex']->id],
+            ])
+            ->assertForbidden();
+    }
+
+    /** Somebody allowed to manage people; the fixture's staff user is a plain member. */
+    private function manager(): User
+    {
+        $manager = User::factory()->create();
+
+        $this->world['workspace']->members()->attach($manager->id, [
+            'role' => WorkspaceRole::Admin->value,
+            'joined_at' => now(),
+        ]);
+
+        return $manager;
+    }
 }

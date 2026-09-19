@@ -254,6 +254,8 @@ Route::domain('{workspace}.'.$host)
         Route::post('settings/members', [MemberController::class, 'store'])->name('members.store');
         Route::delete('settings/invitations/{invitation}', [MemberController::class, 'destroy'])
             ->name('invitations.destroy');
+        Route::patch('settings/members/{user}/projects', [MemberController::class, 'grants'])
+            ->name('members.grants');
         Route::delete('settings/members/{user}', [MemberController::class, 'remove'])
             ->name('members.remove');
 
