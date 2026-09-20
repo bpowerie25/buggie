@@ -40,16 +40,21 @@ class IssueController extends Controller
         return Inertia::render('issues/index', [
             // Plain closures: Inertia evaluates only the props a partial reload asks
             // for, so an inline edit re-runs the issue query and nothing else.
-            'issues' => fn () => $this->issues($request, $query),
+            'issues' => fn () => $this->issues($request, $query, $this->layout($request)),
             'query' => $query->toArray(),
-            'layout' => $request->string('layout')->toString() === 'board' ? 'board' : 'list',
+            'layout' => $this->layout($request),
             'groupBy' => $this->groupBy($request),
             'facets' => fn () => $this->facets(),
         ]);
     }
 
+    private function layout(Request $request): string
+    {
+        return $request->string('layout')->toString() === 'board' ? 'board' : 'list';
+    }
+
     /** @return \Illuminate\Support\Collection<int, array<string, mixed>> */
-    private function issues(Request $request, IssueQuery $query): \Illuminate\Support\Collection
+    private function issues(Request $request, IssueQuery $query, string $layout = 'list'): \Illuminate\Support\Collection
     {
         $builder = Issue::query()->unless(
             $this->isStaff($request->user()),
@@ -63,7 +68,19 @@ class IssueController extends Controller
                 'labels:id,name,color',
                 'project:id,key,slug,name',
             ])
-            ->orderByRaw('priority DESC, updated_at DESC')
+            /*
+             * The board is in the order somebody dragged it into; the list is in the
+             * order that answers "what is most urgent".
+             *
+             * Two different questions, so two different sorts. Making the list follow
+             * the board's manual order would mean a card dragged down the board
+             * quietly leaving the top of everybody's list.
+             */
+            ->when(
+                $layout === 'board',
+                fn (Builder $q) => $q->orderByRaw('board_rank NULLS LAST, id'),
+                fn (Builder $q) => $q->orderByRaw('priority DESC, updated_at DESC'),
+            )
             // A hard ceiling; the list virtualises but the payload should stay sane.
             ->limit(1000)
             ->get()
@@ -358,6 +375,8 @@ class IssueController extends Controller
                     'color' => $s->color,
                     'position' => $s->position,
                     'open' => $s->category->isOpen(),
+                    // The board draws the count against this; null means no limit.
+                    'wip_limit' => $s->wip_limit,
                 ])->values()),
         ];
     }

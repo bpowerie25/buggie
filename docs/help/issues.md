@@ -74,6 +74,44 @@ issue.
 
 Clients cannot drag: changing state is staff work.
 
+### The order of cards
+
+Cards sit in the order you drag them into, not in priority order, and dropping a card
+**within** its own column reorders it. That is the point of a board: "this one next"
+is the question it exists to answer, and there was no way to say it until now.
+
+Dropping above or below the card you are hovering is decided by where the card you are
+holding ends up, not by a rule — aim where you want it to land.
+
+**The board and the list are sorted differently, deliberately.** The board is in the
+order somebody chose; the list is in priority order, which answers "what is most
+urgent". A card dragged to the bottom of a board does not quietly leave the top of
+everybody's list.
+
+**A new issue goes to the bottom of the board.** New work is placed deliberately rather
+than barging into the middle of an order somebody chose — and it still leads the list
+if it is urgent.
+
+Reordering writes no activity entry. Where a card sits is bookkeeping about the board,
+not a change to the work, and an entry per drag would bury the history that matters.
+
+### Work in progress limits
+
+A status can carry a limit: **Project → Settings → Workflow**, edit a status, and put a
+number in the box beside its name. Blank means no limit, which is what every status
+starts with.
+
+The board then shows `2/5` on that column, turns amber when it is full and red when it
+is over.
+
+**Nothing stops you going over it.** That is deliberate. A limit that refuses the drop
+turns "finish something before starting another" into an obstacle to be worked around,
+usually by abandoning the board. The mechanism is that everybody looking at the same
+screen can see the number has gone red.
+
+Limits belong to a status, so they only appear on a board grouped by status. Grouping
+by assignee or priority shows a plain count.
+
 ## The issue page
 
 Two columns.

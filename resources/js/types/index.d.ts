@@ -96,6 +96,8 @@ export interface IssueStatus {
     color: string;
     position: number;
     open: boolean;
+    /** How many issues should sit here at once. Null means no limit. */
+    wip_limit?: number | null;
 }
 
 export interface IssueRow {

@@ -51,6 +51,7 @@ function SortableRow({
 
     const [name, setName] = useState(status.name);
     const [color, setColor] = useState(status.color);
+    const [wip, setWip] = useState(status.wip_limit === null ? '' : String(status.wip_limit ?? ''));
     const [confirming, setConfirming] = useState(false);
     const [moveTo, setMoveTo] = useState<number | ''>('');
 
@@ -60,7 +61,9 @@ function SortableRow({
     function save(extra: Record<string, unknown> = {}) {
         router.patch(
             `/statuses/${status.id}`,
-            { name, color, ...extra },
+            // Blank clears the limit rather than meaning zero. "No limit" and "a
+            // limit of nothing" are different claims and only one is useful.
+            { name, color, wip_limit: wip.trim() === '' ? null : Number(wip), ...extra },
             { preserveScroll: true, onSuccess: onCancel },
         );
     }
@@ -113,6 +116,22 @@ function SortableRow({
                         className="h-8 min-w-0 flex-1"
                     />
 
+                    <input
+                        type="number"
+                        min={1}
+                        max={999}
+                        value={wip}
+                        placeholder="WIP"
+                        aria-label="Work in progress limit"
+                        title="How many issues should sit in this column at once. Blank for no limit."
+                        onChange={(e) => setWip(e.target.value)}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter') save();
+                            if (e.key === 'Escape') onCancel();
+                        }}
+                        className="h-8 w-16 shrink-0 rounded-lg border border-border bg-surface px-2 text-sm text-ink"
+                    />
+
                     <Button size="sm" onClick={() => save()}>
                         <Check className="size-3.5" />
                     </Button>
@@ -131,6 +150,15 @@ function SortableRow({
                     >
                         {status.name}
                     </button>
+
+                    {status.wip_limit != null && (
+                        <span
+                            title="Work in progress limit, shown on the board"
+                            className="shrink-0 rounded bg-raised px-1.5 py-0.5 text-[10px] text-ink-subtle"
+                        >
+                            max {status.wip_limit}
+                        </span>
+                    )}
 
                     {status.is_default && (
                         <span className="shrink-0 rounded bg-accent-soft px-1.5 py-0.5 text-[10px] font-medium text-accent">

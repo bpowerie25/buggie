@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['project_id', 'name', 'category', 'color', 'position', 'is_default'])]
+#[Fillable(['project_id', 'name', 'category', 'color', 'position', 'is_default', 'wip_limit'])]
 class Status extends Model
 {
     use BelongsToWorkspace, HasFactory;
@@ -31,6 +31,7 @@ class Status extends Model
             'category' => StatusCategory::class,
             'is_default' => 'boolean',
             'position' => 'integer',
+            'wip_limit' => 'integer',
         ];
     }
 

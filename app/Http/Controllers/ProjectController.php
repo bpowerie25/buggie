@@ -65,6 +65,7 @@ class ProjectController extends Controller
                 'position' => $s->position,
                 'is_default' => $s->is_default,
                 'open' => $s->category->isOpen(),
+                'wip_limit' => $s->wip_limit,
             ]),
             'categories' => StatusCategory::options(),
 
@@ -97,6 +98,7 @@ class ProjectController extends Controller
                     'is_default' => $status->is_default,
                     'open' => $status->category->isOpen(),
                     'issues_count' => $status->issues_count,
+                    'wip_limit' => $status->wip_limit,
                 ]),
             'categories' => StatusCategory::options(),
 

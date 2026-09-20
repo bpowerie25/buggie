@@ -32,6 +32,15 @@ class StoreStatusRequest extends FormRequest
             ],
 
             'is_default' => ['boolean'],
+
+            /*
+             * How many issues should sit in this column at once.
+             *
+             * Nullable, because no limit is the only sensible default — a limit
+             * somebody did not choose is a number they will ignore. Zero is refused:
+             * a column nothing may enter is a column to delete.
+             */
+            'wip_limit' => ['nullable', 'integer', 'min:1', 'max:999'],
         ];
     }
 
@@ -41,6 +50,7 @@ class StoreStatusRequest extends FormRequest
             'name.unique' => 'This project already has a status with that name.',
             'category.prohibited' => 'A status keeps the category it was created with. '
                 .'Add a new status and move issues across instead.',
+            'wip_limit.min' => 'A limit of nothing is a column to delete, not a limit.',
         ];
     }
 }

@@ -267,6 +267,8 @@ Route::domain('{workspace}.'.$host)
         Route::delete('projects/{project}/versions/{version}', [\App\Http\Controllers\VersionController::class, 'destroy'])
             ->name('versions.destroy');
 
+        Route::patch('issues/{issue}/rank', \App\Http\Controllers\IssueRankController::class)
+            ->name('issues.rank');
         Route::post('issues/{issue}/time', [\App\Http\Controllers\TimeEntryController::class, 'store'])
             ->name('time.store');
         Route::delete('time/{entry}', [\App\Http\Controllers\TimeEntryController::class, 'destroy'])

@@ -115,9 +115,44 @@ export default function IssuesIndex({
      * columns are. Only the page knows that, so the board reports the column and
      * this decides.
      */
-    function moveToColumn(issue: IssueRow, columnName: string) {
+    /**
+     * Put a card where it was dropped: in the right column, and at the right height
+     * within it.
+     *
+     * The two are separate writes because they are separate questions. Moving a card
+     * to "In Progress" is a change to the issue and belongs in its history; moving it
+     * three cards up is not, and an activity entry for every drag would bury the
+     * history that matters.
+     */
+    function rankAfterDrop(issue: IssueRow, columnName: string, beforeKey: string | null) {
+        const cards = groups.find((g) => g.name === columnName)?.issues ?? [];
+        const without = cards.filter((c) => c.key !== issue.key);
+
+        const beforeIndex =
+            beforeKey === null ? without.length : without.findIndex((c) => c.key === beforeKey);
+
+        const after = without[beforeIndex - 1]?.key ?? null;
+        const before = without[beforeIndex]?.key ?? null;
+
+        // Already there. Nothing to say, and saying it would be a wasted round trip
+        // on every click that happens to travel four pixels.
+        if (after === null && before === null) return;
+
+        router.patch(
+            `/issues/${issue.key}/rank`,
+            { after, before },
+            { preserveScroll: true, preserveState: true, only: ['issues'] },
+        );
+    }
+
+    function moveToColumn(issue: IssueRow, columnName: string, beforeKey: string | null = null) {
+        // Dropped back in the column it came from: a reorder, not a move. This used
+        // to be a plain return, which is why dragging a card up its own column did
+        // nothing at all.
         if (groupBy === 'assignee') {
-            if ((issue.assignee?.name ?? 'Unassigned') === columnName) return;
+            if ((issue.assignee?.name ?? 'Unassigned') === columnName) {
+                return rankAfterDrop(issue, columnName, beforeKey);
+            }
 
             const person = (facets?.members ?? []).find((m) => m.name === columnName);
 
@@ -129,11 +164,15 @@ export default function IssuesIndex({
                 patch(issue, { assignee_id: person.id }, { assignee: person });
             }
 
+            rankAfterDrop(issue, columnName, beforeKey);
+
             return;
         }
 
         if (groupBy === 'priority') {
-            if (issue.priority_label === columnName) return;
+            if (issue.priority_label === columnName) {
+                return rankAfterDrop(issue, columnName, beforeKey);
+            }
 
             const priority = (facets?.priorities ?? []).find((p) => p.label === columnName);
 
@@ -149,10 +188,14 @@ export default function IssuesIndex({
                 );
             }
 
+            rankAfterDrop(issue, columnName, beforeKey);
+
             return;
         }
 
-        if (issue.status.name === columnName) return;
+        if (issue.status.name === columnName) {
+            return rankAfterDrop(issue, columnName, beforeKey);
+        }
 
         // Statuses belong to projects, so a board spanning projects merges columns by
         // name and resolves to the status with that name in the dropped issue's own
@@ -164,6 +207,7 @@ export default function IssuesIndex({
 
         if (status) {
             patch(issue, { status_id: status.id }, { status });
+            rankAfterDrop(issue, columnName, beforeKey);
         }
     }
 
@@ -391,7 +435,9 @@ export default function IssuesIndex({
                     // the issue's key and its number. Cards are not draggable there
                     // rather than draggable and inert.
                     editable={editable && groupBy !== 'project'}
-                    onDropInColumn={(issue, columnName) => moveToColumn(issue, columnName)}
+                    onDropInColumn={(issue, columnName, beforeKey) =>
+                        moveToColumn(issue, columnName, beforeKey)
+                    }
                 />
             ) : (
                 <div

@@ -85,6 +85,10 @@ class CreateIssue
                 // this instance and increment it, and a default only the database
                 // knows about reads back as null.
                 'occurrence_count' => 1,
+                // The bottom of the board. New work is placed deliberately rather
+                // than barging into the middle of an order somebody chose — and the
+                // list, which is the default view, still leads with priority.
+                'board_rank' => \App\Support\Issues\BoardRank::forNewIssue($project->workspace_id),
             ])->save();
 
             if ($labels = $attributes['labels'] ?? []) {
