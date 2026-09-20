@@ -111,6 +111,11 @@ class CreateIssue
                 $issue->load(['status', 'project', 'assignee']),
             );
 
+            \App\Support\Chat\ChatNotifications::issue(
+                \App\Enums\WebhookEvent::IssueCreated,
+                $issue,
+            );
+
             return $issue;
         });
     }

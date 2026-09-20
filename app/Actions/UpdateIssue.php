@@ -76,9 +76,11 @@ class UpdateIssue
             // Closed is its own event as well as an update: "tell me when something
             // ships" is a different subscription from "tell me when anything moves".
             \App\Support\Webhooks\Webhooks::issue(\App\Enums\WebhookEvent::IssueUpdated, $fresh);
+            \App\Support\Chat\ChatNotifications::issue(\App\Enums\WebhookEvent::IssueUpdated, $fresh);
 
             if ($wasOpen && ! $fresh->isOpen()) {
                 \App\Support\Webhooks\Webhooks::issue(\App\Enums\WebhookEvent::IssueClosed, $fresh);
+                \App\Support\Chat\ChatNotifications::issue(\App\Enums\WebhookEvent::IssueClosed, $fresh);
             }
 
             return $fresh;

@@ -34,8 +34,9 @@ else. See [Billing and plans](billing.md) and [Self-hosting](self-hosting.md).
 13. [White-labelling](branding.md) — putting your client's name on what they see.
 14. [Releases and versions](releases.md) — what a bug was found in, and fixed in.
 15. [Email](email.md) and [Notifications](notifications.md).
-16. [Keyboard shortcuts](keyboard.md).
-17. [Billing and plans](billing.md), [Self-hosting](self-hosting.md),
+16. [Slack and Teams](chat-notifications.md) — bugs announced where the team already is.
+17. [Keyboard shortcuts](keyboard.md).
+18. [Billing and plans](billing.md), [Self-hosting](self-hosting.md),
     [Privacy and security](privacy-and-security.md).
 
 ## If you were invited to a workspace as a client
@@ -59,6 +60,7 @@ same endpoint as the web widget. See [Native SDKs](native-sdks.md).
 
 - [The API](api.md) — token-authenticated HTTP access to a workspace.
 - [Webhooks](webhooks.md) — calling a URL when something happens.
+- [Slack and Teams](chat-notifications.md) — the same events, written for people.
 - [Importing](importing.md) — bringing issues in from Mantis, Jira or a CSV.
 
 ---

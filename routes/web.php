@@ -233,6 +233,17 @@ Route::domain('{workspace}.'.$host)
         Route::post('settings/webhooks/{webhook}/test', [\App\Http\Controllers\WebhookController::class, 'test'])
             ->name('webhooks.test');
 
+        // Slack and Teams channels. A webhook by another name, except the URL is the
+        // credential rather than carrying one, so it is never sent back to the page.
+        Route::post('settings/chat', [\App\Http\Controllers\ChatIntegrationController::class, 'store'])
+            ->name('chat.store');
+        Route::patch('settings/chat/{chatIntegration}', [\App\Http\Controllers\ChatIntegrationController::class, 'update'])
+            ->name('chat.update');
+        Route::delete('settings/chat/{chatIntegration}', [\App\Http\Controllers\ChatIntegrationController::class, 'destroy'])
+            ->name('chat.destroy');
+        Route::post('settings/chat/{chatIntegration}/test', [\App\Http\Controllers\ChatIntegrationController::class, 'test'])
+            ->name('chat.test');
+
         Route::post('projects/{project}/branding', [\App\Http\Controllers\BrandingController::class, 'update'])
             ->name('branding.update');
 

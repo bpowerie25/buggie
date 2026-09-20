@@ -45,6 +45,10 @@ class AddComment
 
             \App\Support\Webhooks\Webhooks::comment($issue, $author->name, $internal);
 
+            // Chat hears about internal notes too, but only where somebody has said
+            // the channel is the team's own. The text is never sent either way.
+            \App\Support\Chat\ChatNotifications::comment($issue, $author->name, $internal);
+
             $this->notifier->watchers($issue, NotificationReason::Commented, $author, [
                 'excerpt' => $comment->body_text,
                 // Clients watching this issue must not be told about internal notes.

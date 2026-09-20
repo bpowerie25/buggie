@@ -5,6 +5,10 @@ Slack, Teams, or something of your own.
 
 **Settings → Workspace → Webhooks.**
 
+If the destination *is* Slack or Teams, use
+[Slack and Teams](chat-notifications.md) instead — same events, formatted to be read
+by a person rather than parsed by a program.
+
 ## What you can be told about
 
 | Event | Fires when |
