@@ -19,6 +19,7 @@ import {
     LogOut,
     Server,
     Settings,
+    ShieldCheck,
     ChartLine,
     Clock,
     Tag,
@@ -160,6 +161,15 @@ export function AppLayout({
                         active={path.startsWith('/settings/notifications')}
                     >
                         Notifications
+                    </NavLink>
+                    {/* Outside the staff-only block below on purpose: a client's
+                        account is worth breaking into too. */}
+                    <NavLink
+                        href="/settings/two-factor"
+                        icon={ShieldCheck}
+                        active={path.startsWith('/settings/two-factor')}
+                    >
+                        Two-factor
                     </NavLink>
                     {auth.role !== 'client' && (
                         <>

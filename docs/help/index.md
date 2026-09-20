@@ -34,14 +34,16 @@ else. See [Billing and plans](billing.md) and [Self-hosting](self-hosting.md).
 13. [White-labelling](branding.md) — putting your client's name on what they see.
 14. [Releases and versions](releases.md) — what a bug was found in, and fixed in.
 15. [Email](email.md) and [Notifications](notifications.md).
-16. [Keyboard shortcuts](keyboard.md).
-17. [Billing and plans](billing.md), [Self-hosting](self-hosting.md),
+16. [Two-factor authentication](two-factor.md) — a code as well as a password.
+17. [Keyboard shortcuts](keyboard.md).
+18. [Billing and plans](billing.md), [Self-hosting](self-hosting.md),
     [Privacy and security](privacy-and-security.md).
 
 ## If you were invited to a workspace as a client
 
 - [Getting started](getting-started.md) — accepting the invitation and signing in.
 - [Clients](clients.md) — what you can and cannot see, and why.
+- [Two-factor authentication](two-factor.md) — it is not just for staff.
 - [Issues](issues.md) — reading an issue, commenting, filing a new one.
 - [The issue query language](query-language.md) — finding things in the list.
 

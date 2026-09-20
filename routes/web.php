@@ -325,3 +325,36 @@ Route::domain('{workspace}.'.$host)
         Route::post('logout', [AuthenticatedSessionController::class, 'destroy'])
             ->name('workspace.logout');
     });
+
+/*
+|--------------------------------------------------------------------------
+| Two-factor authentication
+|--------------------------------------------------------------------------
+| Two domains, because the feature has two halves. The challenge sits beside
+| sign-in on the central domain and behind `guest`, since whoever is answering
+| it is not signed in yet — that is the whole point of it. Enrolment sits with
+| the other things that belong to a person rather than a workspace.
+|
+| Never gated on a plan, in either mode. Security is not a feature tier.
+*/
+
+Route::domain($host)->middleware('guest')->group(function () {
+    Route::get('two-factor', [\App\Http\Controllers\Auth\TwoFactorChallengeController::class, 'create'])
+        ->name('two-factor.challenge');
+    Route::post('two-factor', [\App\Http\Controllers\Auth\TwoFactorChallengeController::class, 'store']);
+});
+
+Route::domain('{workspace}.'.$host)
+    ->middleware(['auth', 'workspace'])
+    ->group(function () {
+        Route::get('settings/two-factor', [\App\Http\Controllers\TwoFactorController::class, 'edit'])
+            ->name('two-factor.edit');
+        Route::post('settings/two-factor', [\App\Http\Controllers\TwoFactorController::class, 'store'])
+            ->name('two-factor.store');
+        Route::post('settings/two-factor/confirm', [\App\Http\Controllers\TwoFactorController::class, 'confirm'])
+            ->name('two-factor.confirm');
+        Route::post('settings/two-factor/recovery-codes', [\App\Http\Controllers\TwoFactorController::class, 'recoveryCodes'])
+            ->name('two-factor.recovery-codes');
+        Route::delete('settings/two-factor', [\App\Http\Controllers\TwoFactorController::class, 'destroy'])
+            ->name('two-factor.destroy');
+    });

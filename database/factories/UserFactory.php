@@ -33,6 +33,14 @@ class UserFactory extends Factory
             'avatar_path' => null,
             'timezone' => 'UTC',
             'last_workspace_id' => null,
+
+            // Stated rather than left out. Strict mode throws on reading an attribute
+            // that was never loaded, and anything asking whether an account has a
+            // second factor asks these of whatever instance it was handed.
+            'two_factor_secret' => null,
+            'two_factor_recovery_codes' => null,
+            'two_factor_confirmed_at' => null,
+            'two_factor_last_step' => null,
         ];
     }
 
