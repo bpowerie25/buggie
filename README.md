@@ -193,3 +193,6 @@ modifications private as long as you do not offer it to others over a network. I
 do run it as a service for other people, the AGPL asks you to publish your changes.
 
 Contributions are welcome — see [`CONTRIBUTING.md`](CONTRIBUTING.md).
+
+Found a security problem? Please do not open a public issue — see
+[`SECURITY.md`](SECURITY.md).

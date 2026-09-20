@@ -3,7 +3,20 @@
 A single Hetzner box running the same images a self-hoster runs, with Caddy in front
 for TLS. Follow this top to bottom the first time; after that only §6 matters.
 
-Server: `188.245.198.86`. Deploys the **private** `buggie-platform` repository.
+This runbook is written for whoever operates an install. Set the address once and
+the commands below can be pasted as they are:
+
+```sh
+export SERVER=203.0.113.10        # your server
+export SSH_KEY=~/.ssh/id_ed25519  # the key it accepts
+```
+
+The production address is deliberately **not** written down here. This file ships in a
+public repository, and a hostname next to the exact SSH user, the exact paths and the
+exact deploy procedure is a map rather than documentation. Keep yours in your password
+manager with the key.
+
+Deploys the **private** `buggie-platform` repository.
 
 ---
 
@@ -12,13 +25,13 @@ Server: `188.245.198.86`. Deploys the **private** `buggie-platform` repository.
 Do this from your own machine, not the server.
 
 ```sh
-ssh-copy-id -i ~/.ssh/id_ed25519_hetzner.pub root@188.245.198.86
+ssh-copy-id -i "$SSH_KEY".pub root@$SERVER
 ```
 
 It asks for the root password once. Confirm it worked before going further:
 
 ```sh
-ssh -i ~/.ssh/id_ed25519_hetzner root@188.245.198.86 'echo in'
+ssh -i "$SSH_KEY" root@$SERVER 'echo in'
 ```
 
 §3 disables password authentication. If the key is not on the box when that happens,
@@ -33,8 +46,8 @@ Two records at Blacknight, both pointing at the server:
 
 | Type | Name | Value |
 |---|---|---|
-| A | `buggie.eu` | `188.245.198.86` |
-| A | `*.buggie.eu` | `188.245.198.86` |
+| A | `buggie.eu` | `$SERVER` |
+| A | `*.buggie.eu` | `$SERVER` |
 
 The wildcard is not optional: every workspace is a subdomain.
 
@@ -46,7 +59,7 @@ dig +short buggie.eu
 dig +short anything.buggie.eu
 ```
 
-Both must print `188.245.198.86`.
+Both must print `$SERVER`.
 
 ### TLS: pick one
 
@@ -66,7 +79,7 @@ before taking this route.
 ## 3. Server setup
 
 ```sh
-ssh -i ~/.ssh/id_ed25519_hetzner root@188.245.198.86
+ssh -i "$SSH_KEY" root@$SERVER
 
 curl -fsSL https://raw.githubusercontent.com/bpowerie25/buggie/main/deploy/setup-server.sh -o setup-server.sh
 less setup-server.sh        # read it before running it as root
@@ -84,7 +97,7 @@ author out of this very box — `ListenStream=2222` binds IPv6 only.
 since password authentication is now off:
 
 ```sh
-ssh -i ~/.ssh/id_ed25519_hetzner deploy@188.245.198.86 'echo in'
+ssh -i "$SSH_KEY" deploy@$SERVER 'echo in'
 ```
 
 ---
@@ -94,7 +107,7 @@ ssh -i ~/.ssh/id_ed25519_hetzner deploy@188.245.198.86 'echo in'
 As the `deploy` user:
 
 ```sh
-ssh -i ~/.ssh/id_ed25519_hetzner deploy@188.245.198.86
+ssh -i "$SSH_KEY" deploy@$SERVER
 
 ssh-keygen -t ed25519 -C "buggie.eu deploy" -f ~/.ssh/id_ed25519 -N ""
 cat ~/.ssh/id_ed25519.pub
