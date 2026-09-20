@@ -149,8 +149,16 @@ error reporting unless an operator sets their own Sentry DSN. On a self-hosted i
 there is no billing information in the front end at all, so the interface has nothing
 to nag with. A test asserts this.
 
+## Accounts
+
+Passwords are hashed with bcrypt and never stored or logged in the clear. Anyone can
+add [two-factor authentication](two-factor.md) to their own account, on every plan and
+on a self-hosted install alike — the TOTP secret is encrypted at rest, a used code
+cannot be replayed, and the challenge is rate limited.
+
 ## Related pages
 
 - [The reporter widget](widget.md)
 - [Clients](clients.md)
+- [Two-factor authentication](two-factor.md)
 - [Self-hosting](self-hosting.md)

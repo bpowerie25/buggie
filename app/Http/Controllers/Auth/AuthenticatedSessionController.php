@@ -2,10 +2,9 @@
 
 namespace App\Http\Controllers\Auth;
 
+use App\Http\Controllers\Auth\Concerns\SendsUsersOnwards;
 use App\Http\Controllers\Controller;
-use App\Models\Workspace;
-use App\Support\Invitations\PendingInvitation;
-use Illuminate\Http\RedirectResponse;
+use App\Support\TwoFactor\PendingLogin;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
@@ -15,6 +14,8 @@ use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
 
 class AuthenticatedSessionController extends Controller
 {
+    use SendsUsersOnwards;
+
     public function create(): Response
     {
         return Inertia::render('auth/login', [
@@ -29,26 +30,29 @@ class AuthenticatedSessionController extends Controller
             'password' => ['required', 'string'],
         ]);
 
-        if (! Auth::attempt($credentials, $request->boolean('remember'))) {
+        // Checked without signing anybody in. An account with a second factor must
+        // not hold a real session while the second factor is still outstanding, and
+        // attempt() would give it one — logging back out again would cycle the
+        // remember token and knock every other device off with it.
+        if (! Auth::validate($credentials)) {
             throw ValidationException::withMessages([
                 'email' => __('auth.failed'),
             ]);
         }
 
-        $request->session()->regenerate();
+        $user = Auth::getLastAttempted();
 
-        // An invitation outranks `intended`: the invitation is what they were doing,
-        // and `intended` is usually just wherever the guest middleware bounced them.
-        if ($invitation = PendingInvitation::destinationFor($request)) {
-            $request->session()->forget('url.intended');
+        if ($user->hasTwoFactorEnabled()) {
+            PendingLogin::begin($request, $user, $request->boolean('remember'));
 
-            return redirect_across_domains($invitation);
+            return redirect()->route('two-factor.challenge');
         }
 
-        // intended() may hold a URL on any workspace subdomain.
-        return redirect_across_domains(
-            $request->session()->pull('url.intended', $this->destinationFor($request)),
-        );
+        Auth::login($user, $request->boolean('remember'));
+
+        $request->session()->regenerate();
+
+        return $this->onwards($request);
     }
 
     public function destroy(Request $request): SymfonyResponse
@@ -58,21 +62,5 @@ class AuthenticatedSessionController extends Controller
         $request->session()->regenerateToken();
 
         return redirect_across_domains(central_url('/'));
-    }
-
-    /** Drop the user back into their last workspace, or the picker if they have none. */
-    protected function destinationFor(Request $request): string
-    {
-        $user = $request->user();
-
-        $workspace = $user->last_workspace_id
-            ? Workspace::find($user->last_workspace_id)
-            : $user->workspaces()->orderBy('name')->first();
-
-        if ($workspace && $user->belongsToWorkspace($workspace)) {
-            return workspace_url($workspace->slug);
-        }
-
-        return route('workspaces.index');
     }
 }

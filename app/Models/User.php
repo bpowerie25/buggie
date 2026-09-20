@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\WorkspaceRole;
+use App\Models\Concerns\HasTwoFactorAuthentication;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
@@ -21,11 +22,14 @@ use Laravel\Sanctum\HasApiTokens;
     'name', 'email', 'password', 'avatar_path', 'timezone',
     'last_workspace_id', 'notification_settings',
 ])]
-#[Hidden(['password', 'remember_token'])]
+// The two-factor columns are hidden as well as unfillable: a second factor that
+// leaks into a serialised user — page props, an API payload, a log line — is a
+// second factor somebody else also holds.
+#[Hidden(['password', 'remember_token', 'two_factor_secret', 'two_factor_recovery_codes'])]
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
-    use HasApiTokens, HasFactory, Notifiable;
+    use HasApiTokens, HasFactory, HasTwoFactorAuthentication, Notifiable;
 
     protected function casts(): array
     {
@@ -33,6 +37,14 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'notification_settings' => 'array',
+
+            // Encrypted at rest for the same reason mail.password is: a stolen
+            // database dump must not be a stolen second factor. The recovery codes
+            // need no such treatment — they are stored as hashes, and there is
+            // nothing to decrypt them back into.
+            'two_factor_secret' => 'encrypted',
+            'two_factor_recovery_codes' => 'array',
+            'two_factor_confirmed_at' => 'datetime',
         ];
     }
 
