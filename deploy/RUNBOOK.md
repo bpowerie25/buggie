@@ -212,11 +212,42 @@ you deleting something by hand.
 
 **Restore one before relying on it.** A backup nobody has restored is a hope.
 
+The whole procedure, verified on 20 September 2026 against the 03:00 backup. It
+restores into a **scratch database**; production is never touched.
+
 ```sh
-gunzip -c /srv/backups/db-YYYYMMDD-HHMMSS.sql.gz | \
-    docker compose --project-directory . --env-file .env -f deploy/docker-compose.prod.yml exec -T postgres \
-    psql -U buggie -d buggie_restore_test
+cd /srv/buggie
+set -a; . ./.env; set +a
+C="docker compose --project-directory . --env-file .env -f deploy/docker-compose.prod.yml"
+
+$C exec -T postgres psql -U "$DB_USERNAME" -d postgres -c 'CREATE DATABASE buggie_restore_test;'
+
+LATEST=$(ls -1t /srv/backups/db-*.sql.gz | head -1)
+gunzip -c "$LATEST" | $C exec -T postgres psql -U "$DB_USERNAME" -d buggie_restore_test -q
+
+# Compare it against production before believing it.
+Q="select 'tables='||(select count(*) from information_schema.tables where table_schema='public')\
+||' users='||(select count(*) from users)||' issues='||(select count(*) from issues)\
+||' migrations='||(select count(*) from migrations);"
+
+for db in "$DB_DATABASE" buggie_restore_test; do
+    printf '%-22s ' "$db"
+    $C exec -T postgres psql -U "$DB_USERNAME" -d "$db" -tAc "$Q"
+done
+
+$C exec -T postgres psql -U "$DB_USERNAME" -d postgres -c 'DROP DATABASE buggie_restore_test;'
 ```
+
+Run the whole thing in one shell. Splitting it across `ssh` invocations loses the
+sourced `.env` and every variable comes back empty, which looks like an empty
+database rather than a missing variable.
+
+**What that run proved, and what it did not.** The schema, all forty tables and all
+forty migrations restored with zero errors. It did **not** prove that *data* restores,
+because production had no rows yet — so repeat this once there are real accounts in
+it. The storage tarball was a valid archive containing only the `.gitignore` files,
+which is correct while nothing has been uploaded, and is also why it is 245 bytes
+rather than something reassuringly large.
 
 ---
 

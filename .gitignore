@@ -29,3 +29,8 @@ Homestead.json
 Homestead.yaml
 Thumbs.db
 packages/swift/.build/
+
+# Agent worktrees. Git does not ignore a linked worktree placed inside its own
+# repository, so without this a `git add -A` sweeps in whatever is scaffolded there —
+# in practice a vendor/ copy and a .env.
+/.claude/worktrees/

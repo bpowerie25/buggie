@@ -7,7 +7,8 @@ set -euo pipefail
 # ──────────────────────────────────────────────────────────
 #
 # A backup you have never restored is a hope, not a backup. Restore one into a
-# scratch database before you rely on this — the procedure is in README.md.
+# scratch database before you rely on this — the procedure is in deploy/RUNBOOK.md,
+# under "Backups", and has been run against a real nightly dump.
 
 # --project-directory and --env-file are both load-bearing. Without them Compose
 # treats deploy/ as the project directory: it looks for deploy/.env, and resolves the
