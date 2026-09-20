@@ -2,15 +2,19 @@ import { Button } from '@/components/button';
 import { Head, Link } from '@inertiajs/react';
 import {
     Bug,
+    CalendarClock,
     Camera,
     ChartLine,
     Clock,
+    Columns3,
     Check,
     Code2,
     Inbox,
     Layers,
     Mail,
+    MessageSquare,
     Server,
+    ShieldCheck,
     SlidersHorizontal,
     Smartphone,
     Tag,
@@ -63,6 +67,11 @@ const features = [
 /** The rest, once somebody is still reading. */
 const alsoDoes = [
     {
+        icon: Columns3,
+        title: 'A board that answers “what next”',
+        body: 'Kanban grouped by status, assignee, priority or project. Drag cards into the order you actually mean, and set a limit per column that goes red rather than refusing the drop.',
+    },
+    {
         icon: Inbox,
         title: 'Triage, then backlog',
         body: 'Reports land in an inbox, not your backlog. Accept, merge, spam or discard in one keystroke each.',
@@ -108,9 +117,24 @@ const alsoDoes = [
         body: 'Log hours against an issue, set an estimate, and get a total per client and per person for any month. Exports in minutes and hours, so nobody argues about rounding. Clients never see it.',
     },
     {
+        icon: MessageSquare,
+        title: 'Slack and Teams',
+        body: 'A readable message in the channel when something breaks. Internal work stays out of a channel your client can read, and no description or comment text is ever sent to either.',
+    },
+    {
+        icon: CalendarClock,
+        title: 'Deadlines that chase',
+        body: 'A due date nothing follows up on is decoration. Reminders land before and after the date and settle to weekly, so three weeks late is six messages rather than twenty-one.',
+    },
+    {
+        icon: ShieldCheck,
+        title: 'Two-factor, not an upsell',
+        body: 'Codes and recovery codes on every plan including the free one and the self-hosted build. Charging for security is a way of selling the absence of it.',
+    },
+    {
         icon: Webhook,
         title: 'API and webhooks',
-        body: 'A token-authenticated API and signed webhooks, so bugs reach Slack, or whatever you have already built.',
+        body: 'A token-authenticated API scoped to one workspace, and signed webhooks for whatever you have already built.',
     },
 ];
 

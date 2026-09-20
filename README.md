@@ -100,10 +100,30 @@ history is not hostage to anybody's pricing page, including mine.
 - **Email in and out** — file issues by email, reply to a notification to comment, and
   get one digest per issue rather than nine.
 - **Attachments** — drag, drop or paste screenshots and logs onto an issue.
+- **A board that answers "what next"** — kanban grouped by status, assignee, priority
+  or project, with cards you drag into the order you actually mean and work-in-progress
+  limits that go red rather than refusing the drop.
+- **Custom fields** — per project, because an agency's clients do not share a
+  vocabulary. Filterable, exportable, and internal unless you say otherwise.
+- **Time tracking** — hours against an issue, an estimate beside them, and a total per
+  client and per person for any month. Stored in minutes, exported in both.
+- **Insights** — opened against closed, whether the backlog is growing, and how long a
+  typical bug takes to close. Median, not an average one long-running bug has wrecked.
+- **Due dates that chase** — a ladder of reminders before and after the date, settling
+  to weekly, so three weeks late is six messages rather than twenty-one.
 - **Releases and changelogs** — group issues into a release, mark it shipped, and hand
   the client a list of what changed rather than writing one.
+- **White-labelling** — put your client's name and colours on the portal and the
+  reporter panel, per project.
+- **Import your backlog** — Jira, MantisBT or a spreadsheet, with a preview of what it
+  will create before it creates anything.
+- **Two-factor authentication** — TOTP with recovery codes. Not a paid add-on; nothing
+  about security is.
+- **Slack and Teams** — a readable message in the channel, with the same event
+  vocabulary as the webhooks and a switch that keeps internal work out of a channel a
+  client can read.
 - **API and webhooks** — a token-authenticated API scoped to one workspace, and signed
-  webhooks so bugs reach Slack or whatever you have already built.
+  webhooks for whatever you have already built.
 - **Export** — CSV of whatever the filter is showing, because "you can leave whenever
   you like" is not true unless the data comes out.
 - **Data ages out** — screenshots and reporter identities are pruned on a schedule you
@@ -178,11 +198,18 @@ built the way it is.
 
 ## Status
 
-Working: multi-tenancy, issues, the query language and saved views, the board, the
-reporter widget, triage, clients, the portal, email-in and notification digests.
+In use and worth your time: multi-tenancy, issues, the query language and saved views,
+the board with ordering and WIP limits, the reporter widget, triage, clients, the
+portal, custom fields, time tracking, insights, releases, imports, white-labelling,
+due-date chasing, two-factor authentication, email in and out, webhooks, Slack and
+Teams, the API and CSV export.
 
-Not done: realtime updates, `@mention` autocomplete, undo for bulk edits, email
-verification on sign-up.
+Not done, and worth knowing before you commit to it: no realtime updates, no
+`@mention` autocomplete, no undo for bulk edits, no email verification on sign-up, no
+issue templates, and the interface is English only.
+
+Each help page ends with its own **Known rough edges**, which are kept honest rather
+than aspirational. Start at [`docs/help/index.md`](docs/help/index.md).
 
 ## Licence
 
