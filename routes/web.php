@@ -262,6 +262,8 @@ Route::domain('{workspace}.'.$host)
             ->name('time.destroy');
         Route::patch('issues/{issue}/estimate', [\App\Http\Controllers\TimeEntryController::class, 'estimate'])
             ->name('time.estimate');
+        Route::get('insights', \App\Http\Controllers\InsightsController::class)
+            ->name('insights');
         Route::get('time', [\App\Http\Controllers\TimeReportController::class, 'index'])
             ->name('time.index');
         Route::get('time/export', [\App\Http\Controllers\TimeReportController::class, 'export'])

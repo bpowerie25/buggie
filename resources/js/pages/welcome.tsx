@@ -3,6 +3,7 @@ import { Head, Link } from '@inertiajs/react';
 import {
     Bug,
     Camera,
+    ChartLine,
     Clock,
     Check,
     Code2,
@@ -95,6 +96,11 @@ const alsoDoes = [
         icon: SlidersHorizontal,
         title: 'Fields that match the work',
         body: 'Add your own fields per project — a client reference, an environment, a browser. Filter on them, export them, fill them in over the API. Each one is internal until you say otherwise.',
+    },
+    {
+        icon: ChartLine,
+        title: 'Numbers for the client call',
+        body: 'Opened against closed, whether the backlog is growing, and how long a typical bug actually takes — median, not an average one long-running bug has wrecked.',
     },
     {
         icon: Clock,

@@ -19,6 +19,7 @@ import {
     LogOut,
     Server,
     Settings,
+    ChartLine,
     Clock,
     Tag,
     Users,
@@ -171,6 +172,13 @@ export function AppLayout({
                             </NavLink>
                             {/* Staff only, like everything in this block: how long
                                 something took is not a client's business. */}
+                            <NavLink
+                                href="/insights"
+                                icon={ChartLine}
+                                active={path.startsWith('/insights')}
+                            >
+                                Insights
+                            </NavLink>
                             <NavLink href="/time" icon={Clock} active={path.startsWith('/time')}>
                                 Time
                             </NavLink>
