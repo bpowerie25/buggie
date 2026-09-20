@@ -35,8 +35,9 @@ else. See [Billing and plans](billing.md) and [Self-hosting](self-hosting.md).
 14. [Releases and versions](releases.md) — what a bug was found in, and fixed in.
 15. [Email](email.md) and [Notifications](notifications.md).
 16. [Two-factor authentication](two-factor.md) — a code as well as a password.
-17. [Keyboard shortcuts](keyboard.md).
-18. [Billing and plans](billing.md), [Self-hosting](self-hosting.md),
+17. [Slack and Teams](chat-notifications.md) — bugs announced where the team already is.
+18. [Keyboard shortcuts](keyboard.md).
+19. [Billing and plans](billing.md), [Self-hosting](self-hosting.md),
     [Privacy and security](privacy-and-security.md).
 
 ## If you were invited to a workspace as a client
@@ -61,6 +62,7 @@ same endpoint as the web widget. See [Native SDKs](native-sdks.md).
 
 - [The API](api.md) — token-authenticated HTTP access to a workspace.
 - [Webhooks](webhooks.md) — calling a URL when something happens.
+- [Slack and Teams](chat-notifications.md) — the same events, written for people.
 - [Importing](importing.md) — bringing issues in from Mantis, Jira or a CSV.
 
 ---

@@ -22,6 +22,33 @@ interface WebhookRow {
     }[];
 }
 
+interface ChatRow {
+    id: number;
+    name: string;
+    provider: string;
+    provider_label: string;
+    project: string | null;
+    events: string[];
+    is_active: boolean;
+    internal_activity: boolean;
+    last_delivered_at: string | null;
+    // Whether an address is stored, never the address. It is the whole credential.
+    has_url: boolean;
+    deliveries: {
+        event: string;
+        status: number | null;
+        error: string | null;
+        ok: boolean;
+        at: string | null;
+    }[];
+}
+
+interface ChatProvider {
+    value: string;
+    label: string;
+    hint: string;
+}
+
 interface TokenRow {
     id: number;
     name: string;
@@ -39,6 +66,8 @@ export default function WorkspaceSettings({
     abilities = [],
     webhooks = [],
     webhookEvents = [],
+    chatIntegrations = [],
+    chatProviders = [],
     projects = [],
 }: {
     workspace: { name: string; slug: string; created_at: string };
@@ -48,6 +77,8 @@ export default function WorkspaceSettings({
     abilities?: string[];
     webhooks?: WebhookRow[];
     webhookEvents?: { value: string; label: string }[];
+    chatIntegrations?: ChatRow[];
+    chatProviders?: ChatProvider[];
     projects?: { id: number; name: string }[];
 }) {
     const { data, setData, patch, processing, errors } = useForm({ name: workspace.name });
@@ -90,6 +121,13 @@ export default function WorkspaceSettings({
             <ApiTokens tokens={tokens} abilities={abilities} workspace={workspace} domain={domain} />
 
             <Webhooks webhooks={webhooks} events={webhookEvents} projects={projects} />
+
+            <ChatIntegrations
+                integrations={chatIntegrations}
+                providers={chatProviders}
+                events={webhookEvents}
+                projects={projects}
+            />
 
             {can_delete && (
                 <section className="mt-12 max-w-lg rounded-xl border border-danger/30 bg-danger-soft p-4">
@@ -477,6 +515,277 @@ function Webhooks({
             ) : (
                 <Button size="sm" variant="ghost" className="mt-4" onClick={() => setAdding(true)}>
                     Add a webhook
+                </Button>
+            )}
+        </section>
+    );
+}
+
+/**
+ * Slack and Teams channels.
+ *
+ * The address is write-only: it is never sent to this page, so an existing channel
+ * shows its name and nothing else. Re-pasting replaces it; leaving the field blank
+ * leaves it alone, which is the same bargain the mail settings screen offers for the
+ * SMTP password.
+ */
+function ChatIntegrations({
+    integrations,
+    providers,
+    events,
+    projects,
+}: {
+    integrations: ChatRow[];
+    providers: ChatProvider[];
+    events: { value: string; label: string }[];
+    projects: { id: number; name: string }[];
+}) {
+    const [adding, setAdding] = useState(false);
+
+    // The test failure arrives as a shared error rather than a form one: it is a
+    // different request, and the provider's own words are the useful part.
+    const sendError = (usePage().props.errors as Record<string, string>)?.chat;
+
+    const { data, setData, post, processing, errors, reset } = useForm({
+        name: '',
+        provider: providers[0]?.value ?? 'slack',
+        url: '',
+        project_id: '' as string | number,
+        events: [] as string[],
+        internal_activity: true,
+    });
+
+    function submit(e: FormEvent) {
+        e.preventDefault();
+
+        post('/settings/chat', {
+            preserveScroll: true,
+            onSuccess: () => {
+                reset();
+                setAdding(false);
+            },
+        });
+    }
+
+    const hint = providers.find((p) => p.value === data.provider)?.hint;
+
+    return (
+        <section className="mt-12 max-w-2xl">
+            <h2 className="text-sm font-semibold text-ink">Slack and Teams</h2>
+            <p className="mt-1 text-sm text-ink-muted">
+                Post a readable message into a channel when something happens. Paste the
+                incoming-webhook address the service gives you — Buggie stores it
+                encrypted and never shows it again.
+            </p>
+
+            {sendError && (
+                <p className="mt-3 rounded-lg border border-danger/30 bg-danger-soft px-3 py-2 font-mono text-xs text-danger">
+                    {sendError}
+                </p>
+            )}
+
+            {integrations.length > 0 && (
+                <ul className="mt-4 space-y-3">
+                    {integrations.map((integration) => (
+                        <li
+                            key={integration.id}
+                            className="rounded-xl border border-border bg-raised p-4"
+                        >
+                            <div className="flex items-start gap-3">
+                                <span className="min-w-0 flex-1">
+                                    <span className="block truncate text-sm text-ink">
+                                        {integration.name}
+                                        {!integration.is_active && (
+                                            <span className="ml-1.5 text-xs text-ink-subtle">
+                                                disabled
+                                            </span>
+                                        )}
+                                    </span>
+                                    <span className="text-xs text-ink-subtle">
+                                        {integration.provider_label} ·{' '}
+                                        {integration.project ?? 'Every project'} ·{' '}
+                                        {integration.events.length} event
+                                        {integration.events.length === 1 ? '' : 's'}
+                                        {integration.internal_activity && ' · internal notes'}
+                                    </span>
+                                    {!integration.has_url && (
+                                        <span className="block text-xs text-danger">
+                                            The stored address cannot be read. Re-enter it.
+                                        </span>
+                                    )}
+                                </span>
+
+                                <button
+                                    type="button"
+                                    onClick={() =>
+                                        router.post(
+                                            `/settings/chat/${integration.id}/test`,
+                                            {},
+                                            { preserveScroll: true },
+                                        )
+                                    }
+                                    className="shrink-0 rounded-md border border-border px-2 py-1 text-xs text-ink-muted transition hover:text-ink"
+                                >
+                                    Test
+                                </button>
+
+                                <button
+                                    type="button"
+                                    aria-label={`Delete ${integration.name}`}
+                                    onClick={() =>
+                                        router.delete(`/settings/chat/${integration.id}`, {
+                                            preserveScroll: true,
+                                        })
+                                    }
+                                    className="shrink-0 rounded p-1 text-ink-subtle transition hover:text-danger"
+                                >
+                                    <Trash2 className="size-3.5" />
+                                </button>
+                            </div>
+
+                            {integration.deliveries.length > 0 && (
+                                <ul className="mt-3 space-y-0.5 border-t border-border pt-2">
+                                    {integration.deliveries.map((delivery, i) => (
+                                        <li
+                                            key={i}
+                                            className="flex items-center gap-2 font-mono text-[11px]"
+                                        >
+                                            <span
+                                                className={
+                                                    delivery.ok ? 'text-success' : 'text-danger'
+                                                }
+                                            >
+                                                {delivery.status ?? 'failed'}
+                                            </span>
+                                            <span className="text-ink-subtle">{delivery.event}</span>
+                                            {delivery.error && (
+                                                <span className="min-w-0 truncate text-ink-subtle">
+                                                    {delivery.error}
+                                                </span>
+                                            )}
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
+                        </li>
+                    ))}
+                </ul>
+            )}
+
+            {adding ? (
+                <form onSubmit={submit} className="mt-4 space-y-3 rounded-xl border border-border p-4">
+                    <Field label="Service" error={errors.provider}>
+                        <select
+                            value={data.provider}
+                            onChange={(e) => setData('provider', e.target.value)}
+                            className="w-full rounded-lg border border-border bg-raised px-3 py-2 text-sm text-ink"
+                        >
+                            {providers.map((provider) => (
+                                <option key={provider.value} value={provider.value}>
+                                    {provider.label}
+                                </option>
+                            ))}
+                        </select>
+                    </Field>
+
+                    <Field label="Name" error={errors.name}>
+                        <Input
+                            value={data.name}
+                            placeholder="#bugs"
+                            onChange={(e) => setData('name', e.target.value)}
+                        />
+                    </Field>
+
+                    <Field label="Address" error={errors.url} hint={hint}>
+                        <Input
+                            value={data.url}
+                            placeholder="https://hooks.slack.com/services/..."
+                            onChange={(e) => setData('url', e.target.value)}
+                        />
+                    </Field>
+
+                    <Field label="Project" error={errors.project_id}>
+                        <select
+                            value={data.project_id}
+                            onChange={(e) => setData('project_id', e.target.value)}
+                            className="w-full rounded-lg border border-border bg-raised px-3 py-2 text-sm text-ink"
+                        >
+                            <option value="">Every project</option>
+                            {projects.map((project) => (
+                                <option key={project.id} value={project.id}>
+                                    {project.name}
+                                </option>
+                            ))}
+                        </select>
+                    </Field>
+
+                    <div>
+                        <p className="text-sm text-ink">Post when</p>
+                        {errors.events && <p className="text-xs text-danger">{errors.events}</p>}
+                        <div className="mt-1 space-y-1">
+                            {events.map((event) => (
+                                <label
+                                    key={event.value}
+                                    className="flex items-center gap-2 text-sm text-ink-muted"
+                                >
+                                    <input
+                                        type="checkbox"
+                                        checked={data.events.includes(event.value)}
+                                        onChange={(e) =>
+                                            setData(
+                                                'events',
+                                                e.target.checked
+                                                    ? [...data.events, event.value]
+                                                    : data.events.filter((v) => v !== event.value),
+                                            )
+                                        }
+                                    />
+                                    {event.label}
+                                </label>
+                            ))}
+                        </div>
+                    </div>
+
+                    <label className="flex items-start gap-2 text-sm text-ink-muted">
+                        <input
+                            type="checkbox"
+                            className="mt-1"
+                            checked={data.internal_activity}
+                            onChange={(e) => setData('internal_activity', e.target.checked)}
+                        />
+                        <span>
+                            This channel is the team&rsquo;s own
+                            <span className="block text-xs text-ink-subtle">
+                                Ticked, it hears everything — internal issues, incoming
+                                reports and internal notes. Unticked, it hears only what a
+                                client could already see, which is what you want if this
+                                channel belongs to a client. Note text is never sent
+                                either way, only that somebody left one.
+                            </span>
+                        </span>
+                    </label>
+
+                    <div className="flex gap-2">
+                        <Button
+                            type="submit"
+                            size="sm"
+                            disabled={processing || data.events.length === 0}
+                        >
+                            Add
+                        </Button>
+                        <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setAdding(false)}
+                        >
+                            Cancel
+                        </Button>
+                    </div>
+                </form>
+            ) : (
+                <Button size="sm" variant="ghost" className="mt-4" onClick={() => setAdding(true)}>
+                    Add a channel
                 </Button>
             )}
         </section>

@@ -69,6 +69,37 @@ class WorkspaceSettingsController extends Controller
                         ]),
                 ]),
             'webhookEvents' => \App\Enums\WebhookEvent::options(),
+
+            'chatIntegrations' => \App\Models\ChatIntegration::with(['project:id,name'])
+                ->latest()
+                ->get()
+                ->map(fn (\App\Models\ChatIntegration $integration) => [
+                    'id' => $integration->id,
+                    'name' => $integration->name,
+                    'provider' => $integration->provider->value,
+                    'provider_label' => $integration->provider->label(),
+                    'project' => $integration->project?->name,
+                    'events' => $integration->events,
+                    'is_active' => $integration->is_active,
+                    'internal_activity' => $integration->internal_activity,
+                    'last_delivered_at' => $integration->last_delivered_at?->toIso8601String(),
+
+                    // Never the address itself. Whoever holds it can post into that
+                    // channel as us, and whether one is set is all the form needs to
+                    // know — the same rule as the SMTP password.
+                    'has_url' => $integration->hasUrl(),
+
+                    'deliveries' => $integration->deliveries()->limit(5)->get()
+                        ->map(fn (\App\Models\ChatDelivery $delivery) => [
+                            'event' => $delivery->event,
+                            'status' => $delivery->status,
+                            'error' => $delivery->error,
+                            'ok' => $delivery->succeeded(),
+                            'at' => $delivery->created_at?->toIso8601String(),
+                        ]),
+                ]),
+            'chatProviders' => \App\Enums\ChatProvider::options(),
+
             'projects' => \App\Models\Project::active()->orderBy('name')->get(['id', 'name']),
         ]);
     }
