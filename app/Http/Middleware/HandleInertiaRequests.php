@@ -120,6 +120,24 @@ class HandleInertiaRequests extends Middleware
                 ]
                 : null,
 
+            /*
+             * Backups, for operators only.
+             *
+             * Unlike the mail warning this is not shown to a workspace owner: a
+             * customer of the hosted service cannot act on it, and telling them the
+             * backups are late is alarming without being useful. On a self-hosted
+             * install the operator is the person whose server it is, which is exactly
+             * who needs to know.
+             */
+            'backups' => fn () => $user
+                && \Illuminate\Support\Facades\Gate::forUser($user)->allows('operate')
+                && ($warning = app(\App\Support\Backups\BackupStatus::class)->warning()) !== null
+                    ? [
+                        'warning' => $warning,
+                        'severe' => app(\App\Support\Backups\BackupStatus::class)->isSevere(),
+                    ]
+                    : null,
+
             'flash' => [
                 'success' => fn () => $request->session()->get('success'),
                 'error' => fn () => $request->session()->get('error'),

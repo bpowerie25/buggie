@@ -19,7 +19,10 @@ echo "🚀 Setting up the Buggie production server..."
 
 # ── 1. System ──
 apt update && apt upgrade -y
-apt install -y ca-certificates curl git ufw fail2ban unattended-upgrades
+# rclone is here rather than installed later because the thing it does — getting
+# backups off this machine — is worth nothing if it is added after the machine is
+# the only place the backups are.
+apt install -y ca-certificates curl git ufw fail2ban unattended-upgrades rclone
 
 # ── 2. Deploy user ──
 # NOTE: this copies root's authorized_keys to the deploy user. If you reached this

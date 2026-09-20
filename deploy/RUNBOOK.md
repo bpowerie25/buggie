@@ -208,7 +208,64 @@ crontab -e
 
 Set `BUGGIE_BACKUP_REMOTE` in `.env` to an `rclone` remote, or the backups sit on the
 same disk as the thing they are backing up and protect against exactly one failure:
-you deleting something by hand.
+you deleting something by hand. Until it is set, every operator sees a banner in the
+application saying so.
+
+### Getting backups off the server
+
+`rclone` is installed by `setup-server.sh`. Anything it supports works; Cloudflare R2
+and Backblaze B2 are both cheap and neither charges for the egress you will only ever
+pay on the day you are already having a bad one.
+
+**Do this on the server, as `deploy`. The credentials never need to leave it.**
+
+```sh
+rclone config
+# n) New remote → name it "offsite" → pick your provider → paste its keys
+```
+
+**Encrypt it.** The dump is every customer's issues, every email address, every
+password hash and every encrypted secret in one file. It is going onto somebody
+else's disk, so it should be unreadable there.
+
+```sh
+rclone config
+# n) New remote → name it "offsite-crypt" → storage: crypt
+#    remote: offsite:buggie-backups
+#    Encrypt filenames: yes. Generate a password, and a salt.
+```
+
+**Write the crypt password down somewhere that is not this server.** It is not
+recoverable, and an encrypted backup you cannot decrypt is an expensive way to store
+noise. A password manager is fine; the server is not.
+
+Then, in `.env`:
+
+```
+BUGGIE_BACKUP_REMOTE=offsite-crypt:
+BUGGIE_BACKUP_KEEP_DAYS=90
+```
+
+Run it once by hand rather than waiting for 03:00:
+
+```sh
+cd /srv/buggie && bash deploy/backup.sh
+rclone ls offsite-crypt:
+```
+
+### Restoring from the off-site copy
+
+This is the half nobody tests, and the copy on the server is no use in the situation
+that made you want an off-site one.
+
+```sh
+rclone copy offsite-crypt:/db-YYYYMMDD-HHMMSS.sql.gz /tmp/
+gzip -t /tmp/db-YYYYMMDD-HHMMSS.sql.gz    # it decrypted and it is intact
+```
+
+Then restore it exactly as below, from `/tmp` instead of `/srv/backups`. **Do this
+from a machine that is not the server at least once**, because "can I get the file
+back" and "can I get the file back when the server is gone" are different questions.
 
 **Restore one before relying on it.** A backup nobody has restored is a hope.
 

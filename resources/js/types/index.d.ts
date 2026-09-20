@@ -70,6 +70,8 @@ export interface SharedProps {
     } | null;
     /** Present only when mail would not actually be delivered. */
     mail: { deliverable: false; can_fix: boolean } | null;
+    /** Operators only, and only when something about the backups needs saying. */
+    backups: { warning: string; severe: boolean } | null;
     flash: { success: string | null; error: string | null };
     [key: string]: unknown;
 }

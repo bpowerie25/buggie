@@ -72,7 +72,8 @@ export function AppLayout({
     activeQuery?: string;
     children: ReactNode;
 }) {
-    const { auth, workspace, workspaces, views, inboxCount, billing, mail, docsUrl, ziggy } = usePage<
+    const { auth, workspace, workspaces, views, inboxCount, billing, mail, backups, docsUrl, ziggy } =
+        usePage<
         SharedProps & { ziggy: { location: string } }
     >().props;
     const [switcherOpen, setSwitcherOpen] = useState(false);
@@ -309,6 +310,7 @@ export function AppLayout({
 
                 <div className="p-6">
                     <MailBanner mail={mail} path={path} />
+                    <BackupBanner backups={backups} />
                     <UsageBanner billing={billing} />
                     <Flash />
                     {children}
@@ -351,6 +353,28 @@ function MailBanner({ mail, path }: { mail: SharedProps['mail']; path: string })
                     Set up email
                 </Link>
             )}
+        </div>
+    );
+}
+
+/**
+ * Says that the backups are not what somebody thinks they are.
+ *
+ * Operators only, and only when there is something to say — a failed run, a run that
+ * did not happen, or backups that exist but never leave the machine they protect.
+ */
+function BackupBanner({ backups }: { backups: SharedProps['backups'] }) {
+    if (!backups) return null;
+
+    return (
+        <div
+            className={`mb-6 flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2 text-sm ${
+                backups.severe
+                    ? 'border-danger/30 bg-danger-soft text-danger'
+                    : 'border-amber-500/40 bg-amber-500/10 text-amber-600 dark:text-amber-500'
+            }`}
+        >
+            <span>{backups.warning}</span>
         </div>
     );
 }
