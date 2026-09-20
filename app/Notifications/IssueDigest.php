@@ -4,6 +4,7 @@ namespace App\Notifications;
 
 use App\Enums\NotificationReason;
 use App\Models\Issue;
+use App\Support\Notifications\DueReminderSchedule;
 use Illuminate\Bus\Queueable;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
@@ -74,6 +75,11 @@ class IssueDigest extends Notification
                     NotificationReason::StatusChanged => "{$actor} moved this to "
                         .($entry->data['to'] ?? 'a new status').'.',
                     NotificationReason::Reported => "{$actor} updated an issue you reported.",
+                    // Nobody did this one: the date arrived. Naming an actor here
+                    // would put somebody's name on a deadline they did not set.
+                    NotificationReason::DueDate => DueReminderSchedule::sentence(
+                        (int) ($entry->data['days'] ?? 0),
+                    ),
                 };
             })
             ->unique()

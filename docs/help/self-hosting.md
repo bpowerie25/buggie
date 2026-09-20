@@ -74,14 +74,20 @@ Two background processes are load-bearing.
 issues. Without it, reports still arrive and ingest still answers `202` — they simply
 never fingerprint, never group and never notify, and nothing on screen says so.
 
-**The scheduler** runs two jobs:
+**The scheduler** runs three jobs:
 
 - `notifications:flush`, every minute, which sends [digests](notifications.md).
 - `buggie:prune`, daily at 03:20, which ages out old screenshots and reporter
   identities.
+- `issues:chase-due`, daily at 06:40, which chases
+  [due dates](notifications.md#due-dates).
 
-Without the scheduler, digests accumulate and are never delivered, and nothing is ever
-pruned.
+Without the scheduler, digests accumulate and are never delivered, nothing is ever
+pruned, and no due date is ever chased.
+
+All three are safe to run by hand. `issues:chase-due` in particular records the day it
+last chased each issue, so a second run on the same day sends nothing;
+`issues:chase-due --dry-run` reports who would be told without recording anything.
 
 In the self-hosted image, one container runs the web server, the queue worker and the
 scheduler together under supervisord with automatic restart. That is right for a small
