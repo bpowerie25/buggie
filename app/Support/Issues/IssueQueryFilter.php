@@ -40,8 +40,30 @@ class IssueQueryFilter
         $this->version($query, $parsed);
         $this->customFields($query, $parsed, $viewer);
         $this->absence($query, $parsed);
+        $this->overdue($query, $parsed);
 
         return $query;
+    }
+
+    /**
+     * `is:overdue` — past its due date and still open.
+     *
+     * A value of `is` rather than an operator of its own, because it is the same kind
+     * of thing `is:open` is: a statement about the issue's standing rather than about
+     * one of its fields. `is` is single-valued, so `is:overdue` replaces `is:open`
+     * and state() falls through to its default of open — which is what was meant. An
+     * issue nobody is going to work on again is not late, it is finished.
+     *
+     * Strictly past: something due today has until the end of the day.
+     */
+    private function overdue(Builder $query, IssueQuery $parsed): void
+    {
+        if (! $parsed->has('is', 'overdue')) {
+            return;
+        }
+
+        $query->whereNotNull('due_on')
+            ->whereDate('due_on', '<', now()->startOfDay()->toDateString());
     }
 
     private function project(Builder $query, IssueQuery $parsed): void

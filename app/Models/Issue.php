@@ -41,6 +41,9 @@ class Issue extends Model
             'resolved_at' => 'datetime',
             'closed_at' => 'datetime',
             'due_on' => 'date',
+            // Deliberately absent from #[Fillable]: the chaser owns this, and a
+            // request that could set it could silence a reminder.
+            'due_reminded_on' => 'date',
         ];
     }
 

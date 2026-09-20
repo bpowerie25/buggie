@@ -10,6 +10,15 @@ enum NotificationReason: string
     case StatusChanged = 'status';
     case Reported = 'reported';
 
+    /**
+     * Due soon and overdue share one reason, and therefore one switch.
+     *
+     * Splitting them would offer "warn me beforehand but never tell me it is late",
+     * which nobody wants and everybody would have to read past. The digest line says
+     * which it is; the preference only answers whether due dates may write to you.
+     */
+    case DueDate = 'due';
+
     public function label(): string
     {
         return match ($this) {
@@ -18,6 +27,7 @@ enum NotificationReason: string
             self::Commented => 'New comment',
             self::StatusChanged => 'Status changed',
             self::Reported => 'Activity on an issue you reported',
+            self::DueDate => 'Due soon, or overdue',
         };
     }
 
@@ -30,6 +40,7 @@ enum NotificationReason: string
             self::Commented => 'A new comment on an issue you are watching.',
             self::StatusChanged => 'An issue you are watching moves.',
             self::Reported => 'Activity on an issue you filed yourself.',
+            self::DueDate => 'An issue you hold or watch is nearly due, or is late.',
         };
     }
 

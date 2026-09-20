@@ -25,7 +25,7 @@ Values containing spaces are quoted: `label:"needs repro"`.
 
 | Key | Values | |
 |---|---|---|
-| `is` | `open`, `closed`, `any` | Defaults to `open`. An unrecognised value falls back to `open` rather than showing nothing. |
+| `is` | `open`, `closed`, `any`, `overdue` | Defaults to `open`. An unrecognised value falls back to `open` rather than showing nothing. `is:overdue` is open issues past their due date — something due today has until the end of the day. It replaces `is:open` rather than combining with it, because a closed issue is finished rather than late. See [Notifications](notifications.md#due-dates). |
 | `project` | a project slug | `project:marketing-site` |
 | `assignee` | `@me`, `me`, a name, a user id, or `none` | |
 | `reporter` | the same values | Who filed it. |
@@ -99,6 +99,8 @@ is:closed project:shop               closed issues in the shop project
 no:assignee                          nobody has picked it up
 is:open no:assignee priority:urgent  urgent and unowned
 assignee:@me is:open                 my open work
+is:overdue                           open and past its due date
+assignee:@me is:overdue              my own work that is late
 reporter:@me                         things I filed
 label:regression -label:wontfix      regressions we have not given up on
 type:question                        questions rather than bugs

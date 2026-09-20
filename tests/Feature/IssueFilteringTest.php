@@ -9,6 +9,7 @@ use App\Models\Project;
 use App\Models\User;
 use App\Support\Tenancy\Tenancy;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -159,6 +160,36 @@ class IssueFilteringTest extends TestCase
 
         // The dangerous failure is a filter that silently does nothing.
         $this->assertSame([], $this->titlesFor('assignee:nobodyhere'));
+    }
+
+    #[Test]
+    public function is_overdue_finds_late_open_work_and_nothing_else(): void
+    {
+        $this->state = $this->seedWorkspace();
+        [$workspace] = $this->state;
+
+        app(Tenancy::class)->run($workspace, function () {
+            $due = [
+                'Checkout is broken' => '2026-10-14',   // yesterday
+                'Sidebar overlaps footer' => '2026-10-15', // today, so not late yet
+                'Already finished' => '2026-10-01',     // long past, but closed
+            ];
+
+            foreach ($due as $title => $date) {
+                Issue::where('title', $title)->firstOrFail()
+                    ->forceFill(['due_on' => $date])->save();
+            }
+        });
+
+        $this->travelTo(Carbon::parse('2026-10-15 09:00'));
+
+        $this->assertSame(['Checkout is broken'], $this->titlesFor('is:overdue'));
+
+        // The controls: something due today has until the end of the day, a closed
+        // issue is finished rather than late, and the dated issues are all still
+        // there when nothing asks about dates.
+        $this->assertCount(4, $this->titlesFor('is:any'));
+        $this->assertSame(['Already finished'], $this->titlesFor('is:closed'));
     }
 
     #[Test]
