@@ -223,3 +223,7 @@ Contributions are welcome — see [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 Found a security problem? Please do not open a public issue — see
 [`SECURITY.md`](SECURITY.md).
+
+What changed and what is coming: [`CHANGELOG.md`](CHANGELOG.md) and
+[`ROADMAP.md`](ROADMAP.md). There are no tagged releases yet, so self-hosting today
+means running `main` — the changelog says what would change that.
