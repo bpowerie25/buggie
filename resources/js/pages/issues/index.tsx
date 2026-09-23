@@ -17,7 +17,16 @@ import type { Facets, IssueRow, IssueStatus, SavedView, SharedProps } from '@/ty
 import type { FormDataConvertible } from '@inertiajs/core';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { Bookmark, ChevronRight, Download, LayoutGrid, List, Plus } from 'lucide-react';
+import {
+    Bookmark,
+    ChevronRight,
+    Download,
+    LayoutGrid,
+    List,
+    Plus,
+    Undo2,
+    X,
+} from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 // Narrower than RequestPayload, which allows FormData and so cannot be nested
@@ -67,6 +76,18 @@ export default function IssuesIndex({
      */
     const [overrides, setOverrides] = useState<Record<string, Partial<IssueRow>>>({});
 
+    /**
+     * The last thing that happened, and how to take it back.
+     *
+     * Held in the page rather than on the server. Undo here is a seconds-scale
+     * affordance for a click somebody did not mean — the row's previous values are
+     * already known, because that is what the optimistic update replaced, so undoing
+     * is sending them back. It deliberately does not survive a reload: a button that
+     * offers to undo something from yesterday is making a promise about history that
+     * nothing here keeps.
+     */
+    const [undo, setUndo] = useState<{ label: string; run: () => void } | null>(null);
+
     useEffect(() => setOverrides({}), [issues]);
 
     const rows = useMemo(
@@ -86,7 +107,21 @@ export default function IssuesIndex({
     );
 
     const patch = useCallback(
-        (issue: IssueRow, changes: Changes, optimistic: Partial<IssueRow>) => {
+        (
+            issue: IssueRow,
+            changes: Changes,
+            optimistic: Partial<IssueRow>,
+            // What it was, so it can be put back. Omitted by callers with nothing
+            // meaningful to reverse.
+            undoable?: { label: string; changes: Changes; optimistic: Partial<IssueRow> },
+        ) => {
+            if (undoable) {
+                setUndo({
+                    label: undoable.label,
+                    run: () => patch(issue, undoable.changes, undoable.optimistic),
+                });
+            }
+
             setOverrides((current) => ({
                 ...current,
                 [issue.key]: { ...current[issue.key], ...optimistic },
@@ -289,10 +324,38 @@ export default function IssuesIndex({
         'g a': () => navigate(withTerm(query, 'assignee', '@me')),
     });
 
-    function bulk(changes: Changes) {
+    function bulk(changes: Changes, describe?: string) {
+        const keys = [...selected];
+
+        /*
+         * The previous value of every row, captured before the change.
+         *
+         * A bulk edit is the thing most worth being able to take back and the most
+         * tedious to reverse by hand — forty issues moved to the wrong status is
+         * forty clicks otherwise. Each row goes back to what it had rather than to a
+         * single shared value, because they did not all start the same.
+         */
+        const before = rows
+            .filter((row) => selected.has(row.key))
+            .map((row) => ({ key: row.key, status: row.status, assignee: row.assignee }));
+
+        if (describe && 'status_id' in changes) {
+            setUndo({
+                label: `${keys.length} issue${keys.length === 1 ? '' : 's'} moved to ${describe}`,
+                run: () =>
+                    before.forEach((row) =>
+                        router.patch(
+                            `/issues/${row.key}`,
+                            { status_id: row.status.id },
+                            { preserveScroll: true, preserveState: true, only: ['issues'] },
+                        ),
+                    ),
+            });
+        }
+
         router.patch(
             '/issues/bulk',
-            { keys: [...selected], changes },
+            { keys, changes },
             {
                 preserveScroll: true,
                 only: ['issues', 'flash'],
@@ -374,7 +437,7 @@ export default function IssuesIndex({
                                     key={status.name}
                                     onSelect={() => {
                                         close();
-                                        bulk({ status_id: status.id });
+                                        bulk({ status_id: status.id }, status.name);
                                     }}
                                 >
                                     <StatusDot status={status} />
@@ -422,6 +485,38 @@ export default function IssuesIndex({
                         className="ml-auto text-ink-muted hover:text-ink"
                     >
                         Clear
+                    </button>
+                </div>
+            )}
+
+            {/*
+                One level of undo, and it disappears on the next navigation.
+                
+                Deliberately not a history stack: the useful window for "that was not
+                what I meant" is about five seconds, and a stack invites somebody to
+                trust it for longer than it is true.
+            */}
+            {undo && (
+                <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-border bg-raised px-3 py-2 text-sm">
+                    <span className="text-ink-muted">{undo.label}</span>
+                    <button
+                        type="button"
+                        onClick={() => {
+                            undo.run();
+                            setUndo(null);
+                        }}
+                        className="ml-auto flex items-center gap-1.5 font-medium text-accent hover:underline"
+                    >
+                        <Undo2 className="size-3.5" />
+                        Undo
+                    </button>
+                    <button
+                        type="button"
+                        aria-label="Dismiss"
+                        onClick={() => setUndo(null)}
+                        className="rounded p-1 text-ink-subtle transition hover:text-ink"
+                    >
+                        <X className="size-3.5" />
                     </button>
                 </div>
             )}
@@ -487,6 +582,9 @@ export default function IssuesIndex({
                                             editable={editable}
                                             facets={facets}
                                             menu={menu?.key === line.issue.key ? menu.kind : null}
+                                            onOpenMenu={(kind) =>
+                                                setMenu({ key: line.issue.key, kind })
+                                            }
                                             onCloseMenu={() => setMenu(null)}
                                             onFocus={() =>
                                                 setActive(
@@ -522,6 +620,7 @@ function Row({
     editable,
     facets,
     menu,
+    onOpenMenu,
     onCloseMenu,
     onFocus,
     onToggleSelect,
@@ -533,10 +632,16 @@ function Row({
     editable: boolean;
     facets?: Facets;
     menu: MenuKind | null;
+    onOpenMenu: (kind: MenuKind) => void;
     onCloseMenu: () => void;
     onFocus: () => void;
     onToggleSelect: () => void;
-    onPatch: (issue: IssueRow, changes: Changes, optimistic: Partial<IssueRow>) => void;
+    onPatch: (
+        issue: IssueRow,
+        changes: Changes,
+        optimistic: Partial<IssueRow>,
+        undoable?: { label: string; changes: Changes; optimistic: Partial<IssueRow> },
+    ) => void;
 }) {
     const statuses = facets?.statuses_by_project[issue.project.id] ?? [];
 
@@ -562,7 +667,32 @@ function Row({
                 }`}
             />
 
-            <StatusDot status={issue.status} />
+            {/*
+                The status is the control, not a decoration.
+                
+                Changing one issue's status already worked — by pressing `e` on the
+                focused row — which is invisible to anybody who has not read the
+                shortcut sheet. Everyone else selected the row and used the bulk
+                toolbar to change exactly one thing. The menu, the patch and the
+                optimistic update were all already here; only the click was missing.
+            */}
+            {editable ? (
+                <button
+                    type="button"
+                    aria-label={`Change status of ${issue.key}, currently ${issue.status.name}`}
+                    title={`${issue.status.name} — click to change`}
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        onOpenMenu('status');
+                    }}
+                    className="-m-1 shrink-0 rounded p-1 transition hover:bg-raised"
+                >
+                    <StatusDot status={issue.status} />
+                </button>
+            ) : (
+                <StatusDot status={issue.status} />
+            )}
+
             <TypeIcon type={issue.type} />
 
             <span className="w-20 shrink-0 font-mono text-xs text-ink-subtle">{issue.key}</span>
@@ -587,23 +717,61 @@ function Row({
                 )}
             </span>
 
-            <PriorityBars
-                priority={issue.priority}
-                color={issue.priority_color}
-                label={issue.priority_label}
-            />
+            {editable ? (
+                <button
+                    type="button"
+                    aria-label={`Change priority of ${issue.key}, currently ${issue.priority_label}`}
+                    title={`${issue.priority_label} — click to change`}
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        onOpenMenu('priority');
+                    }}
+                    className="-m-1 shrink-0 rounded p-1 transition hover:bg-raised"
+                >
+                    <PriorityBars
+                        priority={issue.priority}
+                        color={issue.priority_color}
+                        label={issue.priority_label}
+                    />
+                </button>
+            ) : (
+                <PriorityBars
+                    priority={issue.priority}
+                    color={issue.priority_color}
+                    label={issue.priority_label}
+                />
+            )}
 
             <span className="hidden w-16 shrink-0 text-right text-[11px] text-ink-subtle sm:inline">
                 {relativeTime(issue.updated_at)}
             </span>
 
-            {issue.assignee ? (
+            {/* The empty circle is a target too: "nobody has this" is the state you
+                most often want to change. */}
+            {editable ? (
+                <button
+                    type="button"
+                    aria-label={`Change assignee of ${issue.key}, currently ${issue.assignee?.name ?? 'unassigned'}`}
+                    title={`${issue.assignee?.name ?? 'Unassigned'} — click to change`}
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        onOpenMenu('assignee');
+                    }}
+                    className="-m-1 shrink-0 rounded p-1 transition hover:bg-raised"
+                >
+                    {issue.assignee ? (
+                        <Avatar name={issue.assignee.name} />
+                    ) : (
+                        <span className="inline-block size-5 rounded-full border border-dashed border-border-strong" />
+                    )}
+                </button>
+            ) : issue.assignee ? (
                 <Avatar name={issue.assignee.name} />
             ) : (
                 <span className="inline-block size-5 shrink-0 rounded-full border border-dashed border-border-strong" />
             )}
 
-            {/* Keyboard-opened menu, anchored to this row. */}
+            {/* Opened by clicking a control above, or by e / a / p on the focused row. */}
             {menu && editable && (
                 <div
                     role="menu"
@@ -616,7 +784,16 @@ function Row({
                                 selected={status.id === issue.status.id}
                                 onSelect={() => {
                                     onCloseMenu();
-                                    onPatch(issue, { status_id: status.id }, { status });
+                                    onPatch(
+                                        issue,
+                                        { status_id: status.id },
+                                        { status },
+                                        {
+                                            label: `${issue.key} moved to ${status.name}`,
+                                            changes: { status_id: issue.status.id },
+                                            optimistic: { status: issue.status },
+                                        },
+                                    );
                                 }}
                             >
                                 <StatusDot status={status} />
