@@ -460,9 +460,10 @@ export default function Welcome({
                             </p>
 
                             <p className="mt-4 max-w-xl text-sm text-pretty text-ink-subtle">
-                                The hosted service exists so you do not have to run a server. It
-                                is the same software either way — buggie.eu runs the identical
-                                image you would install yourself.
+                                The hosted service exists so you do not have to run a server.
+                                It runs the identical image you would install yourself, nothing
+                                is held back from the open build, and nothing already in it will
+                                be taken away.
                             </p>
                         </Section>
                     )}

@@ -170,9 +170,15 @@ See [`docs/SELF_HOSTING.md`](docs/SELF_HOSTING.md) for TLS, email, backups and u
 ## Hosted
 
 There is a hosted version for people who would rather not run Postgres, Redis, a queue
-worker, a scheduler, object storage, inbound mail and a CDN. It is the same code — the
-only difference is that it is somebody else's problem. Plans and limits apply there and
-nowhere else.
+worker, a scheduler, object storage, inbound mail and a CDN. It runs the same code, and
+the difference is that all of that is somebody else's problem. Plans and limits apply
+there and nowhere else.
+
+**Nothing is held back from the open build, and nothing already in it will be removed.**
+Whether some future enterprise-shaped feature — single sign-on, audit logging, retention
+policies — would ever arrive only on the hosted service is an open question rather than
+a plan; see [`ROADMAP.md`](ROADMAP.md). What is settled is that the published project is
+AGPL-3.0 and stays that way.
 
 ## Development
 
