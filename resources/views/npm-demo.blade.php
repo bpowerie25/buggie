@@ -26,7 +26,7 @@
     window.__npm = { init, open, identify, isSupported };
 
     await init({
-      key: 'pk_d0w1qvkznpjsjvnvg4ygqrnw',
+      key: @json($widgetKey),
       endpoint: window.location.origin,
       launcher: false,
       identity: { id: 77, email: 'npm@shopper.test', name: 'NPM Tester' },

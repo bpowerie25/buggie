@@ -113,7 +113,23 @@ if (! app()->isProduction()) {
     // Harness for the @buggie/widget npm package, exercising the loader rather than
     // a raw script tag. Serves the built package straight from packages/ so it is
     // always whatever was last built, with nothing copied into public/.
-    Route::domain($host)->get('npm-demo', fn () => view('npm-demo'))->name('npm.demo');
+    Route::domain($host)->get('npm-demo', function () {
+        /*
+         * A real key from this database, not a literal.
+         *
+         * The harness hard-coded one from whenever it was written, and the seeder
+         * makes a fresh random key every time — so the page silently stopped working
+         * on the next `migrate --seed`, and looked exactly like a broken widget
+         * rather than a stale fixture.
+         */
+        $key = \App\Models\WidgetKey::withoutGlobalScopes()
+            ->where('is_active', true)
+            ->value('public_key');
+
+        abort_if($key === null, 404, 'No widget key exists — run the seeder first.');
+
+        return view('npm-demo', ['widgetKey' => $key]);
+    })->name('npm.demo');
 
     Route::domain($host)->get('npm-demo/package', function () {
         $path = base_path('packages/widget/dist/index.js');
