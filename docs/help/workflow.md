@@ -31,7 +31,8 @@ resolved. Moving back the other way clears both and writes a *reopened* event.
 
 ## The default six
 
-Every new project starts with:
+Unless you [start it from a template](projects.md#starting-from-a-template), every
+new project starts with:
 
 | Name | Category | |
 |---|---|---|

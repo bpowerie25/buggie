@@ -35,6 +35,11 @@ two people creating issues at the same moment cannot receive the same number.
 
 Free text, up to 2000 characters. It appears on the projects list and the dashboard.
 
+### Start from
+
+What the project is set up with: its statuses, the labels it expects to exist, and
+its custom fields. See **Starting from a template**, below.
+
 ### Site URL
 
 Where the application actually runs, for example `https://acme.com`. It must be a
@@ -77,9 +82,82 @@ is not editable.
   interface and are recoverable only by someone with database access. Only owners and
   admins can delete.
 
+## Starting from a template
+
+An agency running twenty client sites sets the same things up twenty times: the same
+statuses, the same two or three labels, the same "Client reference" field. **Start
+from** on the new-project form does it once.
+
+It covers three things, and only these three: **statuses**, **labels** and **custom
+field definitions**. Everything else about the project — its name, key, site URL,
+branding, widget keys — is its own.
+
+### The built-in templates
+
+| Template | What it is for |
+|---|---|
+| **Standard** | The six statuses every project has always started with. No labels, no fields. This is what you get if you choose nothing. |
+| **Client website build** | A fixed-scope build with a sign-off step. Work passes internal QA, then sits in *Awaiting client* until somebody says yes. |
+| **Ongoing support** | A live site on a retainer. Everything arrives in *Triage* and is scheduled, resolved or declined. Carries a **Billable** checkbox. |
+| **Internal product** | Your own work. An icebox, a sized queue, a review step, and no waiting-on-client status because there is no client. |
+
+They live in `config/templates.php`, which means a self-hosted install has them
+without anything being seeded, and editing or adding one is a change to a file rather
+than something somebody did once in a database. The file explains its own rules.
+
+Every template's statuses map to the same five [categories](workflow.md) as any other
+status — a template may call a column anything, but `is:open` keeps meaning what it
+means.
+
+**A template's custom fields are always internal.** A field reaches a client because
+you decided it should, on the project, and never because of a list picked in a hurry
+while creating one. Share it afterwards from project settings.
+
+**Labels are workspace-wide**, so a template creates the ones that do not exist yet
+and leaves the ones that do exactly as they are, colour and all. If you already have
+a "Regression" label, it stays yours.
+
+### Copying an existing project
+
+The more useful of the two, and the reason this exists: *make it like Acme's*.
+
+Pick **Copy an existing project** and choose one. The new project gets that project's
+statuses exactly — names, colours, order, which one is the default, any WIP limit —
+and its custom field definitions, keeping their keys so a saved view filtering on
+`field:client_ref` works on the new project too.
+
+What is **not** copied, none of it an oversight:
+
+- **Issues, comments and attachments.** This is a new project, not a fork of the work
+  in an old one.
+- **Custom field values.** The definitions come across; what was filled in on
+  somebody else's issues does not.
+- **Client access.** A client who holds the project you copied does **not** get the
+  new one. Grant it deliberately, the way you granted the first.
+- **Widget keys.** A key is a credential with its own origin allowlist. Add one from
+  project settings when the new project is ready to receive reports.
+- **Versions, webhooks, branding and the inbound email address.**
+
+You can only copy from a project in the workspace you are in. Archived projects are
+left out of the list.
+
+### Known rough edges
+
+- **A template applies at creation and never again.** Editing `config/templates.php`,
+  or changing the project you copied from, does nothing to projects that already
+  exist — they own their statuses and fields from the moment they are created. This
+  is deliberate: a template that reached back into live projects would rename columns
+  and delete fields on work in progress. If you want an existing project changed,
+  change it in [project settings](workflow.md).
+- **There is no "save this project as a template".** Copying an existing project is
+  the same thing without the extra concept, and a template saved from a project would
+  be a third copy of a workflow, free to drift from both.
+- **A template cannot pre-fill anything a client can see.** By design, but it does
+  mean a field that is genuinely meant to be shared is two steps rather than one.
+
 ## What is created with a project
 
-Every new project is seeded with six statuses:
+With no template chosen, every new project is seeded with six statuses:
 
 | Name | Category |
 |---|---|

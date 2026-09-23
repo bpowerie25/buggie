@@ -63,4 +63,30 @@ class CustomField extends Model
         // key to the empty string, which collides with the next one.
         return $key === '' ? 'field_'.Str::lower(Str::random(6)) : $key;
     }
+
+    /**
+     * A key nothing else on this project is using.
+     *
+     * Two fields named "Browser" is a reasonable thing to do by accident, and the
+     * unique index would otherwise turn it into a 500. Lives here rather than in the
+     * controller because a template and a copied project reach it too, and three
+     * copies of a uniqueness rule is two too many.
+     *
+     * Idempotent on a key that has already been derived, so copying another
+     * project's field keeps its key — a saved view filtering on
+     * `field:client_ref=…` keeps working on the copy.
+     */
+    public static function uniqueKeyFor(int $projectId, string $name): string
+    {
+        $base = static::keyFrom($name);
+        $key = $base;
+        $suffix = 2;
+
+        while (static::where('project_id', $projectId)->where('key', $key)->exists()) {
+            $key = substr($base, 0, 57).'_'.$suffix;
+            $suffix++;
+        }
+
+        return $key;
+    }
 }

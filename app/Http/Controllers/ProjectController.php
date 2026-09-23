@@ -33,7 +33,25 @@ class ProjectController extends Controller
     {
         $this->authorize('create', Project::class);
 
-        return Inertia::render('projects/create');
+        return Inertia::render('projects/create', [
+            // Resolved rather than injected: controller arguments here are spliced in
+            // positionally after the workspace binding is dropped, and this method
+            // takes none.
+            'templates' => app(\App\Support\Templates\ProjectTemplates::class)->summaries(),
+
+            // "Make it like Acme's" is the case an agency actually has. Archived
+            // projects are left out: copying the workflow of something nobody works
+            // on any more is rarely what was meant, and the list is long enough.
+            'sources' => Project::active()->orderBy('name')->get()->map(fn (Project $p) => [
+                'id' => $p->id,
+                'name' => $p->name,
+                'key' => $p->key,
+            ]),
+
+            // Which one is preselected, so the form does not have to guess from the
+            // order the config file happens to be written in.
+            'defaultTemplate' => (string) config('templates.default'),
+        ]);
     }
 
     public function store(StoreProjectRequest $request, CreateProject $action): RedirectResponse

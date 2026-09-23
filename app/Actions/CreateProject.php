@@ -3,8 +3,8 @@
 namespace App\Actions;
 
 use App\Models\Project;
-use App\Models\Status;
 use App\Support\Billing\LimitExceeded;
+use App\Support\Templates\ProjectTemplates;
 use App\Support\Tenancy\Tenancy;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -12,7 +12,7 @@ use Illuminate\Support\Str;
 class CreateProject
 {
     /**
-     * @param  array{name: string, key?: string|null, description?: string|null, site_url?: string|null}  $attributes
+     * @param  array{name: string, key?: string|null, description?: string|null, site_url?: string|null, template?: string|null, source_project_id?: int|string|null}  $attributes
      */
     public function handle(array $attributes): Project
     {
@@ -31,21 +31,44 @@ class CreateProject
                 'site_url' => $attributes['site_url'] ?? null,
             ]);
 
-            $this->seedStatuses($project);
+            $this->applySetup($project, $attributes);
 
             return $project->load('statuses');
         });
     }
 
-    /** Every project starts with the six default statuses; names editable, categories not. */
-    protected function seedStatuses(Project $project): void
+    /**
+     * Statuses, labels and custom fields, from a template or from another project.
+     *
+     * Inside the same transaction as the project row: a project with half a workflow
+     * is worse than no project, because nothing about it says it is unfinished.
+     *
+     * @param  array<string, mixed>  $attributes
+     */
+    protected function applySetup(Project $project, array $attributes): void
     {
-        foreach (Status::DEFAULTS as $position => $status) {
-            $project->statuses()->create([
-                ...$status,
-                'position' => $position,
-            ]);
+        $setup = app(ApplyProjectSetup::class);
+        $sourceId = $attributes['source_project_id'] ?? null;
+
+        if ($sourceId !== null && $sourceId !== '') {
+            /*
+             * findOrFail through the workspace scope, so an id belonging to another
+             * workspace is not found rather than found and copied. The request
+             * refuses it first — this is the second lock, and it is the one that
+             * holds when something other than the form calls this.
+             */
+            $setup->copyFrom(Project::findOrFail($sourceId), $project);
+
+            return;
         }
+
+        // An unknown template key throws. Quietly falling back to the defaults would
+        // hand somebody a project that is not the one they asked for, and the only
+        // symptom would be a workflow they have to rebuild by hand.
+        $setup->fromTemplate(
+            $project,
+            app(ProjectTemplates::class)->findOrFallback($attributes['template'] ?? null),
+        );
     }
 
     /** "Marketing Site" -> MAR; "GAA Website" -> GAAW. Falls back to a suffix on collision. */
