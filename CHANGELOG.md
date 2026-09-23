@@ -50,6 +50,12 @@ today you are running `main`, which is honest rather than ideal — see
   action, so every entry point gets it.
 - Non-euro subscribers were not recognised on webhook, because the plan lookup searched
   only the default currency. They would have paid and received nothing.
+- **Deleting a project broke the issue list for the whole workspace.** Projects
+  soft-delete, and the `cascadeOnDelete` on `issues.project_id` only fires on a real
+  DELETE — so the issues stayed in every list belonging to a project that no longer
+  resolved, and the list threw on the first one it rendered. One click, no way back,
+  because projects have no restore path either. Issues of a deleted project are now
+  hidden rather than destroyed, so restoring the project would bring them back.
 - Settings → Billing returned a 500 for every owner. Nothing covered the successful
   load; the two tests touching the route asserted a 403 and a 404.
 - Prices showed without a period or a VAT note whenever Stripe was unconfigured,

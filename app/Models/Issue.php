@@ -22,6 +22,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
     'project_id', 'title', 'description', 'description_text', 'type', 'status_id',
     'priority', 'reporter_id', 'assignee_id', 'visibility', 'due_on', 'version_id',
 ])]
+#[\Illuminate\Database\Eloquent\Attributes\ScopedBy([\App\Models\Scopes\LiveProjectScope::class])]
 class Issue extends Model
 {
     use BelongsToWorkspace, HasFactory, SoftDeletes;

@@ -455,7 +455,9 @@ class IssueController extends Controller
             ],
             'assignee' => $issue->assignee?->only(['id', 'name']),
             'labels' => $issue->labels->map->only(['id', 'name', 'color']),
-            'project' => $issue->project->only(['id', 'key', 'name', 'slug']),
+            // Null-safe as well as scoped. The scope should mean this never sees a
+            // deleted project, and a crash in a list is a bad way to find out it did.
+            'project' => $issue->project?->only(['id', 'key', 'name', 'slug']),
             'updated_at' => $issue->updated_at->toIso8601String(),
         ];
     }
