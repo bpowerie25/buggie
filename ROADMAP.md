@@ -37,14 +37,6 @@ omissions. All of them are reversible if somebody makes the case.
   most of why the older trackers feel the way they do.
 - **Per-seat pricing, ever.** Clients are seats, and inviting clients is the point of
   the product. The hosted service meters reports.
-- **Paywalled security.** Two-factor, audit trails and the tenancy guarantees are in
-  the open-source build and stay there. Charging for security is a way of selling the
-  absence of it.
-- **A closed-source core.** The published project is AGPL-3.0 and everything in it
-  stays that way. The hosted service is operations — backups, mail, uptime,
-  somebody else's problem — not features held back.
-- **Session replay.** Tempting for intake and a privacy liability nobody asked this
-  project to hold.
 - **An issue tracker for the whole company.** Buggie is for client work. HR tickets and
   IT support are somebody else's product.
 
@@ -59,6 +51,16 @@ Genuinely open, and worth an issue if you have a view.
   shipping their definitions to every visitor.
 - Whether "no limit" is the right default for work-in-progress limits, given that a
   limit nobody sets is a feature nobody uses.
+- **Where the line between the open project and the hosted service sits.** Today there
+  is no line: buggie.eu runs the same image you would install, and the difference is
+  that somebody else runs Postgres, mail and backups. Whether some future
+  enterprise-shaped feature — single sign-on, audit logging, retention policies —
+  arrives only in the hosted service is genuinely open. What is not open is taking
+  anything away: the published project is AGPL-3.0 and what is in it stays in it.
+- **Whether anything about security could ever be a paid feature.** The instinct here
+  is firmly no, on the grounds that charging for security sells the absence of it, and
+  two-factor is in the free plan and the self-hosted build because of it. It is listed
+  as undecided rather than settled because it is entangled with the question above.
 
 ## How this gets decided
 
