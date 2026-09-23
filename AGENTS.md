@@ -169,6 +169,21 @@ minute, run by the `scheduler` compose service) groups by person-plus-issue and 
 once the group has been quiet for `buggie.digest_delay_minutes`, measured from the last
 entry.
 
+`Notifier::record` writes **two** rows. `pending_notifications` is the send queue and
+is deleted the moment its digest goes out; `in_app_notifications` is the record behind
+the notification list and survives until `buggie:prune` ages it out. Both are written
+in one place because that place is the only one that already knows not to tell somebody
+about their own actions and not to tell a client about internal work.
+
+**What a notification list shows is decided when it is read.** Membership, project
+grants and an issue's client visibility all change after a row is written, so
+`NotificationController` puts every row through `IssuePolicy` — the way
+`ChaseDueIssues` does — rather than trusting the check that let it be recorded.
+`InAppNotification::visibleTo` is the same rules in SQL and exists **only** for the
+unread badge, which runs on every page load. Do not reach for it to prefilter the
+list: a prefilter that agrees with the policy hides a broken policy call, and one that
+disagrees is the leak.
+
 ## Open source, and the hosted service
 
 Buggie is AGPL-3.0. The same code runs somebody's own server and the commercial hosted

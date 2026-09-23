@@ -73,10 +73,19 @@ export function AppLayout({
     activeQuery?: string;
     children: ReactNode;
 }) {
-    const { auth, workspace, workspaces, views, inboxCount, billing, mail, backups, docsUrl, ziggy } =
-        usePage<
-        SharedProps & { ziggy: { location: string } }
-    >().props;
+    const {
+        auth,
+        workspace,
+        workspaces,
+        views,
+        inboxCount,
+        notificationCount,
+        billing,
+        mail,
+        backups,
+        docsUrl,
+        ziggy,
+    } = usePage<SharedProps & { ziggy: { location: string } }>().props;
     const [switcherOpen, setSwitcherOpen] = useState(false);
     const [paletteOpen, setPaletteOpen] = useState(false);
     const [shortcutsOpen, setShortcutsOpen] = useState(false);
@@ -157,10 +166,14 @@ export function AppLayout({
                     >
                         Projects
                     </NavLink>
+                    {/* The list, not the preferences — the preferences are a link on
+                        it. What happened to you is the thing you open daily; how you
+                        are told about it is something you set once. */}
                     <NavLink
-                        href="/settings/notifications"
+                        href="/notifications"
                         icon={Bell}
-                        active={path.startsWith('/settings/notifications')}
+                        active={path.startsWith('/notifications') || path.startsWith('/settings/notifications')}
+                        badge={notificationCount}
                     >
                         Notifications
                     </NavLink>

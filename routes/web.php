@@ -223,12 +223,27 @@ Route::domain('{workspace}.'.$host)
         Route::delete('widget-keys/{widgetKey}', [WidgetKeyController::class, 'destroy'])
             ->name('widget-keys.destroy');
 
-        // Yours, not this workspace's: somebody invited to four client workspaces
-        // should not have to switch the same thing off four times.
+        // --- notifications ----------------------------------------------------
+        // The list belongs to the workspace you are in — what happened here, to you.
+        // The preferences behind it do not: somebody invited to four client
+        // workspaces should not have to switch the same thing off four times.
+        //
+        // Marking read is a POST, including the one that happens by opening an
+        // entry. A GET that changes something is a GET that a link prefetcher will
+        // fire on somebody's behalf.
+        Route::get('notifications', [\App\Http\Controllers\NotificationController::class, 'index'])
+            ->name('notifications.index');
+        Route::post('notifications/read', [\App\Http\Controllers\NotificationController::class, 'readAll'])
+            ->name('notifications.read-all');
+        Route::post('notifications/{notification}/read', [\App\Http\Controllers\NotificationController::class, 'read'])
+            ->whereNumber('notification')
+            ->name('notifications.read');
+
         Route::get('settings/notifications', [\App\Http\Controllers\NotificationPreferenceController::class, 'edit'])
             ->name('notifications.edit');
         Route::patch('settings/notifications', [\App\Http\Controllers\NotificationPreferenceController::class, 'update'])
             ->name('notifications.update');
+        // --- end notifications ------------------------------------------------
 
         // The whole install, not this workspace: mail, and whatever else an operator
         // needs to change without editing .env and redeploying.

@@ -3,6 +3,7 @@
 namespace App\Support\Notifications;
 
 use App\Enums\NotificationReason;
+use App\Models\InAppNotification;
 use App\Models\Issue;
 use App\Models\PendingNotification;
 use App\Models\User;
@@ -12,6 +13,12 @@ use App\Models\User;
  *
  * Nothing is sent here. Rows accumulate and FlushNotifications turns each
  * person-plus-issue group into one message, so ten edits in a minute is one email.
+ *
+ * Two rows are written, not one. The pending row is a send queue and is deleted the
+ * moment its digest goes out; the in-app row is the record and stays until pruned.
+ * Both are written here because this is the one place that already knows not to
+ * notify somebody about their own actions, and not to tell a client about internal
+ * work — a second write site would be a second place to forget.
  */
 class Notifier
 {
@@ -32,14 +39,20 @@ class Notifier
             return;
         }
 
-        PendingNotification::create([
+        $row = [
             'user_id' => $recipient->id,
             'issue_id' => $issue->id,
             'actor_id' => $actor?->id,
             'reason' => $reason->value,
             'data' => $data,
             'created_at' => now(),
-        ]);
+        ];
+
+        PendingNotification::create($row);
+
+        // The preference is honoured for both surfaces. Somebody who says "never
+        // tell me about comments" is not asking to be told about them quietly.
+        InAppNotification::create($row);
     }
 
     /**

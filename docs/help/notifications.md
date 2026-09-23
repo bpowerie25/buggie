@@ -1,8 +1,11 @@
 # Notifications
 
-Buggie never sends a notification the moment something happens. Activity is recorded,
-and a scheduled job turns each person-plus-issue group into **one message** once the
-group has gone quiet. Ten edits in a minute is one email, not ten.
+Activity is recorded when it happens, and you find out in two places.
+
+**The list**, under **Notifications** in the sidebar, gets everything immediately.
+**Email** does not: a scheduled job turns each person-plus-issue group into **one
+message** once the group has gone quiet, so ten edits in a minute is one email, not
+ten.
 
 ## What you are told about
 
@@ -18,9 +21,9 @@ group has gone quiet. Ten edits in a minute is one email, not ten.
 All six are on by default. Preferences are opt-out: silence should be chosen, not the
 default.
 
-> **Worth knowing:** there is no settings screen for these yet. The per-person
-> preference is stored and honoured, but nothing in the interface changes it, so in
-> practice everybody receives all five.
+One switch covers both surfaces. Turning a reason off stops the email *and* keeps it
+out of the list — somebody who says "never tell me about comments" is not asking to
+be told about them quietly. See [Turning them off](#turning-them-off).
 
 ## Who is told
 
@@ -39,6 +42,73 @@ Three rules are enforced regardless of preferences:
 There is no control for watching or unwatching an issue by hand, and the watcher list
 is not shown on the issue page.
 
+## The list
+
+**Notifications** in the sidebar, with the number you have not read yet beside it.
+
+Everything in the table above lands there the moment it happens: no batching, no
+delay, nothing scheduled. Each entry says which issue, what happened, who did it and
+when, and opening one takes you to the issue.
+
+It exists because email used to be the only way a notification reached anybody, and
+mail is not configured on a great many installs. On those the activity was recorded,
+the digest was assembled, and it was handed to a mail server that was not there. The
+tracker knew perfectly well that six issues had been put in your name and had no way
+of saying so.
+
+### Read and unread
+
+Opening an entry marks it read. **Mark all read** clears the rest. Read entries stay
+where they are — the list is a record of what you were told, not a queue to be
+emptied.
+
+Read state is yours. Two people watching the same issue have their own counts, and
+yours going quiet says nothing about theirs.
+
+### What it will not show you
+
+**The list is filtered when you read it, not when it was written.** Anything about an
+issue you cannot see *now* is not in it, whatever was true at the time:
+
+- **Removed from a workspace**, you see none of its notifications — you cannot reach
+  the workspace at all.
+- **A client who loses a project grant** loses the notifications about its issues
+  with it.
+- **An issue that stops being shared with clients** stops appearing in a client's
+  list, including activity from while it was shared.
+- **Somebody moved from staff to client** stops seeing the internal comments they
+  were told about while they were staff.
+
+Every one of those happens *after* the notification was recorded, which is the whole
+reason the question is asked at the point of reading. The rule is the same one the
+rest of the product follows — see [Clients](clients.md).
+
+### How long they are kept
+
+Ninety days, read or unread, and then `buggie:prune` deletes them
+(`RETAIN_NOTIFICATION_DAYS`, and zero disables it). What actually happened is on the
+issue, and issues are never pruned. A notification nobody opened in three months is
+not waiting to be opened.
+
+### Known rough edges
+
+- **The list is per workspace.** It shows what happened in the workspace you are
+  looking at, and the count beside it counts only that. Four client workspaces means
+  four lists and four counts.
+- **Nothing updates while you sit still.** The count is worked out when a page loads,
+  so something arriving while you stare at one screen appears when you move.
+- **The most recent hundred, and no paging.** Older than that is on the issue, which
+  is where the history lives anyway. The hundred are picked before the visibility
+  rules run, so somebody who has just lost access to a project can see fewer.
+- **Opening an unread entry is a button, not a link**, so you cannot middle-click it
+  into a new tab. Marking something read has to be a POST: a link that changes
+  something is a link that a prefetcher will follow on your behalf, and a list that
+  quietly marked itself read because something crawled it would be worse than one
+  that never marked anything.
+- There is no mark-as-unread, and no way to delete a single entry.
+- Nothing in the list says whether the email went out as well, or whether it could
+  have.
+
 ## How the batching works
 
 A scheduled command, `notifications:flush`, runs every minute. It groups pending
@@ -53,8 +123,9 @@ The email subject is `[WEB-142] The checkout button does nothing`, the body is o
 line per thing that happened, and there is a button to open the issue. `Reply-To` is
 set so that replying comments on the issue — see [Email](email.md#replying-to-a-notification).
 
-Digests are also written to an in-application notifications table, but there is no
-screen that reads it; email is how you find out.
+Digests are also written to Laravel's own notifications table as they are sent. That
+is a record of what was emailed, and is separate from the list above, which is
+written when the activity happens rather than when a message goes out.
 
 **If digests never arrive, the scheduler is not running.** Nothing else surfaces that:
 the entries simply accumulate. See
@@ -135,10 +206,10 @@ See [The issue query language](query-language.md).
 
 ## What is not here
 
-There is no in-app notification bell, no Slack integration, no unsubscribe link in
-digest mail, no realtime "Ann is viewing" presence, and no `@mention` autocomplete in
-the editor — mentions are recognised and notified when present, but nothing helps you
-type one.
+There is no bell in the top bar — the list is a page, reached from the sidebar. There
+is no unsubscribe link in digest mail, no realtime "Ann is viewing" presence, and no
+`@mention` autocomplete in the editor: mentions are recognised and notified when
+present, but nothing helps you type one.
 
 ## Related pages
 
@@ -148,13 +219,18 @@ type one.
 
 ## Turning them off
 
-**Notifications** in the sidebar. Every reason has its own switch, and everything is
-on until you turn it off — a tracker nobody hears from is a tracker nobody uses.
+**Preferences**, at the top of the notification list. Every reason has its own
+switch, and everything is on until you turn it off — a tracker nobody hears from is a
+tracker nobody uses.
+
+A switch covers both the email and the list. There is deliberately no way to keep one
+and drop the other: two switches per reason is twelve switches, and nobody has ever
+wanted to be told about comments only in the place they were not looking.
 
 The preferences belong to you, not to a workspace. Somebody invited to four client
 workspaces should not have to switch the same thing off four times, so changing them
 anywhere changes them everywhere.
 
-Turning everything off is allowed and the page says plainly what it means: you will
-not be emailed about anything, including issues assigned to you. That should be a
+Turning everything off is allowed and the page says plainly what it means: nothing
+will reach you about anything, including issues assigned to you. That should be a
 choice, not something discovered a fortnight later when a client says nobody replied.

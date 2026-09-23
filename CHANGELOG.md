@@ -12,6 +12,13 @@ today you are running `main`, which is honest rather than ideal — see
 
 ### Added
 
+- **An in-app notification list.** Notifications existed only as email, and mail is
+  unconfigured on a great many installs, so in practice they existed nowhere: the
+  activity was recorded, the digest was assembled, and it went to a mail server that
+  was not there. There is now a list of what has happened to you, an unread count in
+  the sidebar, and a mark-all-read. What it shows is decided against the issue policy
+  when you read it, not when the row was written, so losing a workspace, a project
+  grant or a client-visible flag takes the notifications with it.
 - **A board that can be ordered.** Cards drag into the order you mean rather than
   sitting in priority order, and a status can carry a work-in-progress limit. The
   limit is shown and counted but never enforced: a limit that refuses the drop turns a
