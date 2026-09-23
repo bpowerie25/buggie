@@ -4,7 +4,7 @@ namespace App\Notifications;
 
 use App\Enums\NotificationReason;
 use App\Models\Issue;
-use App\Support\Notifications\DueReminderSchedule;
+use App\Support\Notifications\ActivitySentence;
 use Illuminate\Bus\Queueable;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
@@ -63,25 +63,11 @@ class IssueDigest extends Notification
     private function lines(): array
     {
         return $this->entries
-            ->map(function ($entry): string {
-                $actor = $entry->actor?->name ?? 'Someone';
-                $reason = NotificationReason::from($entry->reason);
-
-                return match ($reason) {
-                    NotificationReason::Assigned => "{$actor} assigned this to you.",
-                    NotificationReason::Mentioned => "{$actor} mentioned you.",
-                    NotificationReason::Commented => "{$actor} commented: "
-                        .\Illuminate\Support\Str::limit($entry->data['excerpt'] ?? '', 140),
-                    NotificationReason::StatusChanged => "{$actor} moved this to "
-                        .($entry->data['to'] ?? 'a new status').'.',
-                    NotificationReason::Reported => "{$actor} updated an issue you reported.",
-                    // Nobody did this one: the date arrived. Naming an actor here
-                    // would put somebody's name on a deadline they did not set.
-                    NotificationReason::DueDate => DueReminderSchedule::sentence(
-                        (int) ($entry->data['days'] ?? 0),
-                    ),
-                };
-            })
+            ->map(fn ($entry): string => ActivitySentence::for(
+                NotificationReason::from($entry->reason),
+                $entry->actor?->name,
+                $entry->data ?? [],
+            ))
             ->unique()
             ->values()
             ->all();

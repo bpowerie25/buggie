@@ -61,6 +61,8 @@ export interface SharedProps {
     workspaces: WorkspaceListing[];
     views: SavedView[];
     inboxCount: number;
+    /** Unread in-app notifications for this person, in this workspace. */
+    notificationCount: number;
     billing: {
         plan: string;
         usage: Record<string, { used: number; limit: number | null; over: boolean; near: boolean }>;

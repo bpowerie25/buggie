@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Enums\ReportState;
+use App\Models\InAppNotification;
 use App\Models\PortalToken;
 use App\Models\Report;
 use Illuminate\Console\Command;
@@ -34,6 +35,7 @@ class PruneOldData extends Command
             'reporter identities scrubbed' => $this->scrubReporters($dry),
             'dismissed reports deleted' => $this->deleteDismissed($dry),
             'expired portal links deleted' => $this->deleteExpiredTokens($dry),
+            'old notifications deleted' => $this->deleteOldNotifications($dry),
         ];
 
         foreach ($results as $label => $count) {
@@ -149,6 +151,28 @@ class PruneOldData extends Command
         });
 
         return $count;
+    }
+
+    /**
+     * In-app notifications, read or unread alike.
+     *
+     * Unread is not the same as unfinished. A notification nobody opened in three
+     * months is not waiting to be opened, and keeping it would mean the badge on a
+     * returning account counts a year of things that no longer matter. What actually
+     * happened is still on the issue, which is never pruned.
+     */
+    private function deleteOldNotifications(bool $dry): int
+    {
+        $days = config('buggie.retention.notifications');
+
+        if (! $days) {
+            return 0;
+        }
+
+        $query = InAppNotification::withoutGlobalScopes()
+            ->where('created_at', '<', now()->subDays($days));
+
+        return $dry ? $query->count() : $query->delete();
     }
 
     private function deleteExpiredTokens(bool $dry): int

@@ -107,6 +107,12 @@ return [
 
         // Expired portal links, some time after they stopped working.
         'expired_portal_tokens' => (int) env('RETAIN_EXPIRED_TOKENS_DAYS', 30),
+
+        // In-app notifications, read or not. They are a record of being told, not
+        // the record of what happened — that is the issue, and it is never pruned.
+        // Nobody scrolls three months back through "Ann commented", and left alone
+        // the table grows for ever on the busiest workspaces.
+        'notifications' => (int) env('RETAIN_NOTIFICATION_DAYS', 90),
     ],
 
     'operators' => array_values(array_filter(array_map(

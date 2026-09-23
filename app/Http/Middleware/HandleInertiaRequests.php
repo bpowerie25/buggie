@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\InAppNotification;
 use App\Models\Report;
 use App\Models\SavedView;
 use App\Support\Mail\Deliverability;
@@ -84,6 +85,19 @@ class HandleInertiaRequests extends Middleware
             // Staff only: the badge should not tell a client an inbox exists.
             'inboxCount' => fn () => $user && $workspace && $user->can('viewAny', Report::class)
                 ? Report::awaitingTriage()->count()
+                : 0,
+
+            /*
+             * Unread notifications, for the sidebar badge.
+             *
+             * One indexed count, on an index built for exactly this
+             * (workspace, user, read_at). For staff that is the whole query. For a
+             * client it gains the visibility subquery, because a badge that counts
+             * things the list refuses to show is a badge that never reaches zero —
+             * and counting them is also how you tell somebody an issue exists.
+             */
+            'notificationCount' => fn () => $user && $workspace
+                ? InAppNotification::query()->visibleTo($user)->whereNull('read_at')->count()
                 : 0,
 
             // Drives the usage banner. Cheap: three counts, and only for staff who

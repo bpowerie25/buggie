@@ -128,13 +128,15 @@ signed in as. A scheduled job, `buggie:prune`, runs daily and ages it out.
 | Reporter name, address, reference and IP hash scrubbed, including the identity block inside the captured environment | 180 days |
 | Spam and discarded reports deleted outright | 30 days after triage |
 | Expired portal links deleted | 30 days after expiry |
+| In-app notifications deleted, read or not | 90 days |
 | **Issues and comments** | **Never pruned** |
 
 Issues and comments are the work product; a tracker that deletes its own history is
 not a tracker.
 
 Each window is a day count in configuration (`RETAIN_SCREENSHOT_DAYS`,
-`RETAIN_REPORTER_DAYS`, `RETAIN_DISMISSED_DAYS`, `RETAIN_EXPIRED_TOKENS_DAYS`), and
+`RETAIN_REPORTER_DAYS`, `RETAIN_DISMISSED_DAYS`, `RETAIN_EXPIRED_TOKENS_DAYS`,
+`RETAIN_NOTIFICATION_DAYS`), and
 setting one to zero disables that rule. They are install-wide: there is no per-workspace
 retention setting. `buggie:prune --dry-run` reports what would go without deleting
 anything.
