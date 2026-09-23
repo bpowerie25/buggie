@@ -7,6 +7,20 @@ Bug tracker with an embeddable reporter widget. Multi-tenant SaaS.
 Design spec: `docs/DESIGN.md`. Read it before adding features — it explains what is
 deliberately *not* being built.
 
+## Tests get their own database per checkout
+
+`./bin/test` names the test database after the directory it runs from, so the main
+checkout uses `buggie_testing` and a worktree gets `buggie_testing_<dir>`.
+
+This is not tidiness. The suite truncates and re-migrates as it goes, so two checkouts
+sharing one database deadlock, and the failures land in whichever run loses. That
+produced 25, 27 and 28 failures on three consecutive runs of an unchanged tree —
+which reads exactly like a regression and is not one. If a test count moves between
+identical runs, suspect this before suspecting the code.
+
+`BUGGIE_TEST_DB` overrides it. Note that `-e DB_DATABASE=` is the only way to redirect
+it, because `phpunit.xml` sets the database with `force="true"`.
+
 ## There is no local PHP
 
 Everything runs in Docker. Do not install PHP or Composer on the host, and do not

@@ -1,2 +1,40 @@
 #!/usr/bin/env sh
-exec docker compose exec -T app php artisan test "$@"
+set -eu
+
+# ──────────────────────────────────────────────────────────
+# Run the test suite.
+# ──────────────────────────────────────────────────────────
+#
+# Each checkout gets its own database, named after the directory it runs from.
+#
+# The suite truncates and re-migrates as it goes, so two checkouts sharing one
+# database do not merely interfere — they deadlock, and the failures land in
+# whichever run happens to lose. That produced 25, 27 and 28 failures on three
+# consecutive runs of an unchanged tree, which reads exactly like a real regression
+# and is not one. It cost an hour across two sessions before anybody noticed the
+# count was moving.
+#
+# Worktrees are the common case: `.claude/worktrees/agent-<id>` becomes
+# `buggie_testing_agent_<id>`. The main checkout keeps `buggie_testing` so nothing
+# about the ordinary path changes.
+#
+# Override with BUGGIE_TEST_DB if you want a specific one.
+
+name="$(basename "$(pwd)")"
+
+if [ "$name" = "buggy" ]; then
+    db="${BUGGIE_TEST_DB:-buggie_testing}"
+else
+    # Postgres identifiers: letters, digits and underscores.
+    safe="$(printf '%s' "$name" | tr -c 'a-zA-Z0-9' '_')"
+    db="${BUGGIE_TEST_DB:-buggie_testing_$safe}"
+fi
+
+# Created on demand. Postgres has no IF NOT EXISTS for CREATE DATABASE, so the error
+# from it already existing — the usual case — is swallowed, along with a race between
+# two runs creating it at once. A real connection problem still surfaces below.
+docker compose exec -T postgres psql -U "${DB_USERNAME:-buggie}" -d postgres \
+    -c "CREATE DATABASE $db" >/dev/null 2>&1 || true
+
+# -e beats phpunit.xml's force="true", which is the only way to redirect this.
+exec docker compose exec -T -e DB_DATABASE="$db" app php artisan test "$@"

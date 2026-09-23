@@ -54,6 +54,7 @@ export default function EditProject({
     statuses,
     categories,
     inboundAddress,
+    inboundReason = null,
     versions = [],
     customFields = [],
     fieldTypes = [],
@@ -64,6 +65,7 @@ export default function EditProject({
     statuses: StatusRow[];
     categories: { value: StatusRow['category']; label: string; open: boolean }[];
     inboundAddress: string;
+    inboundReason?: string | null;
     versions?: VersionRow[];
     customFields?: CustomFieldRow[];
     fieldTypes?: { value: string; label: string; has_options: boolean }[];
@@ -190,7 +192,16 @@ export default function EditProject({
                     to a client who would rather email than sign in.
                 </p>
 
-                <CopyRow value={inboundAddress} label="Copy email address" />
+                {inboundReason ? (
+                    // No copyable address at all while it would not work. A field you
+                    // can copy is a promise that copying it achieves something.
+                    <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-600 dark:text-amber-500">
+                        Filing issues by email is not set up on this install, so this
+                        project has no working address yet. {inboundReason}
+                    </p>
+                ) : (
+                    <CopyRow value={inboundAddress} label="Copy email address" />
+                )}
 
                 <p className="mt-2 text-xs text-ink-subtle">
                     Treat it as unlisted. Anyone who has it can file into this project, so it

@@ -134,6 +134,9 @@ class ProjectController extends Controller
             // Generated since M5 and never once displayed, which made filing by email
             // impossible without database access.
             'inboundAddress' => $project->inboundAddress(),
+            // Whether that address is a destination or a placeholder. Offering one to
+            // copy without saying which is how somebody emails into silence.
+            'inboundReason' => app(\App\Support\Mail\InboundMail::class)->reason(),
             'branding' => [
                 'name' => $project->brand_name,
                 'color' => $project->brand_color,
