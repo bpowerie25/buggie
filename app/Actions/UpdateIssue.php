@@ -59,6 +59,7 @@ class UpdateIssue
                     'type' => $this->simple($issue, 'type', $value, IssueEventType::TypeChanged, $actor),
                     'visibility' => $this->simple($issue, 'visibility', $value, IssueEventType::VisibilityChanged, $actor),
                     'labels' => $this->labels($issue, $value, $actor),
+                    'start_on' => $issue->fill(['start_on' => $value]),
                     'due_on' => $issue->fill(['due_on' => $value]),
                     'version_id' => $this->version($issue, $value === null ? null : (int) $value, $actor),
                     default => null,

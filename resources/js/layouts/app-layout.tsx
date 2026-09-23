@@ -21,6 +21,7 @@ import {
     Settings,
     ShieldCheck,
     ChartLine,
+    ChartGantt,
     Clock,
     Tag,
     Trash2,
@@ -203,6 +204,16 @@ export function AppLayout({
                                 active={path.startsWith('/insights')}
                             >
                                 Insights
+                            </NavLink>
+                            {/* Inside the staff block for the same reason: a plan
+                                across the workspace is a plan across every client
+                                in it. */}
+                            <NavLink
+                                href="/timeline"
+                                icon={ChartGantt}
+                                active={path.startsWith('/timeline')}
+                            >
+                                Timeline
                             </NavLink>
                             {/* Owners and admins only — the server refuses anybody
                                 else, and a link to a 403 is worse than no link. */}

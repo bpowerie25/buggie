@@ -55,6 +55,7 @@ interface Issue extends IssueRow {
     description: JSONContent | null;
     reporter: Person | null;
     visibility: VisibilityValue;
+    start_on: string | null;
     due_on: string | null;
     version: { id: number; name: string } | null;
     created_at: string;
@@ -921,6 +922,30 @@ export default function ShowIssue({
                             </Link>
                         ) : (
                             <span className="text-sm text-ink-subtle">Not in a release</span>
+                        )}
+                    </SidebarRow>
+
+                    {/* Beside Due, because the two are one decision: a timeline
+                        bar needs both ends, and setting one without the other is
+                        how an issue ends up as a marker rather than a span. */}
+                    <SidebarRow label="Starts">
+                        {can.update ? (
+                            <input
+                                type="date"
+                                value={issue.start_on ?? ''}
+                                aria-label="Start date"
+                                onChange={(e) =>
+                                    router.patch(
+                                        `/issues/${issue.key}`,
+                                        // Empty clears it, as with the due date.
+                                        { start_on: e.target.value || null },
+                                        { preserveScroll: true },
+                                    )
+                                }
+                                className="w-full rounded-md border border-transparent bg-transparent px-1.5 py-1 text-sm text-ink transition hover:border-border"
+                            />
+                        ) : (
+                            <span className="text-sm text-ink">{issue.start_on ?? 'No date'}</span>
                         )}
                     </SidebarRow>
 
