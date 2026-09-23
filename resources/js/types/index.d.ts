@@ -74,6 +74,13 @@ export interface SharedProps {
     mail: { deliverable: false; can_fix: boolean } | null;
     /** Operators only, and only when something about the backups needs saying. */
     backups: { warning: string; severe: boolean } | null;
+    /** A clock this person left running, if any. Staff only. */
+    timer: {
+        started_at: string;
+        billable: boolean;
+        issue: { key: string; title: string };
+        forgotten: boolean;
+    } | null;
     flash: { success: string | null; error: string | null };
     [key: string]: unknown;
 }

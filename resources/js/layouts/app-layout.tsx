@@ -1,4 +1,5 @@
 import { CommandPalette } from '@/components/command-palette';
+import { RunningTimer } from '@/components/running-timer';
 import { Flash } from '@/components/flash';
 import { ShortcutSheet } from '@/components/shortcut-sheet';
 import { useHotkeys } from '@/hooks/use-hotkeys';
@@ -84,6 +85,7 @@ export function AppLayout({
         billing,
         mail,
         backups,
+        timer,
         docsUrl,
         ziggy,
     } = usePage<SharedProps & { ziggy: { location: string } }>().props;
@@ -341,7 +343,10 @@ export function AppLayout({
             <main className="min-w-0 flex-1">
                 <header className="flex h-14 items-center justify-between gap-4 border-b border-border px-6">
                     <h1 className="truncate text-sm font-semibold text-ink">{title}</h1>
-                    <div className="flex shrink-0 items-center gap-2">{actions}</div>
+                    <div className="flex shrink-0 items-center gap-2">
+                        {timer && <RunningTimer timer={timer} />}
+                        {actions}
+                    </div>
                 </header>
 
                 <div className="p-6">

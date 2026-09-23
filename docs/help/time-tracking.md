@@ -37,6 +37,43 @@ before anything is saved. If it says *"= 2m"* and you meant two hours, you will 
 
 One entry cannot be longer than 24 hours. An entry that long is a typo, not a day.
 
+## The timer, if you want one
+
+Beside the duration box on any issue there is **Start timer**. It is optional and
+always will be: typing `1h 30m` remains the primary way in, because a clock earns its
+keep when you sit on one task for an hour and becomes a liability when you are
+switching between six client emergencies.
+
+While one runs it sits **in the header on every page**, counting up, with a stop
+button and a discard button. That placement is the point — the only real failure of a
+timer is forgetting it, and one you can see only by navigating back to what you were
+doing is one you will not see.
+
+**Stopping it writes an ordinary time entry.** There is no second kind of logged time;
+the Time report cannot tell which entries were typed and which were timed, because by
+then it does not matter. Add a note as you stop it and it lands on the entry.
+
+**Discard** throws it away and logs nothing.
+
+### One clock, and what happens when you start another
+
+You get one timer, not one per project or one per workspace — you can only be doing
+one thing at a time. **Starting a timer stops whatever was running and logs it**, and
+says so. Refusing would be annoying, and discarding silently would lose real work:
+whatever was running was being worked on until that moment.
+
+It follows you between workspaces for the same reason. A clock ticking somewhere you
+cannot see is exactly the clock left running over a weekend.
+
+### A timer left running is not guessed at
+
+Stop one that has been going more than **twelve hours** and nothing is logged. You are
+told how long it ran and asked to add the time by hand.
+
+Nobody worked nineteen hours straight, and writing down that they did is worse than
+asking — it goes onto an invoice, and the person who notices is the client. The header
+badge turns red well before that, so it should rarely come up.
+
 ## Estimates
 
 Set an estimate on the issue and it appears beside the total: *1h 30m of 2h*. Once
@@ -92,8 +129,9 @@ logged" and "you may not see the time" are different answers.
 
 ## Known rough edges
 
-- There is no timer — you enter a duration, you do not start and stop a clock.
-- Entries cannot be edited, only removed and re-entered.
+- Entries cannot be edited, only removed and re-entered. That includes ones a timer
+  produced.
+- The timer has no pause. Stop it and start it again; the two spells log separately.
 - There is no per-person or per-project rate, so the report gives hours and not money.
 - Estimates are per issue; there is no roll-up to a release or a project.
 

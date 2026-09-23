@@ -295,6 +295,15 @@ Route::domain('{workspace}.'.$host)
             ->name('issues.parent');
         Route::patch('issues/{issue}/rank', \App\Http\Controllers\IssueRankController::class)
             ->name('issues.rank');
+        // --- the optional timer ---
+        Route::post('issues/{issue}/timer', [\App\Http\Controllers\TimerController::class, 'start'])
+            ->name('timer.start');
+        Route::post('timer/stop', [\App\Http\Controllers\TimerController::class, 'stop'])
+            ->name('timer.stop');
+        Route::delete('timer', [\App\Http\Controllers\TimerController::class, 'discard'])
+            ->name('timer.discard');
+        // --- end ---
+
         Route::post('issues/{issue}/time', [\App\Http\Controllers\TimeEntryController::class, 'store'])
             ->name('time.store');
         Route::delete('time/{entry}', [\App\Http\Controllers\TimeEntryController::class, 'destroy'])

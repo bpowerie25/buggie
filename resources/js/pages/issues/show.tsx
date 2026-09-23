@@ -30,7 +30,7 @@ import type {
 import type { RequestPayload } from '@inertiajs/core';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import type { JSONContent } from '@tiptap/react';
-import { Eye, EyeOff, Lock, Plus, Tag, Trash2, X } from 'lucide-react';
+import { Eye, EyeOff, Lock, Plus, Tag, Timer, Trash2, X } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 
 interface Comment {
@@ -274,6 +274,26 @@ function TimePanel({
 
                     <Button type="submit" size="sm" className="mb-4" disabled={!duration}>
                         Log
+                    </Button>
+
+                    {/* The optional half. Typing a duration stays the primary way in,
+                        because plenty of people never want a clock — this sits beside
+                        it rather than replacing it. */}
+                    <Button
+                        type="button"
+                        size="sm"
+                        variant="secondary"
+                        className="mb-4"
+                        onClick={() =>
+                            router.post(
+                                `/issues/${issueKey}/timer`,
+                                { billable },
+                                { preserveScroll: true },
+                            )
+                        }
+                    >
+                        <Timer className="size-3.5" />
+                        Start timer
                     </Button>
                 </form>
             )}

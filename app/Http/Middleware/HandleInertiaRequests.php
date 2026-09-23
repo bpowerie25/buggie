@@ -152,6 +152,19 @@ class HandleInertiaRequests extends Middleware
                     ]
                     : null,
 
+            /*
+             * A running timer, if there is one.
+             *
+             * Shared on every page rather than shown only on the issue being timed.
+             * The whole failure mode of a timer is forgetting it, and a clock you can
+             * only see by navigating back to what you were doing is one you will not
+             * see. It follows you across workspaces for the same reason.
+             */
+            'timer' => fn () => $user && $workspace
+                && ($user->membershipIn($workspace)?->isStaff() ?? false)
+                ? $this->runningTimer($user)
+                : null,
+
             'flash' => [
                 'success' => fn () => $request->session()->get('success'),
                 'error' => fn () => $request->session()->get('error'),
@@ -161,6 +174,30 @@ class HandleInertiaRequests extends Middleware
                 ...(new Ziggy)->toArray(),
                 'location' => $request->url(),
             ],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function runningTimer(\App\Models\User $user): ?array
+    {
+        $timer = \App\Models\RunningTimer::withoutGlobalScopes()
+            ->where('user_id', $user->id)
+            ->with('issue:id,key,title')
+            ->first();
+
+        if ($timer === null || $timer->issue === null) {
+            return null;
+        }
+
+        return [
+            'started_at' => $timer->started_at->toIso8601String(),
+            'billable' => $timer->billable,
+            'issue' => ['key' => $timer->issue->key, 'title' => $timer->issue->title],
+            // Said by the server rather than worked out in the browser, so a clock
+            // left running over a weekend is flagged even if the tab was never open.
+            'forgotten' => $timer->wasForgotten(),
         ];
     }
 }
