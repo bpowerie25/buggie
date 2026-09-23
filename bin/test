@@ -14,8 +14,8 @@ set -eu
 # and is not one. It cost an hour across two sessions before anybody noticed the
 # count was moving.
 #
-# Worktrees are the common case: `.claude/worktrees/agent-<id>` becomes
-# `buggie_testing_agent_<id>`. The main checkout keeps `buggie_testing` so nothing
+# A worktree is the common case: a checkout in `some-branch/` gets
+# `buggie_some_branch_testing`. The main checkout keeps `buggie_testing`, so nothing
 # about the ordinary path changes.
 #
 # Override with BUGGIE_TEST_DB if you want a specific one.
