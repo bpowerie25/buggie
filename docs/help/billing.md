@@ -3,8 +3,9 @@
 **Limits apply on the hosted service and nowhere else.** A self-hosted install runs
 the `self_hosted` plan, whose every limit is unset: no plans, no seat counts, no
 metering, no billing screens, no upgrade prompts and no telemetry. Nothing is held
-back from it, and nothing already in it will be removed. If you are running Buggie on
-your own server, this page does not apply to you. See [Self-hosting](self-hosting.md).
+back from it, and nothing in it will ever be moved behind a paywall. If you are running
+Buggie on your own server, this page does not apply to you. See
+[Self-hosting](self-hosting.md).
 
 The rest of this page describes the hosted service.
 

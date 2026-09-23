@@ -462,8 +462,8 @@ export default function Welcome({
                             <p className="mt-4 max-w-xl text-sm text-pretty text-ink-subtle">
                                 The hosted service exists so you do not have to run a server.
                                 It runs the identical image you would install yourself, nothing
-                                is held back from the open build, and nothing already in it will
-                                be taken away.
+                                is held back from the open build, and nothing in it will ever be
+                                moved behind a paywall.
                             </p>
                         </Section>
                     )}

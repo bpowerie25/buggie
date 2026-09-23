@@ -174,11 +174,16 @@ worker, a scheduler, object storage, inbound mail and a CDN. It runs the same co
 the difference is that all of that is somebody else's problem. Plans and limits apply
 there and nowhere else.
 
-**Nothing is held back from the open build, and nothing already in it will be removed.**
+**Nothing is held back from the open build, and nothing in it will ever be moved behind
+a paywall.** That is the promise worth making, and it is narrower than it sounds on
+purpose: features do get deprecated and deleted in the ordinary way, and promising
+otherwise would be promising to maintain everything for ever. What will not happen is
+something you have today becoming something you have to pay for.
+
 Whether some future enterprise-shaped feature — single sign-on, audit logging, retention
 policies — would ever arrive only on the hosted service is an open question rather than
-a plan; see [`ROADMAP.md`](ROADMAP.md). What is settled is that the published project is
-AGPL-3.0 and stays that way.
+a plan; see [`ROADMAP.md`](ROADMAP.md). The published project is AGPL-3.0 and stays that
+way.
 
 ## Development
 
