@@ -27,7 +27,13 @@ if [ "$name" = "buggy" ]; then
 else
     # Postgres identifiers: letters, digits and underscores.
     safe="$(printf '%s' "$name" | tr -c 'a-zA-Z0-9' '_')"
-    db="${BUGGIE_TEST_DB:-buggie_testing_$safe}"
+
+    # The suffix has to be `_testing`, not a prefix. TestCase refuses to run against
+    # any database whose name does not end that way — a guard against ever pointing
+    # the suite at real data — so `buggie_testing_agent_x` is rejected and
+    # `buggie_agent_x_testing` is not. Named the wrong way round first, which failed
+    # every test in a worktree with an error that reads nothing like a naming problem.
+    db="${BUGGIE_TEST_DB:-buggie_${safe}_testing}"
 fi
 
 # Created on demand. Postgres has no IF NOT EXISTS for CREATE DATABASE, so the error
