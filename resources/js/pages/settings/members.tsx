@@ -15,6 +15,8 @@ interface Member {
     is_owner: boolean;
     is_you: boolean;
     projects: number[];
+    /** project id => tier, for clients only. */
+    tiers?: Record<number, string>;
 }
 
 interface PendingInvitation {
@@ -238,6 +240,9 @@ function MemberRow({
 }) {
     const [editing, setEditing] = useState(false);
     const [chosen, setChosen] = useState<number[]>(member.projects);
+    // project id => tier. Seeded from what they already hold so opening the editor
+    // and saving without touching anything changes nothing.
+    const [tiers, setTiers] = useState<Record<number, string>>(member.tiers ?? {});
 
     const isClient = member.role === 'client';
     const names = projects
@@ -247,7 +252,7 @@ function MemberRow({
     function save() {
         router.patch(
             `/settings/members/${member.id}/projects`,
-            { project_ids: chosen },
+            { project_ids: chosen, tiers },
             { preserveScroll: true, onSuccess: () => setEditing(false) },
         );
     }
@@ -307,7 +312,10 @@ function MemberRow({
                 <div className="mt-3 rounded-lg border border-border bg-surface p-3">
                     <p className="text-xs text-ink-muted">
                         {member.name} sees only the projects ticked here, and only issues
-                        marked visible to the client within them.
+                        marked visible to the client within them. <strong>Their own
+                        issues</strong> means the ones they reported or were brought
+                        into; <strong>all client issues</strong> is for a project
+                        manager on the client side who needs the whole picture.
                     </p>
 
                     <div className="mt-2 grid gap-1.5 sm:grid-cols-2">
@@ -327,7 +335,26 @@ function MemberRow({
                                         )
                                     }
                                 />
-                                {project.name}
+                                <span className="min-w-0 flex-1 truncate">{project.name}</span>
+
+                                {/* Only meaningful once the project is ticked, and
+                                    hidden otherwise rather than shown disabled. */}
+                                {chosen.includes(project.id) && (
+                                    <select
+                                        aria-label={`What ${member.name} sees on ${project.name}`}
+                                        value={tiers[project.id] ?? 'client'}
+                                        onChange={(e) =>
+                                            setTiers((current) => ({
+                                                ...current,
+                                                [project.id]: e.target.value,
+                                            }))
+                                        }
+                                        className="shrink-0 rounded border border-border bg-raised px-1.5 py-0.5 text-[11px] text-ink"
+                                    >
+                                        <option value="client">Their own issues</option>
+                                        <option value="client_manager">All client issues</option>
+                                    </select>
+                                )}
                             </label>
                         ))}
                     </div>

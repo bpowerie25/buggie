@@ -132,7 +132,7 @@ class TimeTrackingTest extends TestCase
             return [$project, $issue];
         });
 
-        $project->clients()->attach($client->id, ['role' => 'client']);
+        $project->clients()->attach($client->id, ['role' => 'client_manager']);
 
         $html = $this->actingAs($client)
             ->get($this->workspaceUrl($workspace, "/issues/{$issue->key}"))
@@ -168,7 +168,7 @@ class TimeTrackingTest extends TestCase
             ], $staff)];
         });
 
-        $project->clients()->attach($client->id, ['role' => 'client']);
+        $project->clients()->attach($client->id, ['role' => 'client_manager']);
 
         $this->actingAs($client)
             ->post($this->workspaceUrl($workspace, "/issues/{$issue->key}/time"), [

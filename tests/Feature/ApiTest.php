@@ -167,7 +167,7 @@ class ApiTest extends TestCase
             return $granted;
         });
 
-        $granted->clients()->attach($client->id, ['role' => 'client']);
+        $granted->clients()->attach($client->id, ['role' => 'client_manager']);
 
         $token = $this->tokenFor($client, $workspace, ['read']);
 

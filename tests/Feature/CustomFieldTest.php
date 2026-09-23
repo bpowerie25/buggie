@@ -119,7 +119,7 @@ class CustomFieldTest extends TestCase
         $workspace->members()->attach($client->id, [
             'role' => WorkspaceRole::Client->value, 'joined_at' => now(),
         ]);
-        $project->clients()->attach($client->id, ['role' => 'client']);
+        $project->clients()->attach($client->id, ['role' => 'client_manager']);
 
         $this->actingAs($client)
             ->post($this->workspaceUrl($workspace, "/projects/{$project->slug}/fields"), [
@@ -422,7 +422,7 @@ class CustomFieldTest extends TestCase
             return [$project, $issue];
         });
 
-        $project->clients()->attach($client->id, ['role' => 'client']);
+        $project->clients()->attach($client->id, ['role' => 'client_manager']);
 
         $html = $this->actingAs($client)
             ->get($this->workspaceUrl($workspace, "/issues/{$issue->key}"))
@@ -486,7 +486,7 @@ class CustomFieldTest extends TestCase
             return [$project, $issue];
         });
 
-        $project->clients()->attach($client->id, ['role' => 'client']);
+        $project->clients()->attach($client->id, ['role' => 'client_manager']);
 
         // Staff can find it by that filter.
         $this->actingAs($staff)
@@ -580,7 +580,7 @@ class CustomFieldTest extends TestCase
             return $project;
         });
 
-        $project->clients()->attach($client->id, ['role' => 'client']);
+        $project->clients()->attach($client->id, ['role' => 'client_manager']);
 
         $staffCsv = $this->actingAs($staff)
             ->get($this->workspaceUrl($workspace, '/issues/export'))

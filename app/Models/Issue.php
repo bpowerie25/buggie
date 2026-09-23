@@ -233,9 +233,33 @@ class Issue extends Model
      */
     public function scopeVisibleToClient(Builder $query, User $user): Builder
     {
+        /*
+         * Two tiers, and the difference is the point of the grant.
+         *
+         * A **client manager** sees every client-visible issue in their project —
+         * what a single "client" role used to mean for everybody, which quietly
+         * assumed one client per project. A **client** sees only their own part of
+         * it: what they reported, and what they were drawn into by commenting or
+         * being mentioned, which is what makes somebody a watcher.
+         *
+         * `visibility = client` still gates everything. The tier decides how much of
+         * the client-visible half somebody sees, never whether internal work leaks.
+         */
+        $managed = $user->projects()
+            ->wherePivot('role', \App\Enums\ProjectRole::ClientManager->value)
+            ->select('projects.id');
+
+        $granted = $user->projects()->select('projects.id');
+
         return $query
             ->where('visibility', IssueVisibility::Client->value)
-            ->whereIn('project_id', $user->projects()->select('projects.id'));
+            ->where(fn (Builder $scoped) => $scoped
+                ->whereIn('issues.project_id', $managed)
+                ->orWhere(fn (Builder $own) => $own
+                    ->whereIn('issues.project_id', $granted)
+                    ->where(fn (Builder $mine) => $mine
+                        ->where('issues.reporter_id', $user->id)
+                        ->orWhereHas('watchers', fn ($w) => $w->whereKey($user->id)))));
     }
 
     /** Weighted full-text search over title and flattened description. */

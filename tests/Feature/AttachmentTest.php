@@ -278,7 +278,7 @@ class AttachmentTest extends TestCase
 
         app(Tenancy::class)->run($workspace, function () use ($issue, $client) {
             $issue->forceFill(['visibility' => 'client'])->save();
-            $issue->project->clients()->attach($client->id, ['role' => 'client']);
+            $issue->project->clients()->attach($client->id, ['role' => 'client_manager']);
         });
 
         // Sending a screenshot is half of what a client wants to do.

@@ -108,7 +108,7 @@ class IssueExportTest extends TestCase
             return $granted;
         });
 
-        $granted->clients()->attach($client->id, ['role' => 'client']);
+        $granted->clients()->attach($client->id, ['role' => 'client_manager']);
 
         $body = implode("\n", $this->csv(
             $this->actingAs($client)->get($this->workspaceUrl($workspace, '/issues/export'))->assertOk()

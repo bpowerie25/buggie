@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Actions\InviteToWorkspace;
+use App\Enums\ProjectRole;
 use App\Enums\WorkspaceRole;
 use App\Models\Invitation;
 use App\Models\Project;
@@ -27,12 +28,20 @@ class MemberController extends Controller
         $workspace = $this->tenancy->currentOrFail();
 
         return Inertia::render('settings/members', [
-            'members' => $workspace->members()->orderBy('name')->get()
+            // projects eager-loaded: every row reads its grants, and strict mode
+            // turns a lazy load inside that loop into a 500 rather than one query per
+            // member.
+            'members' => $workspace->members()->with('projects')->orderBy('name')->get()
                 ->map(fn (User $user) => [
                     'id' => $user->id,
                     'name' => $user->name,
                     'email' => $user->email,
                     'role' => $user->pivot->role,
+                    // What each granted project lets them see. Keyed by project id so
+                    // the editor can show a tier per row.
+                    'tiers' => $user->projects->mapWithKeys(
+                        fn ($project) => [$project->id => $project->pivot->role],
+                    ),
                     'is_owner' => $user->id === $workspace->owner_id,
                     'is_you' => $user->id === $request->user()->id,
                     // Ids as well as names: the screen needs to tick boxes, not just
@@ -146,6 +155,10 @@ class MemberController extends Controller
 
         $validated = $request->validate([
             'project_ids' => ['present', 'array'],
+            // project id => tier. Validated against the tiers that mean something, so
+            // "maintainer" cannot be smuggled in from the older vocabulary.
+            'tiers' => ['array'],
+            'tiers.*' => [Rule::in(array_column(ProjectRole::grantable(), 'value'))],
             'project_ids.*' => [Rule::exists('projects', 'id')
                 ->where('workspace_id', $workspace->id)],
         ]);
@@ -159,11 +172,29 @@ class MemberController extends Controller
             ]);
         }
 
+        /*
+         * Each grant carries a tier, and an unspecified one keeps what it had.
+         *
+         * Writing 'client' for every project here would silently demote a client
+         * manager every time somebody edited the list of projects they can see —
+         * a permission quietly narrowing itself because an unrelated checkbox moved.
+         * Anything unrecognised falls to the narrowest tier rather than the last one.
+         */
+        $existing = $user->projects()->pluck('project_user.role', 'projects.id');
+
+        $sync = [];
+
+        foreach ($validated['project_ids'] as $id) {
+            $wanted = $validated['tiers'][$id] ?? $existing[$id] ?? null;
+
+            $sync[$id] = [
+                'role' => (ProjectRole::tryFrom((string) $wanted) ?? ProjectRole::Client)->value,
+            ];
+        }
+
         // sync, not syncWithoutDetaching: unticking a box has to take access away, or
         // the screen offers a choice it does not honour.
-        $user->projects()->sync(
-            array_fill_keys($validated['project_ids'], ['role' => 'client']),
-        );
+        $user->projects()->sync($sync);
 
         return back()->with('success', "Updated what {$user->name} can see.");
     }

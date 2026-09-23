@@ -239,7 +239,7 @@ class VersionTest extends TestCase
             'role' => WorkspaceRole::Client->value,
             'joined_at' => now(),
         ]);
-        $project->clients()->attach($client->id, ['role' => 'client']);
+        $project->clients()->attach($client->id, ['role' => 'client_manager']);
 
         $version = app(Tenancy::class)->run($workspace, function () use ($project) {
             $version = Version::factory()->released()->create(['project_id' => $project->id]);

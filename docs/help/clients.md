@@ -79,6 +79,34 @@ Two cases where Buggie decides for you:
 - An issue a **reporter replies to** through the portal becomes client-visible, since
   somebody replying to their own report expects to be kept informed.
 
+## Two kinds of client
+
+Not every client is the same person. Usually it is whoever reported the bug.
+Occasionally, at a larger organisation, it is a project manager whose job is to see
+all of it.
+
+So a grant carries a **tier**, chosen per project in **Settings → Members → Change**:
+
+| Tier | Sees |
+|---|---|
+| **Their own issues** (the default) | Only what they reported, or were brought into by commenting or being mentioned |
+| **All client issues** | Every issue on that project marked visible to the client |
+
+**The default is the narrow one**, and that is deliberate. A client of an agency
+usually has no business seeing what another department at their company reported, and
+treating "client" as one undifferentiated role quietly assumed otherwise.
+
+**The tier is per project, not per person.** The same account can be a manager on one
+client's project and an ordinary reporter on another. The grant is the unit.
+
+**It changes nothing about the internal half.** Gate 3 still decides whether an issue
+is shared with clients at all; the tier only decides how much of the shared half one
+person sees. A client manager sees no more internal work than anybody else — which is
+to say, none.
+
+Anything unrecognised in that column is read as the narrowest tier. A permission that
+cannot be parsed should never fail open.
+
 ## Internal notes
 
 Comments and activity events default to **internal**. Something a client can see is a

@@ -49,8 +49,8 @@ class MultiClientAccessTest extends TestCase
             ];
 
             // Each client is granted exactly one project.
-            $projects['northwind']->clients()->attach($clients['northwind']->id, ['role' => 'client']);
-            $projects['globex']->clients()->attach($clients['globex']->id, ['role' => 'client']);
+            $projects['northwind']->clients()->attach($clients['northwind']->id, ['role' => 'client_manager']);
+            $projects['globex']->clients()->attach($clients['globex']->id, ['role' => 'client_manager']);
 
             $issues = [];
 
@@ -146,7 +146,7 @@ class MultiClientAccessTest extends TestCase
         // Nothing restricts a client to a single project — they see the union.
         app(Tenancy::class)->run($this->world['workspace'], function () {
             $this->world['projects']['globex']->clients()
-                ->attach($this->world['clients']['northwind']->id, ['role' => 'client']);
+                ->attach($this->world['clients']['northwind']->id, ['role' => 'client_manager']);
         });
 
         $this->assertSame(
@@ -315,7 +315,7 @@ class MultiClientAccessTest extends TestCase
         $northwind = $this->world['projects']['northwind'];
         $globex = $this->world['projects']['globex'];
 
-        $client->projects()->syncWithoutDetaching([$globex->id => ['role' => 'client']]);
+        $client->projects()->syncWithoutDetaching([$globex->id => ['role' => 'client_manager']]);
 
         $this->actingAs($actor)
             ->patch($this->workspaceUrl($workspace, "/settings/members/{$client->id}/projects"), [

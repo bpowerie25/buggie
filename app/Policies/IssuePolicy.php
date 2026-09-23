@@ -3,6 +3,7 @@
 namespace App\Policies;
 
 use App\Enums\IssueVisibility;
+use App\Enums\ProjectRole;
 use App\Enums\WorkspaceRole;
 use App\Models\Issue;
 use App\Models\User;
@@ -42,12 +43,37 @@ class IssuePolicy
             return Response::allow();
         }
 
-        // Clients: the issue must be marked client-visible AND sit in a project they
-        // were granted. Either one alone is not enough.
-        $visible = $issue->visibility === IssueVisibility::Client
-            && $user->projects()->whereKey($issue->project_id)->exists();
+        // Client-visible and in a project they hold. Either one alone is not enough,
+        // and this is true for every client tier.
+        if ($issue->visibility !== IssueVisibility::Client) {
+            return Response::denyAsNotFound();
+        }
 
-        return $visible ? Response::allow() : Response::denyAsNotFound();
+        $grant = $user->projects()->whereKey($issue->project_id)->first();
+
+        if ($grant === null) {
+            return Response::denyAsNotFound();
+        }
+
+        /*
+         * A client manager sees the whole client-visible project. Anybody else sees
+         * the part of it they are in — what they reported, or were drawn into.
+         *
+         * The same rule as Issue::scopeVisibleToClient, expressed for one issue
+         * rather than for a list. Two expressions of one rule is a risk, so both are
+         * tested against the same cases and a change to either without the other
+         * fails those tests.
+         */
+        $tier = ProjectRole::tryFrom((string) $grant->pivot->role) ?? ProjectRole::Client;
+
+        if ($tier->seesEveryClientIssue()) {
+            return Response::allow();
+        }
+
+        $theirs = $issue->reporter_id === $user->id
+            || $issue->watchers()->whereKey($user->id)->exists();
+
+        return $theirs ? Response::allow() : Response::denyAsNotFound();
     }
 
     public function create(User $user): bool

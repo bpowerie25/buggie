@@ -85,7 +85,7 @@ class IssueSidebarTest extends TestCase
         ]);
 
         $project = app(Tenancy::class)->run($workspace, fn () => Project::factory()->create(['key' => 'WEB']));
-        $project->clients()->attach($client->id, ['role' => 'client']);
+        $project->clients()->attach($client->id, ['role' => 'client_manager']);
 
         $issue = app(Tenancy::class)->run($workspace, fn () => Issue::factory()->clientVisible()->create([
             'project_id' => $project->id,

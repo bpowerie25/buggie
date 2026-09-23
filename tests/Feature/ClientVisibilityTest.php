@@ -40,7 +40,7 @@ class ClientVisibilityTest extends TestCase
             ])];
         });
 
-        $project->clients()->attach($client->id, ['role' => 'client']);
+        $project->clients()->attach($client->id, ['role' => 'client_manager']);
 
         return [$workspace, $staff, $client, $project, $issue];
     }
