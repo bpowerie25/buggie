@@ -144,6 +144,9 @@ class IssueController extends Controller
 
         $issue->load([
             'status', 'project', 'assignee', 'reporter', 'labels', 'version',
+            'parent:id,key,title',
+            'children:id,parent_id,key,title,status_id',
+            'children.status:id,name,color,category',
             'attachments.uploadedBy:id,name',
             'watchers:id,name',
             'relations.relatedIssue:id,key,title,status_id',
@@ -158,6 +161,16 @@ class IssueController extends Controller
             // would still put "Internal estimate: 3 days" in the page source.
             'customFields' => app(\App\Support\CustomFields\FieldValues::class)
                 ->forIssue($issue, clientOnly: ! $staff),
+
+            // One level, so this is a parent or a list of children, never both.
+            'parent' => $issue->parent?->only(['key', 'title']),
+            'children' => $issue->children
+                ->map(fn (\App\Models\Issue $child) => [
+                    'key' => $child->key,
+                    'title' => $child->title,
+                    'status' => $child->status?->name,
+                    'open' => $child->status?->category->isOpen() ?? true,
+                ])->values(),
 
             /*
              * Time, for staff only and absent otherwise.

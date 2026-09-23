@@ -58,6 +58,13 @@ assignee:sam assignee:jo        Jo — an issue has one assignee, and the chip i
 label:a label:b                 both labels — labels and fields are the repeatable keys
 ```
 
+**Subtasks**:
+
+```
+parent:WEB-12        the subtasks of one issue
+no:parent            work that is not part of anything yet
+```
+
 **Custom fields** are filtered with a `field:` prefix:
 
 ```

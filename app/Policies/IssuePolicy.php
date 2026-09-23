@@ -75,6 +75,19 @@ class IssuePolicy
 
     public function delete(User $user, Issue $issue): bool
     {
+        return $this->deleteAny($user);
+    }
+
+    /**
+     * Reaching the trash at all, and undeleting from it.
+     *
+     * The same authority as deleting rather than a lesser one: somebody who cannot
+     * remove an issue should not be able to bring a client's back either, and the list
+     * of what has been deleted is itself worth protecting — it is a list of what
+     * somebody wanted gone.
+     */
+    public function deleteAny(User $user): bool
+    {
         return $this->role($user)?->canManageWorkspace() ?? false;
     }
 

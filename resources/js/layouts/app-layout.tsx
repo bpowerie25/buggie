@@ -23,6 +23,7 @@ import {
     ChartLine,
     Clock,
     Tag,
+    Trash2,
     Users,
 } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
@@ -190,6 +191,17 @@ export function AppLayout({
                             >
                                 Insights
                             </NavLink>
+                            {/* Owners and admins only — the server refuses anybody
+                                else, and a link to a 403 is worse than no link. */}
+                            {(auth.role === 'owner' || auth.role === 'admin') && (
+                                <NavLink
+                                    href="/issues/trash"
+                                    icon={Trash2}
+                                    active={path.startsWith('/issues/trash')}
+                                >
+                                    Deleted
+                                </NavLink>
+                            )}
                             <NavLink href="/time" icon={Clock} active={path.startsWith('/time')}>
                                 Time
                             </NavLink>

@@ -3,8 +3,12 @@
 namespace App\Enums;
 
 /**
- * When we will fix it — deliberately separate from severity, which is how bad it is
- * when it happens. A cosmetic typo on the pricing page is low severity, urgent priority.
+ * When we will fix it.
+ *
+ * There was once a separate `severity` column for how bad a thing is when it happens —
+ * a cosmetic typo on a pricing page being low severity and urgent priority. It was
+ * never built beyond the column and has been dropped. The distinction is real and
+ * worth having if anybody asks for it; it just needs a screen rather than a schema.
  */
 enum IssuePriority: int
 {

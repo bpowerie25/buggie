@@ -160,6 +160,15 @@ Route::domain('{workspace}.'.$host)
         Route::get('issues/export', \App\Http\Controllers\IssueExportController::class)
             ->name('issues.export');
 
+        // Before the resource route, for the same reason as export above: /issues/trash
+        // would otherwise resolve as /issues/{issue} with a key of "trash" and 404.
+        Route::get('issues/trash', [\App\Http\Controllers\IssueTrashController::class, 'index'])
+            ->name('issues.trash');
+        Route::post('issues/trash/{key}/restore', [\App\Http\Controllers\IssueTrashController::class, 'restore'])
+            ->name('issues.restore');
+        Route::delete('issues/trash/{key}', [\App\Http\Controllers\IssueTrashController::class, 'forceDelete'])
+            ->name('issues.force-delete');
+
         Route::resource('issues', IssueController::class)->except('edit');
 
         Route::post('issues/{issue}/attachments', [AttachmentController::class, 'store'])
@@ -267,6 +276,8 @@ Route::domain('{workspace}.'.$host)
         Route::delete('projects/{project}/versions/{version}', [\App\Http\Controllers\VersionController::class, 'destroy'])
             ->name('versions.destroy');
 
+        Route::patch('issues/{issue}/parent', \App\Http\Controllers\IssueParentController::class)
+            ->name('issues.parent');
         Route::patch('issues/{issue}/rank', \App\Http\Controllers\IssueRankController::class)
             ->name('issues.rank');
         Route::post('issues/{issue}/time', [\App\Http\Controllers\TimeEntryController::class, 'store'])

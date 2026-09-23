@@ -39,6 +39,7 @@ class IssueQueryFilter
         $this->priority($query, $parsed);
         $this->version($query, $parsed);
         $this->customFields($query, $parsed, $viewer);
+        $this->parent($query, $parsed);
         $this->absence($query, $parsed);
         $this->overdue($query, $parsed);
 
@@ -190,6 +191,22 @@ class IssueQueryFilter
         return $staff ? $query : $query->where('visible_to_client', true);
     }
 
+    /**
+     * `parent:WEB-12` for one issue's subtasks, and `no:parent` for work that is not
+     * part of anything — which is the useful half, because a backlog full of orphans
+     * is what a planning board looks like before somebody groups it.
+     */
+    private function parent(Builder $query, IssueQuery $parsed): void
+    {
+        foreach ($parsed->all('parent') as $key) {
+            $query->whereHas('parent', fn (Builder $q) => $q->where('key', strtoupper(trim($key))));
+        }
+
+        foreach ($parsed->all('parent', negated: true) as $key) {
+            $query->whereDoesntHave('parent', fn (Builder $q) => $q->where('key', strtoupper(trim($key))));
+        }
+    }
+
     private function type(Builder $query, IssueQuery $parsed): void
     {
         foreach ($parsed->all('type') as $type) {
@@ -261,6 +278,10 @@ class IssueQueryFilter
                 // Everything not yet assigned to a release: the list you work from
                 // when deciding what goes in the next one.
                 'version' => $query->whereNull('version_id'),
+                // Work that is not part of anything. The useful half of the parent
+                // filter: a backlog of orphans is what a planning board looks like
+                // before somebody groups it.
+                'parent' => $query->whereNull('parent_id'),
                 default => null,
             };
         }

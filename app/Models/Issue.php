@@ -20,7 +20,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 #[Fillable([
     'project_id', 'title', 'description', 'description_text', 'type', 'status_id',
-    'priority', 'severity', 'reporter_id', 'assignee_id', 'visibility', 'due_on', 'version_id',
+    'priority', 'reporter_id', 'assignee_id', 'visibility', 'due_on', 'version_id',
 ])]
 class Issue extends Model
 {
@@ -70,6 +70,28 @@ class Issue extends Model
     public function timeEntries(): HasMany
     {
         return $this->hasMany(TimeEntry::class);
+    }
+
+    public function parent(): BelongsTo
+    {
+        return $this->belongsTo(Issue::class, 'parent_id');
+    }
+
+    public function children(): HasMany
+    {
+        return $this->hasMany(Issue::class, 'parent_id');
+    }
+
+    /**
+     * Whether this issue may be given a parent at all.
+     *
+     * One level of hierarchy is the whole design. An issue that already has children
+     * cannot become a child itself, or the tree deepens and every count on every
+     * screen becomes a recursive walk.
+     */
+    public function canHaveParent(): bool
+    {
+        return ! $this->children()->exists();
     }
 
     public function reporter(): BelongsTo

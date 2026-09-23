@@ -334,6 +334,8 @@ export default function ShowIssue({
     versions = [],
     customFields = [],
     time = null,
+    parent = null,
+    children = [],
 }: {
     issue: Issue;
     comments: Comment[];
@@ -346,6 +348,8 @@ export default function ShowIssue({
     relationTypes?: { value: string; label: string }[];
     versions?: { id: number; name: string; released: boolean }[];
     customFields?: CustomFieldWithValue[];
+    parent?: { key: string; title: string } | null;
+    children?: { key: string; title: string; status: string | null; open: boolean }[];
     time?: TimeSummary | null;
     can: {
         update: boolean;
@@ -965,6 +969,46 @@ export default function ShowIssue({
                             )}
                         </SidebarRow>
                     ))}
+
+                    {parent && (
+                        <SidebarRow label="Part of">
+                            <Link
+                                href={`/issues/${parent.key}`}
+                                className="text-sm text-accent underline underline-offset-2"
+                            >
+                                <span className="font-mono text-xs">{parent.key}</span>{' '}
+                                {parent.title}
+                            </Link>
+                        </SidebarRow>
+                    )}
+
+                    {children.length > 0 && (
+                        <SidebarRow label="Subtasks">
+                            <div className="space-y-1">
+                                {/* Counted, because "3 of 5 done" is the only thing
+                                    anybody wants from a subtask list at a glance. */}
+                                <span className="text-xs text-ink-subtle">
+                                    {children.filter((c) => !c.open).length} of {children.length} done
+                                </span>
+                                {children.map((child) => (
+                                    <Link
+                                        key={child.key}
+                                        href={`/issues/${child.key}`}
+                                        className="block truncate text-sm text-ink hover:text-accent"
+                                    >
+                                        <span
+                                            className={`font-mono text-xs ${
+                                                child.open ? 'text-ink-subtle' : 'text-success'
+                                            }`}
+                                        >
+                                            {child.key}
+                                        </span>{' '}
+                                        {child.title}
+                                    </Link>
+                                ))}
+                            </div>
+                        </SidebarRow>
+                    )}
 
                     {time && (
                         <SidebarRow label="Time">

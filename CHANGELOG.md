@@ -32,6 +32,11 @@ today you are running `main`, which is honest rather than ideal — see
 - **White-labelling** the reporter portal and panel, per project.
 - **Importing** from Jira, MantisBT or a CSV, with a preview before anything is
   created.
+- **Subtasks.** An issue can be part of another one, exactly one level deep, filtered
+  with `parent:` and `no:parent`. Deleting a parent never takes its children with it.
+- **Deleted issues can be recovered.** Issues have been soft-deleted from the
+  beginning and nothing ever read them again — no screen, no route, no `withTrashed`
+  anywhere — so a delete looked careful and behaved permanently.
 - **A security policy** ([`SECURITY.md`](SECURITY.md)) and this file.
 
 ### Fixed
@@ -49,6 +54,14 @@ today you are running `main`, which is honest rather than ideal — see
   load; the two tests touching the route asserted a 403 and a 404.
 - Prices showed without a period or a VAT note whenever Stripe was unconfigured,
   because "what this costs" and "can you buy it right now" were the same flag.
+
+### Removed
+
+- `issues.severity`. The idea was sound — severity is how bad a thing is, priority is
+  when it gets fixed — but it was never built beyond the column. Nothing wrote it,
+  nothing read it, and the CSV importer maps a Mantis "severity" column onto
+  *priority* instead, so not one row in any install had a value in it. A column that
+  exists only in the schema misleads whoever reads the model next.
 
 ### Security
 

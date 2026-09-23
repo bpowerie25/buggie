@@ -112,6 +112,44 @@ screen can see the number has gone red.
 Limits belong to a status, so they only appear on a board grouped by status. Grouping
 by assignee or priority shows a plain count.
 
+## Subtasks
+
+An issue can be **part of** another one. "Build the importer" is five pieces of work,
+and until now the only way to say so was `blocks`, which claims the wrong thing — a
+subtask does not block its parent, it constitutes it.
+
+Set it from the issue page. The parent lists its children with a count of how many are
+done; the child names its parent.
+
+**One level, on purpose.** A subtask cannot have subtasks, an issue that already has
+children cannot become one, and a subtask has to live in the same project as its
+parent. Sub-sub-tasks are how a tracker turns into a project plan, and every count and
+filter would become a tree walk.
+
+Filter with:
+
+```
+parent:WEB-12        the subtasks of one issue
+no:parent            work that is not part of anything
+-parent:WEB-12       everything except its subtasks
+```
+
+`no:parent` is the half that gets used — a planning board starts as a list of work
+nobody has grouped yet.
+
+**Deleting a parent does not delete its children.** They survive it. While the parent
+is in the trash the link is kept but reads as empty, so restoring the parent restores
+the hierarchy; deleting it permanently leaves the children in place with no parent.
+
+## Deleted issues
+
+Deleting an issue puts it in **Deleted**, in the sidebar, where it can be brought back
+with its comments, attachments and history intact. Only owners and admins can reach it
+— the list of what somebody wanted gone is itself worth protecting.
+
+Deleting permanently is a second, separate action behind a confirmation, and it is the
+only irreversible button in the product.
+
 ## The issue page
 
 Two columns.
