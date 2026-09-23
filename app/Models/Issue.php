@@ -20,7 +20,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 #[Fillable([
     'project_id', 'title', 'description', 'description_text', 'type', 'status_id',
-    'priority', 'reporter_id', 'assignee_id', 'visibility', 'due_on', 'version_id',
+    'priority', 'reporter_id', 'assignee_id', 'visibility', 'start_on', 'due_on', 'version_id',
 ])]
 #[\Illuminate\Database\Eloquent\Attributes\ScopedBy([\App\Models\Scopes\LiveProjectScope::class])]
 class Issue extends Model
@@ -41,6 +41,7 @@ class Issue extends Model
             'last_seen_at' => 'datetime',
             'resolved_at' => 'datetime',
             'closed_at' => 'datetime',
+            'start_on' => 'date',
             'due_on' => 'date',
             // Deliberately absent from #[Fillable]: the chaser owns this, and a
             // request that could set it could silence a reminder.

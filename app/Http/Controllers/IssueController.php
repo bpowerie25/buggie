@@ -210,6 +210,7 @@ class IssueController extends Controller
                 'description' => $issue->description,
                 'reporter' => $issue->reporter?->only(['id', 'name']),
                 'visibility' => $issue->visibility->value,
+                'start_on' => $issue->start_on?->toDateString(),
                 'due_on' => $issue->due_on?->toDateString(),
                 'version' => $issue->version?->only(['id', 'name']),
                 'created_at' => $issue->created_at->toIso8601String(),

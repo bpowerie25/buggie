@@ -30,14 +30,15 @@ else. See [Billing and plans](billing.md) and [Self-hosting](self-hosting.md).
 9. [Clients](clients.md) — inviting them and controlling what they see.
 10. [Custom fields](custom-fields.md) — extra fields on an issue, per project.
 11. [Insights](insights.md) — throughput, backlog and how long things take.
-12. [Time tracking](time-tracking.md) — hours against issues, and what they add up to.
-13. [White-labelling](branding.md) — putting your client's name on what they see.
-14. [Releases and versions](releases.md) — what a bug was found in, and fixed in.
-15. [Email](email.md) and [Notifications](notifications.md).
-16. [Two-factor authentication](two-factor.md) — a code as well as a password.
-17. [Slack and Teams](chat-notifications.md) — bugs announced where the team already is.
-18. [Keyboard shortcuts](keyboard.md).
-19. [Billing and plans](billing.md), [Self-hosting](self-hosting.md),
+12. [Timeline](timeline.md) — when the work is meant to happen, as bars on a date axis.
+13. [Time tracking](time-tracking.md) — hours against issues, and what they add up to.
+14. [White-labelling](branding.md) — putting your client's name on what they see.
+15. [Releases and versions](releases.md) — what a bug was found in, and fixed in.
+16. [Email](email.md) and [Notifications](notifications.md).
+17. [Two-factor authentication](two-factor.md) — a code as well as a password.
+18. [Slack and Teams](chat-notifications.md) — bugs announced where the team already is.
+19. [Keyboard shortcuts](keyboard.md).
+20. [Billing and plans](billing.md), [Self-hosting](self-hosting.md),
     [Privacy and security](privacy-and-security.md).
 
 ## If you were invited to a workspace as a client

@@ -303,6 +303,13 @@ Route::domain('{workspace}.'.$host)
             ->name('time.estimate');
         Route::get('insights', \App\Http\Controllers\InsightsController::class)
             ->name('insights');
+
+        // --- timeline ---------------------------------------------------------
+        // Issues as bars on a date axis. Staff only, enforced in the controller
+        // rather than by a middleware, so the check sits beside the reason for it.
+        Route::get('timeline', \App\Http\Controllers\TimelineController::class)
+            ->name('timeline');
+        // --- end timeline -----------------------------------------------------
         Route::get('time', [\App\Http\Controllers\TimeReportController::class, 'index'])
             ->name('time.index');
         Route::get('time/export', [\App\Http\Controllers\TimeReportController::class, 'export'])

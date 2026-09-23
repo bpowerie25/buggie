@@ -26,6 +26,10 @@ class UpdateIssueRequest extends FormRequest
             'type' => ['sometimes', new Enum(IssueType::class)],
             'priority' => ['sometimes', Rule::in(array_column(IssuePriority::cases(), 'value'))],
             'visibility' => ['sometimes', new Enum(IssueVisibility::class)],
+            // Not validated against each other. A start after its due date is a
+            // typo somebody should see on the timeline and fix, not a rejected
+            // request that leaves them unable to correct the other date first.
+            'start_on' => ['sometimes', 'nullable', 'date'],
             'due_on' => ['sometimes', 'nullable', 'date'],
             // Scoped to the workspace, so a version id from another tenant is not a
             // version at all. Whether it belongs to the issue's project is checked
