@@ -91,7 +91,7 @@ class CustomFieldController extends Controller
             ]);
         }
 
-        $key = $existing?->key ?? $this->uniqueKey($project, $validated['name']);
+        $key = $existing?->key ?? CustomField::uniqueKeyFor($project->id, $validated['name']);
 
         return [
             'name' => $validated['name'],
@@ -101,25 +101,5 @@ class CustomFieldController extends Controller
             'required' => $request->boolean('required'),
             'visible_to_client' => $request->boolean('visible_to_client'),
         ];
-    }
-
-    /**
-     * A key nothing else on this project is using.
-     *
-     * Two fields named "Browser" is a reasonable thing to do by accident, and the
-     * unique index would otherwise turn it into a 500.
-     */
-    private function uniqueKey(Project $project, string $name): string
-    {
-        $base = CustomField::keyFrom($name);
-        $key = $base;
-        $suffix = 2;
-
-        while (CustomField::where('project_id', $project->id)->where('key', $key)->exists()) {
-            $key = substr($base, 0, 57).'_'.$suffix;
-            $suffix++;
-        }
-
-        return $key;
     }
 }

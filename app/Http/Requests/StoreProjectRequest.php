@@ -20,6 +20,29 @@ class StoreProjectRequest extends FormRequest
             'description' => ['nullable', 'string', 'max:2000'],
             // Seeds the widget origin allowlist; see Project::defaultWidgetOrigins().
             'site_url' => ['nullable', 'url', 'max:255'],
+
+            // A key that is not a template is refused rather than ignored: falling
+            // back to the defaults would silently create a project nobody asked for.
+            'template' => [
+                'nullable', 'string',
+                Rule::in(app(\App\Support\Templates\ProjectTemplates::class)->keys()),
+            ],
+
+            /*
+             * Copying another project's setup.
+             *
+             * Validation rules run raw SQL and never see the workspace global scope,
+             * so the scope is applied by hand here. An id from another workspace is
+             * not a 404 waiting to happen — it is both a leak (the names and field
+             * keys of another customer's project) and a corruption (their rows read
+             * while ours are written), so it is refused outright.
+             */
+            'source_project_id' => [
+                'nullable', 'integer',
+                Rule::exists('projects', 'id')
+                    ->where('workspace_id', app(\App\Support\Tenancy\Tenancy::class)->id())
+                    ->whereNull('deleted_at'),
+            ],
         ];
     }
 
@@ -28,6 +51,8 @@ class StoreProjectRequest extends FormRequest
         return [
             'key.regex' => 'The key must be uppercase letters and digits, starting with a letter.',
             'key.unique' => 'Another project in this workspace already uses that key.',
+            'template.in' => 'That is not one of the project templates.',
+            'source_project_id.exists' => 'There is no such project in this workspace.',
         ];
     }
 
