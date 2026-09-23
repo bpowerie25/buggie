@@ -31,7 +31,7 @@ Edit `.env` and set at least:
 | `APP_DOMAIN` | `buggie.example.com` — no scheme, include a port only in development |
 | `SESSION_DOMAIN` | `.buggie.example.com` — the leading dot shares the session across workspace subdomains |
 | `DB_PASSWORD` | anything long |
-| `MAIL_*` | your SMTP details |
+| `MAIL_*` | your SMTP details — or leave them and use the screen described below |
 
 Then:
 
@@ -69,6 +69,39 @@ A minimal Caddyfile:
 }
 ```
 
+## Email out (do this before you invite anybody)
+
+Nothing about Buggie fails loudly without it, which is the problem. Invitations,
+password resets, notification digests and reporter portal links are all queued,
+accepted and then written to a log file. A broken install looks exactly like a working
+one until somebody says they never got their invitation — and they cannot say so,
+because the way in was the invitation.
+
+**There are two places to configure it, and the screen is the better one.**
+
+`MAIL_*` in `.env` works and is the traditional route. But **Settings → Instance**, in
+the application, is easier to live with: the password is encrypted at rest with your
+`APP_KEY` rather than sitting in a file, changing it needs no redeploy, and there is a
+**Send me a test** button that reports the provider's own error — `invalid_token` and
+`no_service` are different problems with different fixes, and without that the only
+symptom is a channel that is quiet.
+
+The screen is reachable by an **operator**: whoever is named in `BUGGIE_OPERATORS`, or,
+if nobody is named, the first account created on the install. That fallback exists so
+you do not have to edit `.env` before you can configure mail on your own server.
+
+Settings saved there override `.env`, and `.env` stays as the fallback.
+
+**Until it is set up**, every operator sees a banner saying so, and inviting somebody
+tells you plainly that the invitation was created but not sent — the members screen
+shows the invitation link, which you can send by hand.
+
+### Getting it to arrive rather than to spam
+
+Send from a domain you control — `hello@buggie.example.com`, never a Gmail address —
+and add an **SPF** and a **DKIM** record for it. Without them a correctly configured
+SMTP account still lands in spam, which looks identical to not sending at all.
+
 ## Email in (optional)
 
 Lets people file issues by writing to a project address, and reply to a notification to
@@ -76,6 +109,14 @@ comment on the issue.
 
 1. Point a Mailgun inbound route at `https://buggie.example.com/api/mail/inbound`.
 2. Set `MAIL_INBOUND_DOMAIN` and `MAILGUN_SIGNING_KEY` in `.env`.
+
+Both are needed. Without the domain, a project's address is a placeholder; without the
+signing key the webhook refuses everything, which is correct and still means a
+correctly addressed email vanishes. Until both are set the project screen says so
+rather than offering an address that goes nowhere.
+
+The signature check is Mailgun's specifically, so Mailgun is the path of least
+resistance here even if you use somebody else for outgoing mail.
 
 Without a signing key the endpoint rejects everything, which is the safe default —
 otherwise anyone could file issues in your workspaces.
