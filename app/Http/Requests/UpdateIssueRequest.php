@@ -49,7 +49,8 @@ class UpdateIssueRequest extends FormRequest
             ],
             'assignee_id' => [
                 'sometimes', 'nullable',
-                Rule::exists('workspace_user', 'user_id')->where('workspace_id', $workspaceId),
+                // Staff only: see Assignable.
+                \App\Support\Issues\Assignable::rule($workspaceId),
             ],
             'labels' => ['sometimes', 'array'],
             'labels.*' => [Rule::exists('labels', 'id')->where('workspace_id', $workspaceId)],
@@ -57,6 +58,13 @@ class UpdateIssueRequest extends FormRequest
             // "sometimes", so that a bulk status change does not arrive looking like
             // a request to clear every custom field on every issue it touches.
             'custom_fields' => ['sometimes', 'array'],
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'assignee_id.exists' => 'Only somebody on the team can be assigned an issue. To ask a client something, use Reply & await client.',
         ];
     }
 }

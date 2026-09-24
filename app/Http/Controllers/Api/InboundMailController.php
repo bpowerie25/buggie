@@ -137,7 +137,7 @@ class InboundMailController extends Controller
             }
 
             // Everyone else writes in public, attributed to their address.
-            $issue->comments()->create([
+            $comment = $issue->comments()->create([
                 'user_id' => $user?->id,
                 'author_name' => EmailBody::senderName($from),
                 'author_email' => $email,
@@ -148,6 +148,10 @@ class InboundMailController extends Controller
             ]);
 
             $issue->touch();
+
+            // The client side answering by email: the same rules as in the app.
+            app(\App\Support\Issues\ClientConversation::class)
+                ->clientReplied($issue, $user, $comment->body_text, EmailBody::senderName($from) ?: $email);
 
             return $issue;
         });

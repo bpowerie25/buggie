@@ -146,6 +146,23 @@ class Project extends Model
         return $this->statuses()->where('is_triage', true)->first();
     }
 
+    /**
+     * Where an issue waits while it is the client's turn. Null when the project has
+     * none, and then there is no "Reply & await client".
+     */
+    public function awaitingClientStatus(): ?Status
+    {
+        return $this->statuses()->where('is_awaiting_client', true)->first();
+    }
+
+    /** A project's reminder and auto-close settings, each off unless a day count is set. */
+    public function clientWaitDays(string $which): ?int
+    {
+        $days = $this->settings[$which] ?? null;
+
+        return is_numeric($days) && (int) $days > 0 ? (int) $days : null;
+    }
+
     public function defaultAssignee(): BelongsTo
     {
         return $this->belongsTo(User::class, 'default_assignee_id');

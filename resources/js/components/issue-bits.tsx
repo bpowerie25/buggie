@@ -117,3 +117,12 @@ export function relativeTime(iso: string): string {
         year: 'numeric',
     });
 }
+
+/** A client has answered and nobody on the team has looked since. Staff only. */
+export function ClientRepliedBadge() {
+    return (
+        <span className="shrink-0 rounded bg-success/10 px-1.5 py-0.5 text-[10px] font-medium text-success">
+            Client replied
+        </span>
+    );
+}

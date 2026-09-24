@@ -4,7 +4,6 @@ namespace App\Actions;
 
 use App\Enums\ClientAudience;
 use App\Enums\IssueEventType;
-use App\Enums\IssueVisibility;
 use App\Enums\NotificationReason;
 use App\Enums\StatusCategory;
 use App\Enums\WatchReason;
@@ -130,10 +129,13 @@ class UpdateIssue
         // A status from another project would silently move the issue's workflow.
         abort_unless($to->project_id === $issue->project_id, 422, 'Status belongs to another project.');
 
+        // Client-visible: where their issue has got to is the first thing a client
+        // wants to know, and the thread should say so rather than leave them to
+        // notice the sidebar changed.
         $issue->recordEvent(IssueEventType::StatusChanged, [
             'from' => ['name' => $from->name, 'category' => $from->category->value],
             'to' => ['name' => $to->name, 'category' => $to->category->value],
-        ], $actor);
+        ], $actor, isInternal: false);
 
         $issue->status_id = $to->id;
 
@@ -143,6 +145,63 @@ class UpdateIssue
         ]);
 
         $this->applyClosure($issue, $from->category, $to->category, $actor);
+        $this->followWait($issue, $from, $to);
+    }
+
+    /**
+     * Move an issue on behalf of the client conversation: one event of the caller's
+     * choosing instead of a plain status change, and no watcher notifications,
+     * because the caller decides who hears about a reply and in what words.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    public function moveTo(Issue $issue, Status $to, ?User $actor, IssueEventType $as, array $data = []): void
+    {
+        $from = $issue->loadMissing('status')->status;
+
+        abort_unless($to->project_id === $issue->project_id, 422, 'Status belongs to another project.');
+
+        if ($from->id !== $to->id) {
+            $issue->recordEvent($as, [
+                'from' => ['name' => $from->name, 'category' => $from->category->value],
+                'to' => ['name' => $to->name, 'category' => $to->category->value],
+                ...$data,
+            ], $actor, isInternal: false);
+
+            $issue->status_id = $to->id;
+            $this->applyClosure($issue, $from->category, $to->category, $actor);
+        }
+
+        $issue->save();
+        $issue->unsetRelation('status');
+
+        $fresh = $issue->refresh()->load(['status', 'project', 'assignee']);
+        \App\Support\Webhooks\Webhooks::issue(\App\Enums\WebhookEvent::IssueUpdated, $fresh);
+
+        if ($from->category->isOpen() && ! $fresh->isOpen()) {
+            \App\Support\Webhooks\Webhooks::issue(\App\Enums\WebhookEvent::IssueClosed, $fresh);
+        }
+    }
+
+    /**
+     * Whose turn it is follows the status, however it was moved.
+     *
+     * Moved into the awaiting-client status by hand, the wait starts as if the team
+     * had used Reply & await client; moved out of it, the wait is over, so nothing
+     * reminds a client about an issue that is no longer waiting on them.
+     */
+    private function followWait(Issue $issue, Status $from, Status $to): void
+    {
+        if ($to->is_awaiting_client && ! $from->is_awaiting_client) {
+            $issue->status_before_waiting_id = $from->id;
+            $issue->awaiting_client_since = now();
+            $issue->client_reminded_at = null;
+            $issue->auto_closed_at = null;
+        } elseif ($from->is_awaiting_client && ! $to->is_awaiting_client) {
+            $issue->status_before_waiting_id = null;
+            $issue->awaiting_client_since = null;
+            $issue->client_reminded_at = null;
+        }
     }
 
     /** Timestamps and reopen/close events follow the category, never the status name. */
@@ -155,7 +214,7 @@ class UpdateIssue
         if ($from->isOpen() && ! $to->isOpen()) {
             $issue->closed_at = now();
             $issue->resolved_at = $to === StatusCategory::Done ? now() : null;
-            $issue->recordEvent(IssueEventType::Closed, ['category' => $to->value], $actor);
+            $issue->recordEvent(IssueEventType::Closed, ['category' => $to->value], $actor, isInternal: false);
 
             return;
         }
@@ -163,7 +222,7 @@ class UpdateIssue
         if (! $from->isOpen() && $to->isOpen()) {
             $issue->closed_at = null;
             $issue->resolved_at = null;
-            $issue->recordEvent(IssueEventType::Reopened, [], $actor);
+            $issue->recordEvent(IssueEventType::Reopened, [], $actor, isInternal: false);
         }
     }
 
@@ -176,9 +235,7 @@ class UpdateIssue
         $previous = $issue->assignee;
         $next = $userId ? User::find($userId) : null;
 
-        if ($next !== null) {
-            $this->assignableToClient($issue, $next, $actor);
-        }
+        \App\Support\Issues\Assignable::ensure($next, $issue->workspace);
 
         $issue->recordEvent(
             $next ? IssueEventType::Assigned : IssueEventType::Unassigned,
@@ -191,43 +248,6 @@ class UpdateIssue
 
         if ($next !== null) {
             $this->notifier->record($next, $issue, NotificationReason::Assigned, $actor);
-        }
-    }
-
-    /**
-     * Assigning to a client makes the issue visible to them, and refuses outright if
-     * they have no grant on its project.
-     *
-     * Asking a client a question is a real workflow — "which browser was it?", "can
-     * you confirm this is fixed?" — and it was half-built: a client could be assigned,
-     * and would be notified, but IssuePolicy still required the issue to be marked
-     * client-visible, so following the notification gave them a 404. Being told about
-     * something you then cannot open is worse than not being told.
-     *
-     * The visibility change is recorded as its own event rather than done quietly.
-     * Who can see an issue is the most consequential thing about it in this product,
-     * and it should never change without the activity feed saying so.
-     */
-    private function assignableToClient(Issue $issue, User $assignee, ?User $actor): void
-    {
-        if ($assignee->membershipIn($issue->workspace)?->isStaff() ?? true) {
-            return;
-        }
-
-        if (! $assignee->projects()->whereKey($issue->project_id)->exists()) {
-            throw ValidationException::withMessages([
-                'assignee_id' => "{$assignee->name} does not have access to this project, so they cannot be asked about it.",
-            ]);
-        }
-
-        if ($issue->visibility !== IssueVisibility::Client) {
-            $issue->visibility = IssueVisibility::Client;
-
-            // Not internal: the client should see why they can suddenly see this.
-            $issue->recordEvent(IssueEventType::VisibilityChanged, [
-                'to' => IssueVisibility::Client->value,
-                'because' => 'assigned to a client',
-            ], $actor, isInternal: false);
         }
     }
 

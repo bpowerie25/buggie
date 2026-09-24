@@ -35,6 +35,7 @@ class ApplyProjectSetup
                 'color' => $status['color'],
                 'is_default' => $status['is_default'],
                 'is_triage' => $status['is_triage'] ?? false,
+                'is_awaiting_client' => $status['is_awaiting_client'] ?? false,
                 'wip_limit' => $status['wip_limit'],
                 'position' => $position,
             ]);
@@ -120,6 +121,7 @@ class ApplyProjectSetup
                 'color' => $status->color,
                 'is_default' => $status->is_default,
                 'is_triage' => $status->is_triage,
+                'is_awaiting_client' => $status->is_awaiting_client,
                 'wip_limit' => $status->wip_limit,
 
                 // Renumbered from zero rather than carried across: the source may

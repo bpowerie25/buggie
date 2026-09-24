@@ -167,11 +167,13 @@ and the reporter.
 
 The composer is rich text. `⌘Enter` (or `Ctrl+Enter`) posts.
 
-For staff the composer **defaults to an internal note**, marked with an amber border
-and a lock. Switching it to *Visible to client* shows a warning line underneath
-before you post. This is the mistake worth designing against: telling a client
-something that was meant for the team. The toggle resets to internal each time the
-page loads.
+For staff the composer is a switch between **Comment** and **Internal note**, and
+**defaults to an internal note**. The line under the editor always says who will see
+what you write. This is the mistake worth designing against: telling a client
+something that was meant for the team. The switch resets to internal each time the
+page loads. On a client-visible issue, **Reply & await client** posts in public and
+moves the issue to the project's awaiting-client status — see
+[Clients](clients.md#whose-turn-it-is).
 
 Clients see no toggle; their comments are always public. A client cannot post an
 internal note even by crafting the request.

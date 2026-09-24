@@ -1,4 +1,11 @@
-import { Avatar, LabelPill, PriorityBars, StatusDot, TypeIcon } from '@/components/issue-bits';
+import {
+    Avatar,
+    ClientRepliedBadge,
+    LabelPill,
+    PriorityBars,
+    StatusDot,
+    TypeIcon,
+} from '@/components/issue-bits';
 import type { IssueRow, IssueStatus } from '@/types';
 import {
     DndContext,
@@ -34,6 +41,11 @@ function Card({ issue, dragging }: { issue: IssueRow; dragging?: boolean }) {
             </div>
 
             <p className="mt-1.5 line-clamp-3 text-xs text-ink">{issue.title}</p>
+            {issue.client_replied && (
+                <div className="mt-1.5">
+                    <ClientRepliedBadge />
+                </div>
+            )}
 
             {(issue.labels.length > 0 || issue.assignee) && (
                 <div className="mt-2 flex items-center gap-1">

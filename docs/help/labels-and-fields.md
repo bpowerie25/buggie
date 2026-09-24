@@ -66,7 +66,8 @@ A project can carry a default assignee, which new issues inherit. The API accept
 there is no control for it in project settings, so in practice new issues start
 unassigned unless you set one.
 
-Clients cannot assign anything and are not shown the staff list.
+Clients cannot assign anything and are not shown the staff list. Only staff can be
+assigned an issue.
 
 In a query: `assignee:@me`, `assignee:sam` (a case-insensitive prefix of the name),
 `no:assignee`, `-assignee:sam`. The same values work for `reporter:`, which matches

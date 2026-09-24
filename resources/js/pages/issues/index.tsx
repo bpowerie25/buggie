@@ -2,6 +2,7 @@ import { Button } from '@/components/button';
 import { IssueBoard } from '@/components/issue-board';
 import {
     Avatar,
+    ClientRepliedBadge,
     LabelPill,
     PriorityBars,
     StatusDot,
@@ -189,7 +190,7 @@ export default function IssuesIndex({
                 return rankAfterDrop(issue, columnName, beforeKey);
             }
 
-            const person = (facets?.members ?? []).find((m) => m.name === columnName);
+            const person = (facets?.assignees ?? []).find((m) => m.name === columnName);
 
             // "Unassigned" is a real column and a real destination, not a failure to
             // find somebody.
@@ -453,7 +454,7 @@ export default function IssuesIndex({
                                 <PopoverItem onSelect={() => { close(); bulk({ assignee_id: null }); }}>
                                     Unassigned
                                 </PopoverItem>
-                                {(facets?.members ?? []).map((member) => (
+                                {(facets?.assignees ?? []).map((member) => (
                                     <PopoverItem
                                         key={member.id}
                                         onSelect={() => { close(); bulk({ assignee_id: member.id }); }}
@@ -704,6 +705,8 @@ function Row({
                 {issue.title}
             </Link>
 
+            {issue.client_replied && <ClientRepliedBadge />}
+
             <span className="hidden shrink-0 rounded bg-surface px-1.5 py-0.5 text-[11px] text-ink-muted lg:inline">
                 {issue.project.key}
             </span>
@@ -812,7 +815,7 @@ function Row({
                             >
                                 Unassigned
                             </PopoverItem>
-                            {(facets?.members ?? []).map((member) => (
+                            {(facets?.assignees ?? []).map((member) => (
                                 <PopoverItem
                                     key={member.id}
                                     selected={member.id === issue.assignee?.id}

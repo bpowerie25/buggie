@@ -33,6 +33,16 @@ final class ActivitySentence
             NotificationReason::DueDate => DueReminderSchedule::sentence(
                 (int) ($data['days'] ?? 0),
             ),
+            // `from` is set when the reader is a client, and is the workspace's name
+            // unless it has chosen to show its staff: see AuthorLabel.
+            NotificationReason::AwaitingReply => ($data['from'] ?? $actor).' replied and is waiting on you: '
+                .Str::limit($data['excerpt'] ?? '', 140),
+            // A portal reporter has no account, so no actor; their name rides in data.
+            NotificationReason::ClientReplied => ($data['from'] ?? $actor).' replied: '
+                .Str::limit($data['excerpt'] ?? '', 140),
+            // Nobody did this either: time passed.
+            NotificationReason::ClientReminder => 'Still waiting on your reply'
+                .(isset($data['since']) ? ' since '.$data['since'] : '').'.',
         };
     }
 }

@@ -8,6 +8,8 @@ use App\Models\Issue;
 use App\Models\User;
 use App\Enums\NotificationReason;
 use App\Support\Notifications\Notifier;
+use App\Support\Issues\AuthorLabel;
+use App\Support\Issues\ClientConversation;
 use App\Support\RichText\TiptapDocument;
 use Illuminate\Support\Facades\DB;
 
@@ -17,10 +19,12 @@ class AddComment
 
     /**
      * @param  array{body: array<string, mixed>, is_internal?: bool}  $attributes
+     * @param  bool  $notify  False when the caller decides who hears about it — see
+     *                        ClientConversation::replyAndAwait().
      */
-    public function handle(Issue $issue, array $attributes, User $author): Comment
+    public function handle(Issue $issue, array $attributes, User $author, bool $notify = true): Comment
     {
-        return DB::transaction(function () use ($issue, $attributes, $author) {
+        return DB::transaction(function () use ($issue, $attributes, $author, $notify) {
             $body = $attributes['body'];
 
             $comment = $issue->comments()->create([
@@ -42,6 +46,7 @@ class AddComment
             $issue->touch();
 
             $internal = $comment->is_internal;
+            $fromClient = AuthorLabel::role($author, $issue->workspace) === 'client';
 
             \App\Support\Webhooks\Webhooks::comment($issue, $author->name, $internal);
 
@@ -49,11 +54,27 @@ class AddComment
             // the channel is the team's own. The text is never sent either way.
             \App\Support\Chat\ChatNotifications::comment($issue, $author->name, $internal);
 
-            $this->notifier->watchers($issue, NotificationReason::Commented, $author, [
-                'excerpt' => $comment->body_text,
-                // Clients watching this issue must not be told about internal notes.
-                'internal' => $internal,
-            ]);
+            $conversation = app(ClientConversation::class);
+
+            if ($fromClient) {
+                // A client's word is always public, and it is their answer: the
+                // conversation decides whether the issue moves and who is told.
+                $conversation->clientReplied($issue, $author, $comment->body_text);
+            } else {
+                if ($notify) {
+                    $this->notifier->watchers($issue, NotificationReason::Commented, $author, [
+                        'excerpt' => $comment->body_text,
+                        // Clients watching this issue must not be told about internal notes.
+                        'internal' => $internal,
+                    ]);
+                }
+
+                // Answering the client takes the "client replied" badge down. An
+                // internal note does not: the client is still waiting to hear.
+                if (! $internal) {
+                    $conversation->seenByStaff($issue);
+                }
+            }
 
             foreach (TiptapDocument::mentionedUserIds($body) as $id) {
                 if ($mentioned = User::find($id)) {

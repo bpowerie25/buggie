@@ -66,14 +66,24 @@ project grants. The workspace owner cannot be removed.
 ## Deciding what a client sees
 
 An issue is internal by default. Make one visible with the **Visibility** control in
-the right-hand column of the issue page. There is no bulk control for visibility — the
+the right-hand column of the issue page, which offers four choices:
+
+| | Who among the clients sees it |
+|---|---|
+| **Internal only** | Nobody. |
+| **Default** | Client managers on the project, the reporter, and anyone watching. |
+| **All clients on this project** | Every client who holds the project, whatever their tier. |
+| **Specific clients** | The default, plus the clients you tick. Only clients on the project are offered. |
+
+The badge beside the issue key says who can actually see it — "Visible to: Jane, Mia",
+"All Kennco clients". Only staff see those names; a client sees "Shared with you". There is no bulk control for visibility — the
 bulk bar on the issue list offers status, assignee and priority only — so sharing is
 one issue at a time, which is the intended shape rather than an oversight.
 
 Two cases where Buggie decides for you:
 
-- An issue a **client files** is forced to client-visible and left unassigned, so they
-  do not lose sight of it the moment it is created.
+- An issue a **client files** is forced to client-visible, left unassigned and starts in
+  **New**, so they do not lose sight of it and the team sees it on Triage.
 - An issue accepted from a report that carried an **email address** is created
   client-visible; an anonymous report becomes internal. See [Triage](triage.md).
 - An issue a **reporter replies to** through the portal becomes client-visible, since
@@ -85,12 +95,15 @@ Not every client is the same person. Usually it is whoever reported the bug.
 Occasionally, at a larger organisation, it is a project manager whose job is to see
 all of it.
 
-So a grant carries a **tier**, chosen per project in **Settings → Members → Change**:
+So a grant carries a **tier**, chosen per project on **Settings → Members** — each of a
+client's projects has a dropdown that saves as you change it — and when you invite them:
 
 | Tier | Sees |
 |---|---|
-| **Their own issues** (the default) | Only what they reported, or were brought into by commenting or being mentioned |
-| **All client issues** | Every issue on that project marked visible to the client |
+| **Own issues only** (the default) | Only what they reported, or were brought into by commenting or being mentioned |
+| **All client-visible issues** | Every issue on that project marked visible to the client |
+
+Every change is listed under *Recent changes* on the same screen.
 
 **The default is the narrow one**, and that is deliberate. A client of an agency
 usually has no business seeing what another department at their company reported, and
@@ -112,10 +125,41 @@ cannot be parsed should never fail open.
 Comments and activity events default to **internal**. Something a client can see is a
 decision someone makes, never an accident.
 
-On the issue page the composer starts as an *Internal note* — amber, with a lock —
-and switching it to *Visible to client* puts a warning line under the button before
-you post. Internal comments are visually distinct in the stream, and internal activity
-events are withheld from clients entirely.
+On the issue page the composer is a two-way switch, **Comment** or **Internal note**,
+starting on *Internal note*. A line under the editor always says who will see what you
+write: "Internal — staff only", or the issue's actual audience. In the thread every
+comment says whether its author is **Staff** or **Client**, and whether it is
+**Internal** or **Visible to client** (hover for who); the left border is amber for an
+internal note, blue for the team writing to the client, green for the client.
+
+A client's copy of the thread holds only public comments and client-safe activity —
+the issue being created, status changes, and replies. Assignment, priority, visibility,
+audience, time and estimates never reach their browser at all. The team is shown to
+clients as the workspace ("Matrix") unless **Settings → Workspace → Show clients the
+names of individual staff** is on.
+
+## Whose turn it is
+
+The **assignee is always somebody on the team**, and never changes on its own. Whose
+turn it is lives in the status:
+
+1. Mark one status per project as the **client's turn** in the workflow editor. The
+   *Client website build* and *Ongoing support* templates come with one.
+2. Write a reply and press **Reply & await client**. The reply is posted in public, the
+   clients who can see the issue are told, and the issue moves to that status,
+   remembering where it was.
+3. When the client answers — in the app, by email, or through the portal — the issue
+   goes back to where it was, the assignee is told (or, with nobody assigned, the team
+   watching it; with nobody watching, it waits on Triage), and a **Client replied**
+   badge appears in lists and Triage until somebody on the team opens it or replies.
+
+A client comment on an issue that is not waiting tells the assignee and changes
+nothing else. Clients can never change a status themselves.
+
+Each project can also, under **Waiting on the client** in its settings, remind the
+client once after a number of days, and close the issue after a longer number with a
+comment saying why. Both are off unless you set them. A reply to an issue closed this
+way reopens it where it was.
 
 A client's own comments are always public, and there is no code path by which a client
 can produce an internal note, whatever the form posts.

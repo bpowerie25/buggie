@@ -97,6 +97,7 @@ class ProjectTemplate
                 'color' => self::color($key, $status['color'] ?? null, "the status “{$name}”"),
                 'is_default' => (bool) ($status['is_default'] ?? false),
                 'is_triage' => (bool) ($status['is_triage'] ?? false),
+                'is_awaiting_client' => (bool) ($status['is_awaiting_client'] ?? false),
                 'wip_limit' => self::wipLimit($key, $status['wip_limit'] ?? null, $name),
             ];
         }
@@ -163,6 +164,12 @@ class ProjectTemplate
 
         if (count($triage) > 1) {
             throw InvalidTemplate::for($key, count($triage).' statuses are marked as where client issues start; there can be one.');
+        }
+
+        $awaiting = array_filter($statuses, fn (array $s) => $s['is_awaiting_client'] ?? false);
+
+        if (count($awaiting) > 1 || (($wait = reset($awaiting)) !== false && ! $wait['category']->isOpen())) {
+            throw InvalidTemplate::for($key, 'at most one status can be where an issue awaits the client, and it must be open.');
         }
 
         if (($first = reset($triage)) !== false && ! $first['category']->isOpen()) {

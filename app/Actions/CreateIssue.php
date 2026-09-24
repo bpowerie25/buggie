@@ -55,13 +55,27 @@ class CreateIssue
             unset($attributes['status_id']);
         }
 
+        // Staff only, whoever is asking and however they got here. The project's
+        // default assignee is checked too: a client there would be handed every new
+        // issue silently, and is skipped rather than refused, because the person
+        // filing did not choose it.
+        if (isset($attributes['assignee_id'])) {
+            \App\Support\Issues\Assignable::ensure(User::find($attributes['assignee_id']), $project->workspace);
+        }
+
+        $fallbackAssignee = $project->defaultAssignee;
+
+        if ($fallbackAssignee !== null && ! \App\Support\Issues\Assignable::isAssignable($fallbackAssignee, $project->workspace)) {
+            $fallbackAssignee = null;
+        }
+
         // Validated before the transaction opens rather than inside it: a rejected
         // value should never have consumed an issue number, and the numbers are
         // handed out by the project rather than by a sequence, so a rolled-back
         // insert leaves a visible gap.
         $customFields = $this->fields->validate($project, $attributes['custom_fields'] ?? []);
 
-        return DB::transaction(function () use ($project, $attributes, $reporter, $customFields, $raisedByClient) {
+        return DB::transaction(function () use ($project, $attributes, $reporter, $customFields, $raisedByClient, $fallbackAssignee) {
             $status = $attributes['status_id'] ?? $this->startingStatus($project, $raisedByClient)?->id;
 
             abort_if($status === null, 422, 'This project has no statuses configured.');
@@ -86,7 +100,9 @@ class CreateIssue
                 'type' => $attributes['type'] ?? 'bug',
                 'status_id' => $status,
                 'priority' => $attributes['priority'] ?? 0,
-                'assignee_id' => $attributes['assignee_id'] ?? $project->default_assignee_id,
+                'assignee_id' => array_key_exists('assignee_id', $attributes) && $attributes['assignee_id'] !== null
+                    ? $attributes['assignee_id']
+                    : $fallbackAssignee?->id,
                 'reporter_id' => $reporter?->id,
                 'visibility' => $attributes['visibility'] ?? 'internal',
             ]);
@@ -114,7 +130,8 @@ class CreateIssue
 
             $this->fields->store($issue, $customFields);
 
-            $issue->recordEvent(IssueEventType::Created, [], $reporter);
+            // Client-visible: "created this issue" is how a client's thread begins.
+            $issue->recordEvent(IssueEventType::Created, [], $reporter, isInternal: false);
 
             $issue->watch($reporter, WatchReason::Reported);
             $issue->watch($issue->assignee, WatchReason::Assigned);

@@ -33,11 +33,20 @@ import type { JSONContent } from '@tiptap/react';
 import { Eye, EyeOff, Lock, Plus, Tag, Timer, Trash2, X } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 
+/** Whoever wrote or did something, as the reader is allowed to see them. */
+interface Actor {
+    id: number | null;
+    name: string;
+    role: 'staff' | 'client';
+}
+
 interface Comment {
     id: number;
     body: JSONContent;
     is_internal: boolean;
-    author: Person | null;
+    author: Actor;
+    /** Who a public comment reaches now, in words. Staff only. */
+    audience: string | null;
     created_at: string;
     edited_at: string | null;
     can_edit: boolean;
@@ -47,7 +56,8 @@ interface Event {
     id: number;
     type: string;
     data: Record<string, unknown>;
-    actor: Person | null;
+    actor: Actor | null;
+    is_internal: boolean;
     created_at: string;
 }
 
@@ -188,6 +198,16 @@ function AudienceControl({
     );
 }
 
+/**
+ * A comment's left border, so the thread can be read at a glance: an internal note,
+ * the team writing to the client, or the client writing.
+ */
+function commentBorder(comment: Comment): string {
+    if (comment.is_internal) return '#F59E0B';
+
+    return comment.author.role === 'client' ? '#10B981' : '#3B82F6';
+}
+
 /** Renders one activity event as a sentence. */
 function typeLabel(value: string): string {
     return value.charAt(0).toUpperCase() + value.slice(1);
@@ -219,6 +239,14 @@ function eventSentence(event: Event): string {
             return `${actor} added the label ${d.name as string}`;
         case 'label_removed':
             return `${actor} removed the label ${d.name as string}`;
+        case 'awaiting_client':
+            return `${actor} replied and is waiting on the client — moved to ${(d.to as { name: string })?.name}`;
+        case 'client_replied':
+            return `${event.actor ? actor : ((d.name as string) ?? 'The client')} replied — moved back to ${(d.to as { name: string })?.name}`;
+        case 'client_reminded':
+            return 'The client was reminded that a reply is waiting';
+        case 'auto_closed':
+            return `Closed after ${d.days as number} days without a reply`;
         case 'audience_changed': {
             const clients = (d.clients as string[] | undefined) ?? [];
             const to =
@@ -489,6 +517,7 @@ export default function ShowIssue({
     diagnostics,
     relationTypes = [],
     projectClients = [],
+    composer = null,
     versions = [],
     customFields = [],
     time = null,
@@ -506,6 +535,13 @@ export default function ShowIssue({
     relationTypes?: { value: string; label: string }[];
     /** Clients on this project who can be named in a specific audience. Staff only. */
     projectClients?: Person[];
+    /** Who a message from the composer reaches, and whether it can await the client. Staff only. */
+    composer?: {
+        internal: string;
+        public: string | null;
+        can_await: boolean;
+        awaiting_status: string | null;
+    } | null;
     versions?: { id: number; name: string; released: boolean }[];
     customFields?: CustomFieldWithValue[];
     parent?: { key: string; title: string } | null;
@@ -547,6 +583,23 @@ export default function ShowIssue({
             },
         );
     }
+
+    function replyAndAwait() {
+        if (!body) return;
+
+        router.post(
+            `/issues/${issue.key}/await-client`,
+            { body },
+            {
+                preserveScroll: true,
+                only: ['issue', 'comments', 'events', 'composer', 'flash', 'errors'],
+                onSuccess: () => setBody(null),
+            },
+        );
+    }
+
+    // Staff see who can see what; a client's payload never has the details to show.
+    const staffView = composer !== null;
 
     // Comments and events interleave into one chronological stream.
     const stream = [
@@ -699,8 +752,25 @@ export default function ShowIssue({
                                         key={`e${entry.data.id}`}
                                         className="flex items-center gap-2 text-xs text-ink-muted"
                                     >
-                                        <span className="ml-2 size-1.5 rounded-full bg-border-strong" />
-                                        {eventSentence(entry.data)}
+                                        {/* Staff can see at a glance what the client can
+                                            see. A client only ever receives public ones. */}
+                                        {staffView ? (
+                                            entry.data.is_internal ? (
+                                                <Lock aria-label="Internal" className="ml-1 size-3 shrink-0 text-amber-500" />
+                                            ) : (
+                                                <Eye aria-label="Visible to client" className="ml-1 size-3 shrink-0 text-sky-500" />
+                                            )
+                                        ) : (
+                                            <span className="ml-2 size-1.5 rounded-full bg-border-strong" />
+                                        )}
+                                        <span>
+                                            {eventSentence(entry.data)}
+                                            {staffView && entry.data.actor && (
+                                                <span className="text-ink-subtle">
+                                                    {' '}({entry.data.actor.role === 'client' ? 'Client' : 'Staff'})
+                                                </span>
+                                            )}
+                                        </span>
                                         <span className="text-ink-subtle">
                                             · {relativeTime(entry.at)}
                                         </span>
@@ -708,27 +778,43 @@ export default function ShowIssue({
                                 ) : (
                                     <li
                                         key={`c${entry.data.id}`}
-                                        className={`rounded-lg border p-3 ${
-                                            entry.data.is_internal
-                                                ? 'border-l-2 border-border border-l-amber-500 bg-surface'
-                                                : 'border-border bg-raised'
+                                        style={{ borderLeftColor: commentBorder(entry.data) }}
+                                        className={`rounded-lg border border-l-4 border-border p-3 ${
+                                            entry.data.is_internal ? 'bg-surface' : 'bg-raised'
                                         }`}
                                     >
-                                        <div className="flex items-center gap-2">
-                                            <Avatar
-                                                name={entry.data.author?.name ?? 'Unknown'}
-                                            />
+                                        <div className="flex flex-wrap items-center gap-2">
+                                            <Avatar name={entry.data.author.name} />
                                             <span className="text-xs font-medium text-ink">
-                                                {entry.data.author?.name ?? 'Unknown'}
+                                                {entry.data.author.name}
                                             </span>
-                                            {entry.data.is_internal && (
+                                            <span
+                                                className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${
+                                                    entry.data.author.role === 'client'
+                                                        ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                                                        : 'bg-surface text-ink-muted'
+                                                }`}
+                                            >
+                                                {entry.data.author.role === 'client' ? 'Client' : 'Staff'}
+                                            </span>
+                                            {entry.data.is_internal ? (
                                                 <span
                                                     title="Internal note — clients cannot see this"
-                                                    className="flex items-center gap-1 text-[11px] text-amber-600 dark:text-amber-500"
+                                                    className="flex items-center gap-1 rounded bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-500"
                                                 >
                                                     <Lock className="size-3" />
                                                     Internal
                                                 </span>
+                                            ) : (
+                                                staffView && (
+                                                    <span
+                                                        title={entry.data.audience ?? undefined}
+                                                        className="flex cursor-help items-center gap-1 rounded bg-sky-500/10 px-1.5 py-0.5 text-[10px] font-medium text-sky-600 dark:text-sky-400"
+                                                    >
+                                                        <Eye className="size-3" />
+                                                        Visible to client
+                                                    </span>
+                                                )
                                             )}
                                             <span className="text-[11px] text-ink-subtle">
                                                 {relativeTime(entry.data.created_at)}
@@ -767,52 +853,83 @@ export default function ShowIssue({
                                     onSubmit={submitComment}
                                 />
 
-                                <div className="mt-2 flex items-center gap-3">
-                                    <Button
-                                        size="sm"
-                                        disabled={!body}
-                                        onClick={submitComment}
+                                {/* Who this reaches, said in words and always shown:
+                                    telling a client something meant for the team is
+                                    the mistake worth designing against. */}
+                                {composer && (
+                                    <p
+                                        className={`mt-2 flex items-center gap-1.5 text-[11px] ${
+                                            internal ? 'text-amber-600 dark:text-amber-500' : 'text-sky-600 dark:text-sky-400'
+                                        }`}
                                     >
-                                        Comment
-                                    </Button>
-
-                                    {can.comment_internally && (
-                                        <button
-                                            type="button"
-                                            onClick={() => setInternal((i) => !i)}
-                                            className={`flex items-center gap-1.5 rounded-lg border px-2 py-1 text-xs transition ${
-                                                internal
-                                                    ? 'border-amber-500/40 bg-amber-500/10 text-amber-600 dark:text-amber-500'
-                                                    : 'border-accent/40 bg-accent-soft text-accent'
-                                            }`}
-                                        >
-                                            {internal ? (
-                                                <>
-                                                    <EyeOff className="size-3" />
-                                                    Internal note
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <Eye className="size-3" />
-                                                    Visible to client
-                                                </>
-                                            )}
-                                        </button>
-                                    )}
-
-                                    <span className="text-[11px] text-ink-subtle">
-                                        ⌘↵ to submit
-                                    </span>
-                                </div>
-
-                                {/* The mistake worth designing against: telling a client
-                                    something that was meant for the team. */}
-                                {!internal && can.comment_internally && (
-                                    <p className="mt-2 text-[11px] text-accent">
-                                        This comment will be visible to the client on this
-                                        project.
+                                        {internal ? <Lock className="size-3" /> : <Eye className="size-3" />}
+                                        {internal
+                                            ? composer.internal
+                                            : issue.visibility === 'internal'
+                                              ? 'This issue is internal — no client can see it'
+                                              : composer.public}
                                     </p>
                                 )}
+
+                                <div className="mt-2 flex flex-wrap items-center gap-3">
+                                    {can.comment_internally && (
+                                        <div
+                                            role="radiogroup"
+                                            aria-label="Who this is for"
+                                            className="flex overflow-hidden rounded-lg border border-border text-xs"
+                                        >
+                                            <button
+                                                type="button"
+                                                role="radio"
+                                                aria-checked={!internal}
+                                                onClick={() => setInternal(false)}
+                                                className={`flex items-center gap-1.5 px-2.5 py-1 transition ${
+                                                    !internal
+                                                        ? 'bg-sky-500/15 font-medium text-sky-700 dark:text-sky-300'
+                                                        : 'text-ink-muted hover:text-ink'
+                                                }`}
+                                            >
+                                                <Eye className="size-3" />
+                                                Comment
+                                            </button>
+                                            <button
+                                                type="button"
+                                                role="radio"
+                                                aria-checked={internal}
+                                                onClick={() => setInternal(true)}
+                                                className={`flex items-center gap-1.5 border-l border-border px-2.5 py-1 transition ${
+                                                    internal
+                                                        ? 'bg-amber-500/15 font-medium text-amber-700 dark:text-amber-300'
+                                                        : 'text-ink-muted hover:text-ink'
+                                                }`}
+                                            >
+                                                <Lock className="size-3" />
+                                                Internal note
+                                            </button>
+                                        </div>
+                                    )}
+
+                                    <Button size="sm" disabled={!body} onClick={submitComment}>
+                                        {internal ? 'Add internal note' : 'Comment'}
+                                    </Button>
+
+                                    {/* Only a public reply on a client-visible issue can wait
+                                        on the client, and only where the project has an
+                                        awaiting-client status. */}
+                                    {!internal && composer?.can_await && can.update && (
+                                        <Button
+                                            size="sm"
+                                            variant="secondary"
+                                            disabled={!body}
+                                            onClick={replyAndAwait}
+                                            title={`Posts this reply and moves the issue to ${composer.awaiting_status}`}
+                                        >
+                                            Reply & await client
+                                        </Button>
+                                    )}
+
+                                    <span className="text-[11px] text-ink-subtle">⌘↵ to submit</span>
+                                </div>
                             </div>
                         )}
                     </section>
@@ -884,7 +1001,7 @@ export default function ShowIssue({
                                         >
                                             Unassigned
                                         </PopoverItem>
-                                        {facets.members.map((member) => (
+                                        {facets.assignees.map((member) => (
                                             <PopoverItem
                                                 key={member.id}
                                                 selected={member.id === issue.assignee?.id}

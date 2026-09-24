@@ -22,3 +22,11 @@ Schedule::command('buggie:prune')->dailyAt('03:20')->withoutOverlapping();
 // on the same day sends nothing.
 Schedule::command('issues:chase-due')->dailyAt('06:40')->withoutOverlapping();
 // --- end due-date chasing -----------------------------------------------------
+
+// --- waiting on clients -------------------------------------------------------
+// Hourly, so a reminder set for three days goes out within the hour of the third
+// day rather than at some fixed time the next morning. Does nothing for a project
+// that has not set a reminder or an auto-close period, which is every project by
+// default. Safe to overlap: see the command.
+Schedule::command('issues:chase-clients')->hourly()->withoutOverlapping();
+// --- end waiting on clients ---------------------------------------------------

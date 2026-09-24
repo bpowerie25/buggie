@@ -188,25 +188,32 @@ class ClientVisibilityTest extends TestCase
     #[Test]
     public function internal_activity_events_are_withheld_from_clients(): void
     {
+        // Where their issue has got to is theirs to see; how the team organises the
+        // work — priority, who holds it — is not.
         [$workspace, $staff, $client, $project, $issue] = $this->scenario();
 
         $done = $project->statuses()->where('category', 'done')->first();
 
         $this->actingAs($staff)->patch(
             $this->workspaceUrl($workspace, '/issues/'.$issue->key),
-            ['status_id' => $done->id],
+            ['status_id' => $done->id, 'priority' => $issue->priority->value === 4 ? 1 : 4, 'assignee_id' => $staff->id],
         );
 
-        $staffEvents = $this->actingAs($staff)
+        $staffEvents = collect($this->actingAs($staff)
             ->get($this->workspaceUrl($workspace, '/issues/'.$issue->key))
-            ->viewData('page')['props']['events'];
+            ->viewData('page')['props']['events'])->pluck('type');
 
-        $clientEvents = $this->actingAs($client)
+        $clientEvents = collect($this->actingAs($client)
             ->get($this->workspaceUrl($workspace, '/issues/'.$issue->key))
-            ->viewData('page')['props']['events'];
+            ->viewData('page')['props']['events'])->pluck('type');
 
-        $this->assertGreaterThan(0, count($staffEvents));
-        $this->assertCount(0, $clientEvents, 'Events default to internal.');
+        $this->assertContains('priority_changed', $staffEvents);
+        $this->assertContains('assigned', $staffEvents);
+
+        $this->assertContains('status_changed', $clientEvents);
+        $this->assertContains('closed', $clientEvents);
+        $this->assertNotContains('priority_changed', $clientEvents);
+        $this->assertNotContains('assigned', $clientEvents);
     }
 
     /** @return array<string, mixed> */

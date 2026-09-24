@@ -126,6 +126,8 @@ export interface IssueRow {
     labels: LabelChip[];
     project: { id: number; key: string; name: string; slug: string };
     updated_at: string;
+    /** A client has answered and nobody on the team has looked since. Staff only. */
+    client_replied?: boolean;
 }
 
 export interface IssueFilters {
@@ -142,6 +144,8 @@ export interface Facets {
     projects: { id: number; name: string; key: string; slug: string }[];
     labels: LabelChip[];
     members: Person[];
+    /** Staff only: who an issue can be assigned to. */
+    assignees: Person[];
     priorities: { value: number; label: string; color: string }[];
     types: { value: IssueTypeValue; label: string }[];
     statuses_by_project: Record<number, IssueStatus[]>;

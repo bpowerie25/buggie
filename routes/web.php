@@ -217,6 +217,8 @@ Route::domain('{workspace}.'.$host)
 
         Route::post('issues/{issue}/comments', [CommentController::class, 'store'])
             ->name('comments.store');
+        Route::post('issues/{issue}/await-client', [CommentController::class, 'await'])
+            ->name('comments.await');
         Route::patch('comments/{comment}', [CommentController::class, 'update'])
             ->name('comments.update');
         Route::delete('comments/{comment}', [CommentController::class, 'destroy'])

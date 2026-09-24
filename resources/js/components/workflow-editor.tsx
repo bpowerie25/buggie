@@ -28,6 +28,8 @@ interface Category {
 
 interface Row extends IssueStatus {
     is_default: boolean;
+    /** Where an issue waits while it is the client's turn. At most one. */
+    is_awaiting_client?: boolean;
     issues_count: number;
 }
 
@@ -166,6 +168,17 @@ function SortableRow({
                         </span>
                     )}
 
+                    {status.is_awaiting_client && (
+                        <button
+                            type="button"
+                            onClick={() => save({ is_awaiting_client: false })}
+                            title="Issues wait here after Reply & await client. Click to unmark."
+                            className="shrink-0 rounded bg-surface px-1.5 py-0.5 text-[10px] font-medium text-ink-muted hover:text-ink"
+                        >
+                            client's turn
+                        </button>
+                    )}
+
                     <span className="w-20 shrink-0 text-right text-[11px] text-ink-subtle">
                         {status.category}
                     </span>
@@ -173,6 +186,17 @@ function SortableRow({
                     <span className="w-16 shrink-0 text-right text-[11px] text-ink-subtle">
                         {status.issues_count} issue{status.issues_count === 1 ? '' : 's'}
                     </span>
+
+                    {!status.is_awaiting_client && status.open && (
+                        <button
+                            type="button"
+                            onClick={() => save({ is_awaiting_client: true })}
+                            title="Issues wait here after Reply & await client"
+                            className="shrink-0 rounded px-1.5 py-0.5 text-[11px] text-ink-subtle hover:text-accent"
+                        >
+                            client's turn
+                        </button>
+                    )}
 
                     {!status.is_default && status.open && (
                         <button

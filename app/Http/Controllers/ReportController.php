@@ -56,7 +56,7 @@ class ReportController extends Controller
 
             // Issues a client filed, waiting in "New". Not reports — they are already
             // issues, and the client can see them — but they need the same first look.
-            'clientIssues' => Issue::awaitingTriage()
+            'clientIssues' => Issue::forTriage()
                 ->with(['project:id,key,name,slug', 'reporter:id,name', 'status:id,name,color,category'])
                 ->when(
                     $request->filled('project'),
@@ -71,6 +71,8 @@ class ReportController extends Controller
                     'project' => $issue->project->key,
                     'reporter' => $issue->reporter?->name,
                     'created_at' => $issue->created_at->toIso8601String(),
+                    // Answered rather than new: the badge says so.
+                    'replied_at' => $issue->client_replied_at?->toIso8601String(),
                 ]),
         ]);
     }
@@ -83,8 +85,7 @@ class ReportController extends Controller
             'title' => ['nullable', 'string', 'max:255'],
             'priority' => ['nullable', Rule::in(array_column(IssuePriority::cases(), 'value'))],
             'type' => ['nullable', Rule::in(array_column(IssueType::cases(), 'value'))],
-            'assignee_id' => ['nullable', Rule::exists('workspace_user', 'user_id')
-                ->where('workspace_id', $this->tenancy->id())],
+            'assignee_id' => ['nullable', \App\Support\Issues\Assignable::rule($this->tenancy->id())],
             'also' => ['array'],          // sibling reports in the same fingerprint group
             'also.*' => ['integer'],
         ]);

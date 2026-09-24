@@ -6,6 +6,7 @@ use App\Actions\AddComment;
 use App\Http\Requests\StoreCommentRequest;
 use App\Models\Comment;
 use App\Models\Issue;
+use App\Support\Issues\ClientConversation;
 use App\Support\RichText\TiptapDocument;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -29,6 +30,20 @@ class CommentController extends Controller
         ], $request->user());
 
         return back();
+    }
+
+    /**
+     * Reply to the client in public and wait on them. Staff only: it moves the issue,
+     * and only staff change state.
+     */
+    public function await(StoreCommentRequest $request, Issue $issue, ClientConversation $conversation): RedirectResponse
+    {
+        $this->authorize('update', $issue);
+        $this->authorize('comment', $issue);
+
+        $conversation->replyAndAwait($issue, $request->array('body'), $request->user());
+
+        return back()->with('success', 'Replied. Waiting on the client.');
     }
 
     public function update(Request $request, Comment $comment): RedirectResponse

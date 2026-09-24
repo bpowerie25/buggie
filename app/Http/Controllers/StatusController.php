@@ -27,13 +27,17 @@ class StatusController extends Controller
 
         $status = DB::transaction(function () use ($request, $project) {
             $status = $project->statuses()->create([
-                ...$request->safe()->except('is_default'),
+                ...$request->safe()->except(['is_default', 'is_awaiting_client']),
                 'position' => (int) $project->statuses()->max('position') + 1,
                 'is_default' => false,
             ]);
 
             if ($request->boolean('is_default')) {
                 $this->makeDefault($project, $status);
+            }
+
+            if ($request->boolean('is_awaiting_client')) {
+                $this->makeAwaitingClient($project, $status);
             }
 
             return $status;
@@ -47,10 +51,16 @@ class StatusController extends Controller
         $this->authorize('update', $status->project);
 
         DB::transaction(function () use ($request, $status) {
-            $status->update($request->safe()->except('is_default'));
+            $status->update($request->safe()->except(['is_default', 'is_awaiting_client']));
 
             if ($request->boolean('is_default')) {
                 $this->makeDefault($status->project, $status);
+            }
+
+            if ($request->has('is_awaiting_client')) {
+                $request->boolean('is_awaiting_client')
+                    ? $this->makeAwaitingClient($status->project, $status)
+                    : $status->forceFill(['is_awaiting_client' => false])->save();
             }
         });
 
@@ -150,5 +160,22 @@ class StatusController extends Controller
 
         $project->statuses()->update(['is_default' => false]);
         $status->forceFill(['is_default' => true])->save();
+    }
+
+    /**
+     * The one status an issue waits in while it is the client's turn. Marked by the
+     * flag, never recognised by its name, and only an open one: an issue waiting on
+     * somebody is not finished.
+     */
+    private function makeAwaitingClient(Project $project, Status $status): void
+    {
+        if (! $status->category->isOpen()) {
+            throw ValidationException::withMessages([
+                'is_awaiting_client' => 'Only an open status can be where an issue waits on the client.',
+            ]);
+        }
+
+        $project->statuses()->whereKeyNot($status->id)->update(['is_awaiting_client' => false]);
+        $status->forceFill(['is_awaiting_client' => true])->save();
     }
 }

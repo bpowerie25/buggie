@@ -106,6 +106,11 @@ class ProjectController extends Controller
 
         return Inertia::render('projects/edit', [
             'project' => $this->summary($project),
+            'clientWait' => [
+                'reminder_days' => $project->clientWaitDays('awaiting_reminder_days'),
+                'close_days' => $project->clientWaitDays('awaiting_close_days'),
+                'has_status' => $project->awaitingClientStatus() !== null,
+            ],
             'statuses' => $project->statuses()->withCount('issues')->get()
                 ->map(fn (Status $status) => [
                     'id' => $status->id,
@@ -114,6 +119,7 @@ class ProjectController extends Controller
                     'color' => $status->color,
                     'position' => $status->position,
                     'is_default' => $status->is_default,
+                    'is_awaiting_client' => $status->is_awaiting_client,
                     'open' => $status->category->isOpen(),
                     'issues_count' => $status->issues_count,
                     'wip_limit' => $status->wip_limit,
@@ -179,7 +185,14 @@ class ProjectController extends Controller
     {
         $this->authorize('update', $project);
 
-        $project->update($request->validated());
+        $validated = $request->validated();
+        $wait = array_intersect_key($validated, array_flip(['awaiting_reminder_days', 'awaiting_close_days']));
+
+        $project->update(array_diff_key($validated, $wait));
+
+        if ($wait !== []) {
+            $project->forceFill(['settings' => [...($project->settings ?? []), ...$wait]])->save();
+        }
 
         return redirect()
             ->route('projects.show', $project)

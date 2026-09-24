@@ -47,6 +47,12 @@ class Issue extends Model
             // Deliberately absent from #[Fillable]: the chaser owns this, and a
             // request that could set it could silence a reminder.
             'due_reminded_on' => 'date',
+            // The client conversation's state, none of it fillable: only
+            // ClientConversation, UpdateIssue and the chaser write these.
+            'awaiting_client_since' => 'datetime',
+            'client_reminded_at' => 'datetime',
+            'auto_closed_at' => 'datetime',
+            'client_replied_at' => 'datetime',
         ];
     }
 
@@ -144,6 +150,12 @@ class Issue extends Model
     public function relations(): HasMany
     {
         return $this->hasMany(IssueRelation::class);
+    }
+
+    /** Where it was before it started waiting on the client, to go back to. */
+    public function statusBeforeWaiting(): BelongsTo
+    {
+        return $this->belongsTo(Status::class, 'status_before_waiting_id');
     }
 
     /**
@@ -249,6 +261,18 @@ class Issue extends Model
                 ->whereColumn('workspace_user.user_id', 'issues.reporter_id')
                 ->whereColumn('workspace_user.workspace_id', 'issues.workspace_id')
                 ->where('workspace_user.role', \App\Enums\WorkspaceRole::Client->value));
+    }
+
+    /**
+     * What the Triage screen lists beside the reports: a client's new issue still in
+     * "New", and any issue a client has answered that nobody on the team has opened
+     * since. The second is how a reply is noticed when nobody holds or watches it.
+     */
+    public function scopeForTriage(Builder $query): Builder
+    {
+        return $query->where(fn (Builder $q) => $q
+            ->awaitingTriage()
+            ->orWhereNotNull('issues.client_replied_at'));
     }
 
     public function scopeClosed(Builder $query): Builder

@@ -16,6 +16,14 @@ enum IssueEventType: string
     case VisibilityChanged = 'visibility_changed';
     /** Which clients see it. Always internal: it names clients, to each other. */
     case AudienceChanged = 'audience_changed';
+    /** The team replied and is waiting on the client. Client-visible. */
+    case AwaitingClient = 'awaiting_client';
+    /** The client answered and the issue went back to where it was. Client-visible. */
+    case ClientReplied = 'client_replied';
+    /** The client was reminded they owe a reply. Internal: it is the team's record. */
+    case ClientReminded = 'client_reminded';
+    /** Closed after waiting too long for a reply. Client-visible, with a comment. */
+    case AutoClosed = 'auto_closed';
     case VersionChanged = 'version_changed';
     case Related = 'related';
     case Unrelated = 'unrelated';
@@ -23,4 +31,18 @@ enum IssueEventType: string
     case Closed = 'closed';
     case Occurrence = 'occurrence';
     case AttachmentAdded = 'attachment_added';
+
+    /**
+     * What a client's thread may ever contain: where their issue got to, and the
+     * conversation. Checked as well as is_internal, so an event written public by
+     * mistake — or by an older rule — still cannot tell a client who holds the
+     * issue, who else can see it, or anything about time.
+     */
+    public function isClientSafe(): bool
+    {
+        return in_array($this, [
+            self::Created, self::StatusChanged, self::Closed, self::Reopened,
+            self::AwaitingClient, self::ClientReplied, self::AutoClosed,
+        ], true);
+    }
 }

@@ -70,7 +70,7 @@ export default function WorkspaceSettings({
     chatProviders = [],
     projects = [],
 }: {
-    workspace: { name: string; slug: string; created_at: string };
+    workspace: { name: string; slug: string; created_at: string; show_staff_names: boolean };
     domain: string;
     can_delete: boolean;
     tokens?: TokenRow[];
@@ -81,7 +81,10 @@ export default function WorkspaceSettings({
     chatProviders?: ChatProvider[];
     projects?: { id: number; name: string }[];
 }) {
-    const { data, setData, patch, processing, errors } = useForm({ name: workspace.name });
+    const { data, setData, patch, processing, errors } = useForm({
+        name: workspace.name,
+        show_staff_names: workspace.show_staff_names,
+    });
     const [confirm, setConfirm] = useState('');
 
     function submit(e: FormEvent) {
@@ -112,6 +115,22 @@ export default function WorkspaceSettings({
                         className="font-mono"
                     />
                 </Field>
+
+                <label className="flex items-start gap-2 text-sm text-ink-muted">
+                    <input
+                        type="checkbox"
+                        checked={data.show_staff_names}
+                        onChange={(e) => setData('show_staff_names', e.target.checked)}
+                        className="mt-0.5 rounded border-border-strong"
+                    />
+                    <span>
+                        Show clients the names of individual staff
+                        <span className="block text-xs text-ink-subtle">
+                            Off, clients see replies and changes from “{workspace.name}”. On, they
+                            see who on the team wrote each one.
+                        </span>
+                    </span>
+                </label>
 
                 <Button type="submit" disabled={processing}>
                     {processing ? 'Saving…' : 'Save changes'}

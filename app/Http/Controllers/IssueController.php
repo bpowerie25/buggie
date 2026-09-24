@@ -16,6 +16,7 @@ use App\Models\Status;
 use App\Models\User;
 use App\Support\Issues\IssueQuery;
 use App\Support\Issues\IssueQueryFilter;
+use App\Support\Issues\AuthorLabel;
 use App\Support\Tenancy\Tenancy;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
@@ -154,6 +155,36 @@ class IssueController extends Controller
         ]);
 
         $staff = $this->isStaff(request()->user());
+        $workspace = $this->tenancy->currentOrFail();
+        $viewer = request()->user();
+
+        // Somebody on the team has looked, so "client replied" comes down.
+        if ($staff) {
+            app(\App\Support\Issues\ClientConversation::class)->seenByStaff($issue);
+        }
+
+        // What a client may know about other issues: only those they could open. A
+        // related or child issue's title is otherwise internal work in the payload.
+        $visibleKeys = $staff ? null : Issue::query()
+            ->whereIn('id', collect([$issue->parent?->id])
+                ->merge($issue->children->pluck('id'))
+                ->merge($issue->relations->pluck('relatedIssue.id'))
+                ->filter()->all())
+            ->visibleToClient($viewer)
+            ->pluck('id')
+            ->all();
+
+        $canSee = fn (?int $id) => $id !== null && ($staff || in_array($id, $visibleKeys, true));
+
+        // Who wrote something, for whoever is reading it: see AuthorLabel.
+        $author = fn (?User $user, ?string $fallback = null) => [
+            'id' => $staff || $user === null || AuthorLabel::role($user, $workspace) === 'client' ? $user?->id : null,
+            'name' => AuthorLabel::for($user, $workspace, $staff, $fallback),
+            'role' => AuthorLabel::role($user, $workspace),
+        ];
+
+        $audience = app(\App\Support\Issues\ClientAudienceSummary::class);
+        $audienceLabel = $staff ? $audience->label($issue) : null;
 
         return Inertia::render('issues/show', [
             // Filtered in the query, not in the template: a field marked internal
@@ -163,8 +194,9 @@ class IssueController extends Controller
                 ->forIssue($issue, clientOnly: ! $staff),
 
             // One level, so this is a parent or a list of children, never both.
-            'parent' => $issue->parent?->only(['key', 'title']),
+            'parent' => $canSee($issue->parent?->id) ? $issue->parent->only(['key', 'title']) : null,
             'children' => $issue->children
+                ->filter(fn (\App\Models\Issue $child) => $canSee($child->id))
                 ->map(fn (\App\Models\Issue $child) => [
                     'key' => $child->key,
                     'title' => $child->title,
@@ -208,7 +240,7 @@ class IssueController extends Controller
             'issue' => [
                 ...$this->summary($issue),
                 'description' => $issue->description,
-                'reporter' => $issue->reporter?->only(['id', 'name']),
+                'reporter' => $issue->reporter === null ? null : $author($issue->reporter),
                 'visibility' => $issue->visibility->value,
                 'client_audience' => $issue->client_audience->value,
                 // Staff only: both name clients, and a client must not learn who
@@ -221,9 +253,11 @@ class IssueController extends Controller
                 'due_on' => $issue->due_on?->toDateString(),
                 'version' => $issue->version?->only(['id', 'name']),
                 'created_at' => $issue->created_at->toIso8601String(),
-                'watchers' => $issue->watchers->map->only(['id', 'name']),
+                // A client is shown only whether they themselves watch it: the list
+                // can name other clients, and the team speaks as the workspace.
+                'watchers' => $staff ? $issue->watchers->map->only(['id', 'name']) : [],
                 'watching' => $issue->watchers->contains('id', request()->user()->id),
-                'relations' => $issue->relations->map(fn ($relation) => [
+                'relations' => $issue->relations->filter(fn ($relation) => $canSee($relation->relatedIssue?->id))->values()->map(fn ($relation) => [
                     'id' => $relation->id,
                     'type' => $relation->type->value,
                     'label' => $relation->type->label(),
@@ -268,7 +302,15 @@ class IssueController extends Controller
                     'id' => $comment->id,
                     'body' => $comment->body,
                     'is_internal' => $comment->is_internal,
-                    'author' => $comment->author?->only(['id', 'name']),
+                    // Portal and email replies have no account; the system's own
+                    // notes (auto-close) have no author and speak as the workspace.
+                    'author' => $author(
+                        $comment->author,
+                        $comment->source === 'system' ? null : ($comment->author_name ?? $comment->author_email),
+                    ),
+                    // Who a public comment reaches now, for the badge's hover. Staff
+                    // only, and the issue's current audience, not a record of then.
+                    'audience' => $staff && ! $comment->is_internal ? $audienceLabel : null,
                     // Microseconds preserved so the merged feed sorts deterministically.
                     'created_at' => $comment->created_at->format('Y-m-d\TH:i:s.uP'),
                     'edited_at' => $comment->edited_at?->toIso8601String(),
@@ -278,11 +320,15 @@ class IssueController extends Controller
                 ->with('actor:id,name')
                 ->unless($staff, fn ($q) => $q->public())
                 ->get()
+                // Filtered here, before the payload, not in the component.
+                ->filter(fn ($event) => $staff || $event->type->isClientSafe())
+                ->values()
                 ->map(fn ($event) => [
                     'id' => $event->id,
                     'type' => $event->type->value,
                     'data' => $event->data,
-                    'actor' => $event->actor?->only(['id', 'name']),
+                    'actor' => $event->actor === null ? null : $author($event->actor),
+                    'is_internal' => $event->is_internal,
                     'created_at' => $event->created_at->format('Y-m-d\TH:i:s.uP'),
                 ]),
             'attachments' => $issue->attachments->map(fn ($attachment) => [
@@ -292,11 +338,19 @@ class IssueController extends Controller
                 'size' => $attachment->size,
                 'url' => route('attachments.show', $attachment),
                 'is_image' => $attachment->isImage(),
-                'uploaded_by' => $attachment->uploadedBy?->name,
+                'uploaded_by' => $attachment->uploadedBy === null ? null : $author($attachment->uploadedBy)['name'],
                 'created_at' => $attachment->created_at->toIso8601String(),
             ]),
             'statuses' => $this->statusesFor($issue->project),
             'facets' => $this->facets(),
+            // Who a message from the composer reaches, in words, for the line under
+            // it. Staff only; a client's message is always public and always theirs.
+            'composer' => $staff ? [
+                'internal' => 'Internal — staff only',
+                'public' => $audienceLabel,
+                'can_await' => app(\App\Support\Issues\ClientConversation::class)->canAwait($issue),
+                'awaiting_status' => $issue->project->awaitingClientStatus()?->name,
+            ] : null,
             'can' => [
                 'update' => request()->user()->can('update', $issue),
                 'comment_internally' => request()->user()->can('commentInternally', $issue),
@@ -394,6 +448,15 @@ class IssueController extends Controller
                     ->orderBy('name')->get(['users.id', 'users.name'])
                     ->map(fn (User $u) => ['id' => $u->id, 'name' => $u->name])
                 : collect(),
+            // Who an issue can be given to: staff only, the same rule the server
+            // enforces. Every assignee picker reads this, never `members`, which also
+            // holds clients so that filter chips can name a reporter.
+            'assignees' => $staff
+                ? $this->tenancy->currentOrFail()->members()
+                    ->wherePivotIn('role', \App\Support\Issues\Assignable::roles())
+                    ->orderBy('name')->get(['users.id', 'users.name'])
+                    ->map(fn (User $u) => ['id' => $u->id, 'name' => $u->name])
+                : collect(),
             'priorities' => IssuePriority::options(),
             'types' => IssueType::options(),
             // Keyed by project: the list spans projects and each has its own workflow.
@@ -474,13 +537,29 @@ class IssueController extends Controller
                 'position' => $issue->status->position,
                 'open' => $issue->status->category->isOpen(),
             ],
-            'assignee' => $issue->assignee?->only(['id', 'name']),
+            // A client reads the team as the workspace unless it shows its staff.
+            'assignee' => $issue->assignee === null ? null : [
+                'id' => $issue->assignee->id,
+                'name' => $this->viewerIsStaff()
+                    ? $issue->assignee->name
+                    : AuthorLabel::for($issue->assignee, $this->tenancy->currentOrFail(), readerIsStaff: false),
+            ],
             'labels' => $issue->labels->map->only(['id', 'name', 'color']),
+            // The team's cue that a client has answered. Staff only.
+            'client_replied' => $this->viewerIsStaff() && $issue->client_replied_at !== null,
             // Null-safe as well as scoped. The scope should mean this never sees a
             // deleted project, and a crash in a list is a bad way to find out it did.
             'project' => $issue->project?->only(['id', 'key', 'name', 'slug']),
             'updated_at' => $issue->updated_at->toIso8601String(),
         ];
+    }
+
+    private ?bool $viewerIsStaff = null;
+
+    /** Whether whoever is reading is on the team. Asked once per request. */
+    private function viewerIsStaff(): bool
+    {
+        return $this->viewerIsStaff ??= request()->user() !== null && $this->isStaff(request()->user());
     }
 
     private function isStaff(User $user): bool

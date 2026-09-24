@@ -29,7 +29,11 @@ class RowMapper
     public function __construct(private Project $project)
     {
         $this->statuses = $project->statuses()->get();
-        $this->members = $project->workspace->members()->get();
+        // Staff only: an import names an assignee, and a client is never one. A client
+        // named in the file is reported as unmatched rather than assigned.
+        $this->members = $project->workspace->members()
+            ->wherePivotIn('role', \App\Support\Issues\Assignable::roles())
+            ->get();
     }
 
     /**

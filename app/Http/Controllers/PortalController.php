@@ -99,7 +99,7 @@ class PortalController extends Controller
                 ),
             ];
 
-            $issue->comments()->create([
+            $comment = $issue->comments()->create([
                 'user_id' => null,
                 'author_name' => null,
                 'author_email' => $portal->email,
@@ -117,6 +117,11 @@ class PortalController extends Controller
             }
 
             $issue->touch();
+
+            // A reporter without an account is still the client side of the
+            // conversation, and their answer counts the same as a client's.
+            app(\App\Support\Issues\ClientConversation::class)
+                ->clientReplied($issue, null, $comment->body_text, $portal->email);
         });
 
         return back()->with('success', 'Thanks — we have added your message.');

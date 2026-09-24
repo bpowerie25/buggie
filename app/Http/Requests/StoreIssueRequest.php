@@ -32,7 +32,8 @@ class StoreIssueRequest extends FormRequest
             ],
             'assignee_id' => [
                 'nullable',
-                Rule::exists('workspace_user', 'user_id')->where('workspace_id', $workspaceId),
+                // Staff only: see Assignable.
+                \App\Support\Issues\Assignable::rule($workspaceId),
             ],
             'visibility' => ['required', new Enum(IssueVisibility::class)],
             'labels' => ['array'],
@@ -54,5 +55,12 @@ class StoreIssueRequest extends FormRequest
             'visibility' => IssueVisibility::Internal->value,
             'labels' => [],
         ]);
+    }
+
+    public function messages(): array
+    {
+        return [
+            'assignee_id.exists' => 'Only somebody on the team can be assigned an issue. To ask a client something, use Reply & await client.',
+        ];
     }
 }

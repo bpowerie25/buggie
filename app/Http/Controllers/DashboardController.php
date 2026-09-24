@@ -29,12 +29,10 @@ class DashboardController extends Controller
                     'description' => $p->description,
                 ]),
 
-            // Anything assigned to whoever is looking, open only.
-            //
-            // It matters most for clients: the team asks them a question by assigning
-            // the issue, and without this the only prompt is an email. A client who
-            // signs in should be able to see what is waiting on them without knowing
-            // the query language.
+            // What is waiting on whoever is looking. For staff, what they hold; for a
+            // client, what the team has replied to and is waiting on them for — the
+            // awaiting-client status, never the assignee, which is always staff. A
+            // client who signs in should see what they owe without the query language.
             'waitingOnYou' => $this->waitingOn($request->user()),
         ]);
     }
@@ -42,15 +40,18 @@ class DashboardController extends Controller
     /** @return array<int, array<string, mixed>> */
     private function waitingOn(User $user): array
     {
+        $staff = $user->membershipIn(app(Tenancy::class)->currentOrFail())?->isStaff() ?? false;
+
         return Issue::query()
             ->with(['project:id,key,name', 'status:id,name,category,color'])
-            ->where('assignee_id', $user->id)
-            ->whereHas('status', fn ($q) => $q->whereNotIn('category', ['done', 'canceled']))
-            // Belt and braces: the policy already decides what a client may open, but
-            // a dashboard is a listing, and a listing is where a leak goes unnoticed.
-            ->unless(
-                $user->membershipIn(app(Tenancy::class)->currentOrFail())?->isStaff() ?? false,
-                fn ($q) => $q->visibleToClient($user),
+            ->when(
+                $staff,
+                fn ($q) => $q->where('assignee_id', $user->id)
+                    ->whereHas('status', fn ($s) => $s->whereNotIn('category', ['done', 'canceled'])),
+                // The same scope that decides what a client may open: a dashboard is
+                // a listing, and a listing is where a leak goes unnoticed.
+                fn ($q) => $q->visibleToClient($user)
+                    ->whereHas('status', fn ($s) => $s->where('is_awaiting_client', true)),
             )
             ->latest('updated_at')
             ->limit(10)

@@ -147,6 +147,21 @@ Reports are **not** issues. They land in `reports` and are promoted, merged or
 discarded from the triage inbox. Anything the fingerprinter cannot group with
 confidence goes to a human.
 
+## Whose turn it is
+
+The assignee is always staff (`Assignable`), checked in the actions as well as the
+requests, and never changes on its own. "Waiting on the client" is a status flagged
+`is_awaiting_client`, and `ClientConversation` moves issues in and out of it. Every
+comment goes through it by author: `AddComment` routes a client's comment to
+`clientReplied`, and the portal and inbound email call it directly, so a new comment
+path must too. `UpdateIssue` keeps the wait state following the status however it
+moved.
+
+A client's issue payload is built for them in `IssueController::show`: events pass
+`IssueEventType::isClientSafe()` as well as `is_internal`, staff are named through
+`AuthorLabel`, and related issues go through the visibility scope. Add a field there
+and ask whether a client should have it; the test asserts on the raw props.
+
 ## What a client may know
 
 Three separate gates, and all of them must be open:

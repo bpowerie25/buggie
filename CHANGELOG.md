@@ -12,6 +12,16 @@ today you are running `main`, which is honest rather than ideal — see
 
 ### Added
 
+- **Reply & await client.** Whose turn it is lives in the status, not the assignee.
+  The reply goes out in public, the clients who can see the issue are told, and the
+  issue moves to the project's awaiting-client status. The client's answer — in the
+  app, by email or through the portal — moves it back, tells the assignee, and puts a
+  *Client replied* badge on lists and Triage until somebody on the team looks. Projects
+  can remind the client once, and close after a longer wait, both off by default.
+- **Who wrote what, and who can read it, on every comment**: a Staff or Client badge, an
+  Internal or Visible-to-client badge with the real audience on hover, and coloured
+  borders. The composer is now an explicit Comment / Internal note switch with a line
+  saying exactly who will see the message.
 - **Choosing which clients see an issue.** Visibility is now *Internal only*,
   *Default* (client managers, the reporter and watchers), *All clients on this
   project*, or *Specific clients* (the default plus people you name). Named sharing is
@@ -72,8 +82,23 @@ today you are running `main`, which is honest rather than ideal — see
   anywhere — so a delete looked careful and behaved permanently.
 - **A security policy** ([`SECURITY.md`](SECURITY.md)) and this file.
 
+### Changed
+
+- **Only staff can be assigned an issue.** A client could be made the assignee as a way
+  of asking them a question, which made the agency's work say it belonged to the
+  client — "Matrix assigned this to Brian Power". Every way in now refuses a client:
+  the sidebar, the list, bulk edit, the API, triage, import and a project's default
+  assignee. `buggie:client-assignees` lists any issue already assigned to a client and
+  changes nothing. Reply & await client replaces the old way of asking.
+- **Clients now see status changes** in their thread, alongside the issue being created
+  and the conversation. Assignment, priority, visibility, audience, time and estimates
+  stay out of their payload entirely, and they see the team as the workspace's name
+  unless the workspace chooses to show its staff.
+
 ### Fixed
 
+- A client's copy of an issue included the full watcher list, which could name other
+  clients, and the titles of related, parent and child issues they could not open.
 - A client filing an issue could set its starting status by adding `status_id` to the
   request — straight into "Done" — although the form never offered one. And any
   issue could be created in a status belonging to another project of the workspace.

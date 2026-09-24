@@ -1,6 +1,6 @@
 import { Button } from '@/components/button';
 import { Diagnostics } from '@/components/diagnostics';
-import { Avatar, relativeTime } from '@/components/issue-bits';
+import { Avatar, ClientRepliedBadge, relativeTime } from '@/components/issue-bits';
 import { Popover, PopoverItem } from '@/components/popover';
 import { useHotkeys } from '@/hooks/use-hotkeys';
 import { AppLayout } from '@/layouts/app-layout';
@@ -25,6 +25,8 @@ type ClientIssue = {
     project: string;
     reporter: string | null;
     created_at: string;
+    /** Set when a client has answered and nobody on the team has looked since. */
+    replied_at: string | null;
 };
 type Type = { value: string; label: string };
 
@@ -386,9 +388,10 @@ export default function ReportsIndex({
 function RaisedByClients({ issues }: { issues: ClientIssue[] }) {
     return (
         <section className="mb-6">
-            <h2 className="text-sm font-semibold text-ink">Raised by clients</h2>
+            <h2 className="text-sm font-semibold text-ink">From clients</h2>
             <p className="mt-0.5 text-xs text-ink-muted">
-                Waiting in New. Change the status to take one off this list.
+                New issues waiting in New, and replies nobody on the team has opened yet.
+                Moving a new one on, or opening a reply, takes it off this list.
             </p>
             <ul className="mt-3 divide-y divide-border overflow-hidden rounded-xl border border-border bg-raised">
                 {issues.map((issue) => (
@@ -403,6 +406,7 @@ function RaisedByClients({ issues }: { issues: ClientIssue[] }) {
                             <span className="min-w-0 flex-1 truncate text-sm text-ink">
                                 {issue.title}
                             </span>
+                            {issue.replied_at && <ClientRepliedBadge />}
                             <span className="shrink-0 text-xs text-ink-subtle">
                                 {issue.reporter ?? 'A client'} · {relativeTime(issue.created_at)}
                             </span>

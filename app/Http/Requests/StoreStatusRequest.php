@@ -33,6 +33,9 @@ class StoreStatusRequest extends FormRequest
 
             'is_default' => ['boolean'],
 
+            // Where an issue waits while it is the client's turn. One per project.
+            'is_awaiting_client' => ['boolean'],
+
             /*
              * How many issues should sit in this column at once.
              *

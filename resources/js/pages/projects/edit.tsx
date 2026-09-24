@@ -59,6 +59,7 @@ export default function EditProject({
     customFields = [],
     fieldTypes = [],
     branding,
+    clientWait,
 }: {
     project: ProjectSummary;
     widgetKeys: WidgetKeyRow[];
@@ -70,12 +71,15 @@ export default function EditProject({
     customFields?: CustomFieldRow[];
     fieldTypes?: { value: string; label: string; has_options: boolean }[];
     branding: { name: string | null; color: string | null; logo: string | null; placeholder: string };
+    clientWait: { reminder_days: number | null; close_days: number | null; has_status: boolean };
 }) {
     const { data, setData, put, processing, errors } = useForm({
         name: project.name,
         description: project.description ?? '',
         site_url: project.site_url ?? '',
         is_archived: project.is_archived ?? false,
+        awaiting_reminder_days: clientWait.reminder_days === null ? '' : String(clientWait.reminder_days),
+        awaiting_close_days: clientWait.close_days === null ? '' : String(clientWait.close_days),
     });
     const [confirmingDelete, setConfirmingDelete] = useState(false);
 
@@ -124,6 +128,37 @@ export default function EditProject({
                         onChange={(e) => setData('description', e.target.value)}
                     />
                 </Field>
+
+                <fieldset className="space-y-3 rounded-lg border border-border p-3">
+                    <legend className="px-1 text-sm font-medium text-ink">Waiting on the client</legend>
+                    <p className="text-xs text-ink-subtle">
+                        {clientWait.has_status
+                            ? 'For issues in the awaiting-client status after Reply & await client. Leave blank to switch off.'
+                            : 'Mark a status as awaiting client in the workflow below to use these.'}
+                    </p>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                        <Field label="Remind the client after (days)" error={errors.awaiting_reminder_days}>
+                            <Input
+                                type="number"
+                                min={1}
+                                max={365}
+                                value={data.awaiting_reminder_days}
+                                placeholder="Off"
+                                onChange={(e) => setData('awaiting_reminder_days', e.target.value)}
+                            />
+                        </Field>
+                        <Field label="Close with no reply after (days)" error={errors.awaiting_close_days}>
+                            <Input
+                                type="number"
+                                min={1}
+                                max={365}
+                                value={data.awaiting_close_days}
+                                placeholder="Off"
+                                onChange={(e) => setData('awaiting_close_days', e.target.value)}
+                            />
+                        </Field>
+                    </div>
+                </fieldset>
 
                 <label className="flex items-center gap-2 text-sm text-ink-muted">
                     <input

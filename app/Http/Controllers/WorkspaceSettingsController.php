@@ -23,6 +23,7 @@ class WorkspaceSettingsController extends Controller
             'workspace' => [
                 'name' => $workspace->name,
                 'slug' => $workspace->slug,
+                'show_staff_names' => \App\Support\Issues\AuthorLabel::showsStaffNames($workspace),
                 'created_at' => $workspace->created_at->toDateString(),
             ],
             'domain' => config('buggie.domain'),
@@ -111,11 +112,19 @@ class WorkspaceSettingsController extends Controller
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:120'],
+            'show_staff_names' => ['sometimes', 'boolean'],
         ]);
 
         // The slug is deliberately not editable: it is in every widget snippet, every
         // invitation link and every bookmark our customers' customers hold.
-        $workspace->update($validated);
+        $workspace->update(['name' => $validated['name']]);
+
+        if (array_key_exists('show_staff_names', $validated)) {
+            $workspace->forceFill(['settings' => [
+                ...($workspace->settings ?? []),
+                \App\Support\Issues\AuthorLabel::SHOW_STAFF_NAMES => (bool) $validated['show_staff_names'],
+            ]])->save();
+        }
 
         return back()->with('success', 'Workspace updated.');
     }
