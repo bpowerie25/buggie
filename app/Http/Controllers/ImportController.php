@@ -7,6 +7,7 @@ use App\Models\Import;
 use App\Models\Project;
 use App\Support\Imports\CsvFormat;
 use App\Support\Imports\CsvReader;
+use App\Support\Imports\ImportTemplate;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -43,6 +44,20 @@ class ImportController extends Controller
         ]);
 
         return redirect()->route('imports.show', [$project, $import]);
+    }
+
+    /**
+     * A spreadsheet to fill in, written for this project: its own status names, and
+     * example rows the importer will skip if they are left in.
+     */
+    public function template(Request $request, Project $project): \Symfony\Component\HttpFoundation\Response
+    {
+        $this->authorize('update', $project);
+
+        return response(ImportTemplate::csv($project, $request->user()), 200, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Content-Disposition' => 'attachment; filename="'.$project->key.'-import-template.csv"',
+        ]);
     }
 
     /** What will happen, before it happens. */
@@ -134,13 +149,17 @@ class ImportController extends Controller
             foreach ($reader->rows($mapping) as $row) {
                 ['attributes' => $attributes, 'notes' => $notes] = $mapper->map($row);
 
+                $example = ImportTemplate::isExample($attributes['source_key']);
+
                 $rows[] = [
                     'source_key' => $attributes['source_key'],
+                    // Shown, so it is plain they were seen and will be left out.
+                    'example' => $example,
                     'title' => $attributes['title'],
                     'status' => $import->project->statuses->firstWhere('id', $attributes['status_id'])?->name,
                     'type' => $attributes['type'],
                     'assignee' => $attributes['assignee_id'] !== null,
-                    'notes' => $notes,
+                    'notes' => $example ? ['An example row from the template; it will be skipped.'] : $notes,
                 ];
 
                 if (count($rows) >= 10) {

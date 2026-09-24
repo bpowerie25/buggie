@@ -97,6 +97,13 @@ class RunImport implements ShouldQueue
 
         ['attributes' => $attributes, 'notes' => $notes] = $mapper->map($row);
 
+        // Left in from the downloadable template. Skipped rather than imported, so an
+        // untouched template creates nothing and a half-edited one creates only what
+        // somebody actually wrote.
+        if (\App\Support\Imports\ImportTemplate::isExample($attributes['source_key'])) {
+            return [false, "{$attributes['source_key']} is an example row from the template; skipped."];
+        }
+
         // Already imported: running the same file twice should change nothing rather
         // than double somebody's backlog.
         if ($attributes['source_key'] !== null) {

@@ -12,6 +12,10 @@ today you are running `main`, which is honest rather than ideal — see
 
 ### Added
 
+- **A spreadsheet template for importing.** Project settings → Import has a *Download a
+  template* link: a CSV with exactly the columns the importer reads, example rows in the
+  project's own status names, and the accepted values listed beside it. The example rows
+  are skipped on import, so an untouched template creates nothing.
 - **Reporter identity on widget reports**: anonymous, unverified email, identified (via
   `identify()`), or verified, where your server signs `id:email` with the key's secret.
   A verified report from a client on the project is linked to them on acceptance, so

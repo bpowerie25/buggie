@@ -27,6 +27,14 @@ Buggie looks for `Issue key`, `Summary`, `Description`, `Status`, `Priority`,
 **Anything else** — any CSV with a column called Title, Summary or Subject. Columns
 named Description, Status, Priority, Type, Assignee and Created are used if present.
 
+**Starting from nothing** — choose **Download a template** on the import card. It is a
+CSV (Excel, Numbers and Google Sheets all open it) with exactly the columns Buggie
+reads, and three example rows written in *this* project's words — its own status
+names, not generic ones. Fill in a row per issue, keep the header row, and save as
+CSV. The example rows are keyed `EXAMPLE-1` to `EXAMPLE-3`, and any row keyed
+`EXAMPLE-…` is skipped, so leaving them in does no harm. Only Title is required; the
+card lists the values each column accepts.
+
 ## What it does with the values
 
 **Statuses** are matched by name against the project's own. A status that does not

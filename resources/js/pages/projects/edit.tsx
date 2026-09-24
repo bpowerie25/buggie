@@ -4,7 +4,7 @@ import { WorkflowEditor } from '@/components/workflow-editor';
 import { AppLayout } from '@/layouts/app-layout';
 import type { ProjectSummary } from '@/types';
 import { Head, Link, router, useForm } from '@inertiajs/react';
-import { Check, Copy, Plus, Trash2 } from 'lucide-react';
+import { Check, Copy, Download, Plus, Trash2 } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 
 interface WidgetKeyRow {
@@ -228,7 +228,7 @@ export default function EditProject({
 
             <Branding project={project} branding={branding} />
 
-            <ImportSection project={project} />
+            <ImportSection project={project} statuses={statuses.map((s) => s.name)} />
 
             <section className="mt-12 max-w-2xl">
                 <h2 className="text-sm font-semibold text-ink">File issues by email</h2>
@@ -683,7 +683,7 @@ function Versions({
  * Nobody moves tracker without their history, so this is less a feature than the
  * thing that makes moving possible at all.
  */
-function ImportSection({ project }: { project: ProjectSummary }) {
+function ImportSection({ project, statuses }: { project: ProjectSummary; statuses: string[] }) {
     const { data, setData, post, processing, errors } = useForm({ file: null as File | null });
 
     function submit(e: FormEvent) {
@@ -698,6 +698,37 @@ function ImportSection({ project }: { project: ProjectSummary }) {
                 A CSV export from Jira or MantisBT, or a spreadsheet of your own. You will
                 see what it is going to create before anything is created.
             </p>
+
+            {/* A plain link, not an Inertia visit: it is a file download. */}
+            <div className="mt-3 rounded-lg border border-border bg-surface p-3 text-xs text-ink-muted">
+                <a
+                    href={`/projects/${project.slug}/imports/template`}
+                    className="inline-flex items-center gap-1.5 font-medium text-accent hover:underline"
+                    download
+                >
+                    <Download className="size-3.5" />
+                    Download a template for {project.key}
+                </a>
+                <p className="mt-1.5">
+                    Opens in Excel, Numbers or Google Sheets. Fill in a row per issue, keep the
+                    header row, and save as CSV. The three EXAMPLE rows are skipped, so leaving
+                    them in does no harm. Only Title is required.
+                </p>
+                <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
+                    <dt className="font-medium text-ink">Status</dt>
+                    <dd>{statuses.join(', ')} — anything that sounds finished counts as done</dd>
+                    <dt className="font-medium text-ink">Priority</dt>
+                    <dd>Urgent, High, Medium, Low, or blank</dd>
+                    <dt className="font-medium text-ink">Type</dt>
+                    <dd>Bug, Feature, Task, Question</dd>
+                    <dt className="font-medium text-ink">Assignee</dt>
+                    <dd>A team member's email or exact name</dd>
+                    <dt className="font-medium text-ink">Created</dt>
+                    <dd>A date, like 2026-09-24</dd>
+                    <dt className="font-medium text-ink">Key</dt>
+                    <dd>Your own reference; importing the same file twice skips rows already in</dd>
+                </dl>
+            </div>
 
             <form onSubmit={submit} className="mt-4 flex flex-wrap items-end gap-3">
                 <div className="flex-1">

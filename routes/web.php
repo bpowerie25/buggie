@@ -315,6 +315,9 @@ Route::domain('{workspace}.'.$host)
             ->name('branding.update');
 
         // Bringing a backlog over from another tracker.
+        // Before imports/{import}, or "template" is read as an import id.
+        Route::get('projects/{project}/imports/template', [\App\Http\Controllers\ImportController::class, 'template'])
+            ->name('imports.template');
         Route::post('projects/{project}/imports', [\App\Http\Controllers\ImportController::class, 'store'])
             ->name('imports.store');
         Route::get('projects/{project}/imports/{import}', [\App\Http\Controllers\ImportController::class, 'show'])
