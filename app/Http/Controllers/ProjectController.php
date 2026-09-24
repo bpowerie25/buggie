@@ -15,9 +15,16 @@ use Inertia\Response;
 
 class ProjectController extends Controller
 {
-    public function index(Request $request): Response
+    public function index(Request $request): Response|RedirectResponse
     {
         $this->authorize('viewAny', Project::class);
+
+        // Projects are the team's: their workflow, their issue numbering, their
+        // releases and how much is in them. A client's view of a project is their
+        // issues in it, so that is where they go.
+        if (! $this->isStaff($request->user())) {
+            return redirect('/issues');
+        }
 
         return Inertia::render('projects/index', [
             'projects' => Project::query()
@@ -65,9 +72,18 @@ class ProjectController extends Controller
             ->with('success', "Project {$project->key} created.");
     }
 
-    public function show(Project $project): Response
+    public function show(Request $request, Project $project): Response|RedirectResponse
     {
-        $this->authorize('view', $project);
+        // Not found rather than forbidden for a project a client does not hold: a 403
+        // would confirm that it exists.
+        abort_unless($request->user()->can('view', $project), 404);
+
+        // A client's view of a project is their issues in it. The page itself shows
+        // the workflow, how many issues the project has ever had, and a count per
+        // release that includes internal work.
+        if (! $this->isStaff($request->user())) {
+            return redirect('/issues?q='.rawurlencode('project:'.$project->slug));
+        }
 
         return Inertia::render('projects/show', [
             'project' => [
@@ -236,5 +252,10 @@ class ProjectController extends Controller
             'site_url' => $project->site_url,
             'is_archived' => $project->is_archived,
         ];
+    }
+
+    private function isStaff(\App\Models\User $user): bool
+    {
+        return $user->membershipIn(app(\App\Support\Tenancy\Tenancy::class)->currentOrFail())?->isStaff() ?? false;
     }
 }

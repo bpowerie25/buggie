@@ -189,7 +189,10 @@ class MultiClientAccessTest extends TestCase
         // An agency runs several clients in one workspace. Northwind knowing that
         // "Globex Portal" is a customer is a leak even though they can read none of
         // the work in it.
-        foreach (['/', '/projects', '/issues'] as $path) {
+        // /projects is not a client's page any more — it sends them to /issues.
+        $this->actingAs($client)->get($this->workspaceUrl($workspace, '/projects'))->assertRedirect('/issues');
+
+        foreach (['/', '/issues'] as $path) {
             $payload = json_encode(
                 $this->actingAs($client)
                     ->get($this->workspaceUrl($workspace, $path))

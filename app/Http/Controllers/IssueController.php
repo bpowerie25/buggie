@@ -425,7 +425,8 @@ class IssueController extends Controller
                 'uploaded_by' => $attachment->uploadedBy === null ? null : $author($attachment->uploadedBy)['name'],
                 'created_at' => $attachment->created_at->toIso8601String(),
             ]),
-            'statuses' => $this->statusesFor($issue->project),
+            // For the status picker, which is staff only.
+            'statuses' => $staff ? $this->statusesFor($issue->project) : [],
             'facets' => $this->facets(),
             // Who a message from the composer reaches, in words, for the line under
             // it. Staff only; a client's message is always public and always theirs.
@@ -544,7 +545,10 @@ class IssueController extends Controller
             'priorities' => IssuePriority::options(),
             'types' => IssueType::options(),
             // Keyed by project: the list spans projects and each has its own workflow.
-            'statuses_by_project' => Status::query()
+            // Staff only. The workflow — every status, its limit, which one is the
+            // default — is how the team organises itself; a client's own issues carry
+            // their own status, and nothing a client uses needs the list.
+            'statuses_by_project' => ! $staff ? [] : Status::query()
                 ->whereIn('project_id', Project::visibleTo($user)->select('projects.id'))
                 ->orderBy('position')
                 ->get()

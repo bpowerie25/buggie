@@ -131,6 +131,11 @@ today you are running `main`, which is honest rather than ideal — see
 
 ### Fixed
 
+- **A client could open a project and see how the team works.** The project page showed
+  every status in the workflow with its work-in-progress limit, the project's total issue
+  count, and a per-release count that included internal issues. The Projects screens are
+  now the team's alone — a client opening a project gets their issues in it — and the
+  status list is no longer sent to a client's issue list, board or issue page.
 - **Backups were never reported, including a failed one.** `deploy/backup.sh` wrote
   its status file to `storage/app`, and the application reads it from `storage/app/private`,
   the root of its local disk. Operators were told no backup had ever run, every night

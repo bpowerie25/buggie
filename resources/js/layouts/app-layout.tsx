@@ -207,13 +207,16 @@ export function AppLayout({
                             Triage
                         </NavLink>
                     )}
-                    <NavLink
-                        href="/projects"
-                        icon={FolderKanban}
-                        active={path.startsWith('/projects')}
-                    >
-                        Projects
-                    </NavLink>
+                    {/* The team's: a client's view of a project is their issues in it. */}
+                    {auth.role !== 'client' && (
+                        <NavLink
+                            href="/projects"
+                            icon={FolderKanban}
+                            active={path.startsWith('/projects')}
+                        >
+                            Projects
+                        </NavLink>
+                    )}
                     {/* The list, not the preferences — the preferences are a link on
                         it. What happened to you is the thing you open daily; how you
                         are told about it is something you set once. */}

@@ -140,6 +140,25 @@ class ClientTimelineTest extends TestCase
         $this->assertTrue($this->kennco->fresh()->showsTimelineToClients());
     }
 
+    #[Test]
+    public function a_client_is_never_sent_the_workflow(): void
+    {
+        $issue = $this->issue($this->kennco, 'Homepage', 'client');
+        $this->kennco->statuses()->where('is_default', true)->update(['wip_limit' => 3]);
+
+        foreach (['/issues', '/issues?layout=board', "/issues/{$issue->key}"] as $path) {
+            $props = $this->actingAs($this->mia)->get($this->workspaceUrl($this->workspace, $path))->viewData('page')['props'];
+
+            $this->assertEmpty($props['facets']['statuses_by_project'] ?? [], "The workflow reached a client on {$path}.");
+            $this->assertEmpty($props['statuses'] ?? [], "The status list reached a client on {$path}.");
+            $this->assertStringNotContainsString('wip_limit', json_encode(collect($props)->except('ziggy')->all()));
+        }
+
+        // Staff still get it: the control.
+        $props = $this->actingAs($this->owner)->get($this->workspaceUrl($this->workspace, '/issues?layout=board'))->viewData('page')['props'];
+        $this->assertNotEmpty($props['facets']['statuses_by_project']);
+    }
+
     private function share(Project $project): void
     {
         $project->forceFill(['settings' => [...($project->settings ?? []), 'client_timeline' => true]])->save();

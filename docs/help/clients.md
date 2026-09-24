@@ -176,7 +176,10 @@ in public. See [Email](email.md).
 
 ## What a client can do
 
-- See their granted projects and the client-visible issues in them.
+- See the client-visible issues in their granted projects. The *Projects* screens are the
+  team's — the workflow, the issue numbering, releases and how much is in them — so a
+  client has no Projects link, and opening a project takes them to their issues in it.
+  They are never sent the list of statuses either: each issue shows its own.
 - Open an issue, read its public comments and public activity, and comment.
 - File a new issue (it will be visible to them).
 - Attach files to an issue they can see.

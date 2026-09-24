@@ -142,13 +142,20 @@ class ProjectTest extends TestCase
 
         $granted->clients()->attach($client->id, ['role' => 'client']);
 
+        // A client's view of a project is their issues in it: the project page shows
+        // the workflow, the issue count and per-release totals including internal work.
         $this->actingAs($client)
             ->get($this->workspaceUrl($workspace, '/projects/'.$granted->slug))
-            ->assertOk();
+            ->assertRedirect('/issues?q=project%3A'.$granted->slug);
 
         $this->actingAs($client)
+            ->get($this->workspaceUrl($workspace, '/projects'))
+            ->assertRedirect('/issues');
+
+        // Not found rather than forbidden: a 403 would confirm it exists.
+        $this->actingAs($client)
             ->get($this->workspaceUrl($workspace, '/projects/'.$hidden->slug))
-            ->assertForbidden();
+            ->assertNotFound();
     }
 
     #[Test]
