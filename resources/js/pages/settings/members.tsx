@@ -204,11 +204,6 @@ export default function Members({
                     Members ({members.length})
                 </h2>
 
-                <datalist id="disciplines">
-                    {disciplines.map((d) => (
-                        <option key={d} value={d} />
-                    ))}
-                </datalist>
                 <ul className="mt-3 divide-y divide-border overflow-hidden rounded-xl border border-border bg-raised">
                     {members.map((member) => (
                         <MemberRow
@@ -216,10 +211,13 @@ export default function Members({
                             member={member}
                             projects={projects}
                             canManage={canManage}
+                            disciplines={disciplines}
                         />
                     ))}
                 </ul>
             </section>
+
+            {canManage && <Disciplines names={disciplines} />}
 
             {memberEvents.length > 0 && (
                 <section className="mt-10 max-w-2xl">
@@ -291,16 +289,126 @@ function InvitationRow({
 }
 
 /**
+ * The workspace's disciplines, in the order the workload screen groups people by.
+ * Renaming one renames it on everybody who has it; removing one leaves them with none.
+ */
+function Disciplines({ names }: { names: string[] }) {
+    const [adding, setAdding] = useState('');
+    const [error, setError] = useState<string>();
+
+    const opts = { preserveScroll: true, onError: (e: Record<string, string>) => setError(e.name ?? e.to ?? e.names) };
+
+    function move(index: number, by: -1 | 1) {
+        const next = [...names];
+        [next[index], next[index + by]] = [next[index + by], next[index]];
+        router.put('/settings/disciplines/order', { names: next }, opts);
+    }
+
+    return (
+        <section className="mt-10 max-w-xl">
+            <h2 className="text-sm font-semibold text-ink">Disciplines</h2>
+            <p className="mt-1 text-sm text-ink-muted">
+                What each member of staff does. The Workload screen groups people by these, in this order.
+            </p>
+
+            <ul className="mt-3 divide-y divide-border rounded-xl border border-border bg-raised">
+                {names.map((name, index) => (
+                    <li key={name} className="flex items-center gap-2 px-3 py-1.5">
+                        <input
+                            defaultValue={name}
+                            maxLength={40}
+                            aria-label={`Rename ${name}`}
+                            onBlur={(e) => {
+                                const to = e.currentTarget.value.trim();
+                                if (!to) e.currentTarget.value = name;
+                                else if (to !== name) {
+                                    setError(undefined);
+                                    router.patch('/settings/disciplines', { from: name, to }, opts);
+                                }
+                            }}
+                            onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+                            className="min-w-0 flex-1 rounded-md border border-transparent bg-transparent px-1.5 py-1 text-sm text-ink hover:border-border focus:border-border focus:outline-none"
+                        />
+                        <button
+                            type="button"
+                            aria-label={`Move ${name} up`}
+                            disabled={index === 0}
+                            onClick={() => move(index, -1)}
+                            className="rounded p-1 text-xs text-ink-subtle hover:text-ink disabled:opacity-30"
+                        >
+                            ↑
+                        </button>
+                        <button
+                            type="button"
+                            aria-label={`Move ${name} down`}
+                            disabled={index === names.length - 1}
+                            onClick={() => move(index, 1)}
+                            className="rounded p-1 text-xs text-ink-subtle hover:text-ink disabled:opacity-30"
+                        >
+                            ↓
+                        </button>
+                        <button
+                            type="button"
+                            aria-label={`Remove ${name}`}
+                            title="Remove it. Anybody who has it is left with no discipline."
+                            onClick={() => router.delete('/settings/disciplines', { data: { name }, ...opts })}
+                            className="rounded p-1 text-xs text-ink-subtle hover:text-danger"
+                        >
+                            ✕
+                        </button>
+                    </li>
+                ))}
+            </ul>
+
+            <form
+                onSubmit={(e) => {
+                    e.preventDefault();
+                    if (!adding.trim()) return;
+                    setError(undefined);
+                    router.post('/settings/disciplines', { name: adding.trim() }, { ...opts, onSuccess: () => setAdding('') });
+                }}
+                className="mt-2 flex gap-2"
+            >
+                <input
+                    value={adding}
+                    maxLength={40}
+                    placeholder="New discipline, e.g. Copywriter"
+                    aria-label="New discipline"
+                    onChange={(e) => setAdding(e.target.value)}
+                    className="flex-1 rounded-lg border border-border bg-surface px-2.5 py-1.5 text-sm text-ink"
+                />
+                <button
+                    type="submit"
+                    disabled={!adding.trim()}
+                    className="rounded-lg bg-accent px-3 py-1.5 text-sm text-accent-ink disabled:opacity-50"
+                >
+                    Add
+                </button>
+            </form>
+            {error && <p className="mt-1 text-xs text-danger">{error}</p>}
+        </section>
+    );
+}
+
+/**
  * A member of staff's weekly hours and what they do, for the workload screen. Saved
  * when a field is left, like the issue sidebar. Blank hours means "not set", which the
  * workload screen shows without a limit rather than against a guess.
  */
-function Capacity({ member, canManage }: { member: Member; canManage: boolean }) {
+function Capacity({
+    member,
+    canManage,
+    disciplines,
+}: {
+    member: Member;
+    canManage: boolean;
+    disciplines: string[];
+}) {
     const [hours, setHours] = useState(member.weekly_hours == null ? '' : String(member.weekly_hours));
     const [discipline, setDiscipline] = useState(member.discipline ?? '');
 
-    function save() {
-        const next = { weekly_hours: hours === '' ? null : Number(hours), discipline: discipline.trim() || null };
+    function save(chosen = discipline) {
+        const next = { weekly_hours: hours === '' ? null : Number(hours), discipline: chosen || null };
 
         if (next.weekly_hours === (member.weekly_hours ?? null) && next.discipline === (member.discipline ?? null)) return;
 
@@ -322,16 +430,22 @@ function Capacity({ member, canManage }: { member: Member; canManage: boolean })
 
     return (
         <div className="mt-0.5 flex flex-wrap items-center gap-1">
-            <input
+            <select
                 value={discipline}
-                list="disciplines"
-                maxLength={40}
-                placeholder="Discipline"
                 aria-label={`What ${member.name} does`}
-                onChange={(e) => setDiscipline(e.target.value)}
-                onBlur={save}
-                className={`w-32 ${field}`}
-            />
+                onChange={(e) => {
+                    setDiscipline(e.target.value);
+                    save(e.target.value);
+                }}
+                className={`w-36 ${field}`}
+            >
+                <option value="">No discipline</option>
+                {disciplines.map((d) => (
+                    <option key={d} value={d}>
+                        {d}
+                    </option>
+                ))}
+            </select>
             <input
                 value={hours}
                 type="number"
@@ -341,7 +455,7 @@ function Capacity({ member, canManage }: { member: Member; canManage: boolean })
                 placeholder="Hours a week"
                 aria-label={`${member.name}'s hours a week`}
                 onChange={(e) => setHours(e.target.value)}
-                onBlur={save}
+                onBlur={() => save()}
                 className={`w-28 ${field}`}
             />
         </div>
@@ -360,10 +474,12 @@ function MemberRow({
     member,
     projects,
     canManage,
+    disciplines,
 }: {
     member: Member;
     projects: { id: number; name: string; key: string }[];
     canManage: boolean;
+    disciplines: string[];
 }) {
     const [editing, setEditing] = useState(false);
     const [chosen, setChosen] = useState<number[]>(member.projects);
@@ -396,7 +512,7 @@ function MemberRow({
                     </p>
                     <p className="truncate text-xs text-ink-subtle">{member.email}</p>
 
-                    {!isClient && <Capacity member={member} canManage={canManage} />}
+                    {!isClient && <Capacity member={member} canManage={canManage} disciplines={disciplines} />}
 
                     {isClient && !editing && (
                         <div className="mt-1 space-y-0.5">

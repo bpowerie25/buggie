@@ -63,10 +63,8 @@ class MemberController extends Controller
                     'url' => $invitation->url(),
                 ]),
             'projects' => Project::active()->orderBy('name')->get(['id', 'name', 'key']),
-            // What people have typed before, first, then the common ones.
-            'disciplines' => $workspace->members()->wherePivotNotNull('discipline')->pluck('workspace_user.discipline')
-                ->merge(['Developer', 'Designer', 'Project manager', 'QA', 'Content'])
-                ->unique(fn ($d) => mb_strtolower($d))->values(),
+            // The list staff are given a discipline from, edited on this screen.
+            'disciplines' => $workspace->disciplines(),
             'canManage' => $request->user()->can('create', Invitation::class),
             'roles' => array_map(
                 fn (WorkspaceRole $role) => ['value' => $role->value, 'label' => $role->label()],
@@ -253,7 +251,8 @@ class MemberController extends Controller
 
         $validated = $request->validate([
             'weekly_hours' => ['nullable', 'numeric', 'min:0', 'max:168'],
-            'discipline' => ['nullable', 'string', 'max:40'],
+            // One of the workspace's list, which is managed on the same screen.
+            'discipline' => ['nullable', 'string', Rule::in($workspace->disciplines())],
         ]);
 
         $workspace->members()->updateExistingPivot($user->id, [

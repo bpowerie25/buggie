@@ -60,6 +60,29 @@ class Workspace extends Model
             ->withTimestamps();
     }
 
+    /** What a workspace starts with, before anybody edits the list. */
+    public const DEFAULT_DISCIPLINES = ['Developer', 'Designer', 'Project manager', 'QA', 'Content'];
+
+    /**
+     * The disciplines staff can be given, in the order the workload screen groups
+     * them. Until somebody edits the list it is the defaults plus any already in use,
+     * so a discipline typed in before there was a list is not quietly lost from it.
+     *
+     * @return array<int, string>
+     */
+    public function disciplines(): array
+    {
+        if (is_array($this->settings['disciplines'] ?? null)) {
+            return array_values($this->settings['disciplines']);
+        }
+
+        return collect(self::DEFAULT_DISCIPLINES)
+            ->merge($this->members()->wherePivotNotNull('discipline')->pluck('workspace_user.discipline'))
+            ->unique(fn (string $d) => mb_strtolower($d))
+            ->values()
+            ->all();
+    }
+
     public function projects(): HasMany
     {
         return $this->hasMany(Project::class);

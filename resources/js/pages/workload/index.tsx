@@ -1,10 +1,14 @@
 import { AppLayout } from '@/layouts/app-layout';
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router, useForm } from '@inertiajs/react';
 import { hours, load } from '@/lib/workload';
-import { Fragment, useState } from 'react';
+import { Fragment, useState, type FormEvent } from 'react';
 
 interface Cell {
     minutes: number;
+    /** Weekdays off this week: leave or public holidays. */
+    off: number;
+    /** Their hours for this week once days off are taken out; null when not set. */
+    capacity: number | null;
     issues: { key: string; title: string; project: string; minutes: number }[];
 }
 
@@ -27,6 +31,137 @@ interface Actual {
     actual: number;
     logged: number;
     available: number | null;
+}
+
+interface TimeOffRow {
+    id: number;
+    /** Null: a public holiday. */
+    who: string | null;
+    starts_on: string;
+    ends_on: string;
+    note: string | null;
+    can_delete: boolean;
+}
+
+/**
+ * Public holidays and leave. Anybody books their own leave; whoever manages members
+ * books anybody's and sets the holidays, which take the day from everyone.
+ */
+function TimeOffPanel({
+    rows,
+    staff,
+    me,
+    canManage,
+}: {
+    rows: TimeOffRow[];
+    staff: { id: number; name: string }[];
+    me: number;
+    canManage: boolean;
+}) {
+    const { data, setData, post, processing, errors, reset } = useForm({
+        user_id: String(me) as string,
+        starts_on: '',
+        ends_on: '',
+        note: '',
+    });
+
+    function submit(event: FormEvent) {
+        event.preventDefault();
+        post('/time-off', {
+            preserveScroll: true,
+            onSuccess: () => reset('starts_on', 'ends_on', 'note'),
+        });
+    }
+
+    const range = (row: TimeOffRow) =>
+        row.starts_on === row.ends_on ? row.starts_on : `${row.starts_on} to ${row.ends_on}`;
+    const input = 'rounded-lg border border-border bg-surface px-2 py-1 text-sm text-ink';
+
+    return (
+        <section className="rounded-xl border border-border p-4">
+            <h2 className="text-sm font-semibold text-ink">Time off</h2>
+            <p className="mt-1 text-xs text-ink-subtle">
+                Leave and public holidays take hours out of the weeks above, and no work is planned onto
+                them.
+            </p>
+
+            {rows.length > 0 && (
+                <ul className="mt-3 divide-y divide-border">
+                    {rows.map((row) => (
+                        <li key={row.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-1.5 text-sm">
+                            <span className={row.who ? 'text-ink' : 'font-medium text-ink'}>
+                                {row.who ?? 'Public holiday'}
+                            </span>
+                            <span className="text-xs text-ink-muted tabular-nums">{range(row)}</span>
+                            {row.note && <span className="min-w-0 flex-1 truncate text-xs text-ink-subtle">{row.note}</span>}
+                            {row.can_delete && (
+                                <button
+                                    type="button"
+                                    aria-label="Remove"
+                                    onClick={() => router.delete(`/time-off/${row.id}`, { preserveScroll: true })}
+                                    className="ml-auto text-xs text-ink-subtle hover:text-danger"
+                                >
+                                    Remove
+                                </button>
+                            )}
+                        </li>
+                    ))}
+                </ul>
+            )}
+
+            <form onSubmit={submit} className="mt-3 flex flex-wrap items-end gap-2">
+                <select
+                    value={data.user_id}
+                    aria-label="Who"
+                    onChange={(e) => setData('user_id', e.target.value)}
+                    className={input}
+                >
+                    {staff.map((person) => (
+                        <option key={person.id} value={person.id}>
+                            {person.id === me ? `${person.name} (you)` : person.name}
+                        </option>
+                    ))}
+                    {canManage && <option value="">Everyone: public holiday</option>}
+                </select>
+                <input
+                    type="date"
+                    value={data.starts_on}
+                    aria-label="From"
+                    onChange={(e) => {
+                        setData('starts_on', e.target.value);
+                        if (!data.ends_on || data.ends_on < e.target.value) setData('ends_on', e.target.value);
+                    }}
+                    className={input}
+                />
+                <input
+                    type="date"
+                    value={data.ends_on}
+                    min={data.starts_on || undefined}
+                    aria-label="To"
+                    onChange={(e) => setData('ends_on', e.target.value)}
+                    className={input}
+                />
+                <input
+                    value={data.note}
+                    maxLength={80}
+                    placeholder={data.user_id ? 'Note (optional)' : 'e.g. Christmas Day'}
+                    aria-label="Note"
+                    onChange={(e) => setData('note', e.target.value)}
+                    className={`min-w-40 flex-1 ${input}`}
+                />
+                <button
+                    type="submit"
+                    disabled={processing || !data.starts_on || !data.ends_on}
+                    className="rounded-lg bg-accent px-3 py-1 text-sm text-accent-ink disabled:opacity-50"
+                >
+                    Add
+                </button>
+            </form>
+            {(errors.ends_on || errors.user_id || errors.starts_on) && (
+                <p className="mt-1 text-xs text-danger">{errors.ends_on ?? errors.user_id ?? errors.starts_on}</p>
+            )}
+        </section>
+    );
 }
 
 const TONE = {
@@ -53,6 +188,9 @@ export default function WorkloadPage({
     filters,
     projects,
     canManage,
+    timeOff = [],
+    staff = [],
+    me,
 }: {
     weeks: string[];
     groups: { discipline: string; people: Person[] }[];
@@ -62,6 +200,10 @@ export default function WorkloadPage({
     filters: { from: string; weeks: number; project_id: number | null; since: number };
     projects: { id: number; name: string }[];
     canManage: boolean;
+    timeOff?: TimeOffRow[];
+    /** Whose leave this viewer can book: everybody for an admin, themselves otherwise. */
+    staff?: { id: number; name: string }[];
+    me: number;
 }) {
     const [open, setOpen] = useState<{ person: number; week: string } | null>(null);
 
@@ -183,7 +325,8 @@ export default function WorkloadPage({
                                             </td>
                                             {weeks.map((w) => {
                                                 const cell = person.cells[w];
-                                                const tone = load(cell.minutes, person.weekly_minutes);
+                                                const tone = load(cell.minutes, cell.capacity);
+                                                const away = cell.off === 5;
                                                 const selected = open?.person === person.id && open.week === w;
 
                                                 return (
@@ -192,16 +335,24 @@ export default function WorkloadPage({
                                                             type="button"
                                                             disabled={cell.minutes === 0}
                                                             onClick={() => setOpen(selected ? null : { person: person.id, week: w })}
-                                                            title={
-                                                                person.weekly_minutes
-                                                                    ? `${hours(cell.minutes)} of ${hours(person.weekly_minutes)}`
-                                                                    : hours(cell.minutes)
-                                                            }
+                                                            title={[
+                                                                cell.capacity !== null
+                                                                    ? `${hours(cell.minutes)} of ${hours(cell.capacity)}`
+                                                                    : hours(cell.minutes),
+                                                                cell.off > 0 ? `${cell.off} day${cell.off === 1 ? '' : 's'} off` : '',
+                                                            ]
+                                                                .filter(Boolean)
+                                                                .join(' · ')}
                                                             className={`w-full rounded-md px-1.5 py-1.5 text-xs tabular-nums ${TONE[tone]} ${
                                                                 selected ? 'ring-2 ring-accent' : ''
                                                             }`}
                                                         >
-                                                            {cell.minutes === 0 ? '–' : hours(cell.minutes)}
+                                                            {cell.minutes === 0 ? (away ? 'Off' : '–') : hours(cell.minutes)}
+                                                            {cell.off > 0 && !(away && cell.minutes === 0) && (
+                                                                <span className="block text-[9px] text-ink-subtle">
+                                                                    {cell.off}d off
+                                                                </span>
+                                                            )}
                                                         </button>
                                                     </td>
                                                 );
@@ -256,7 +407,8 @@ export default function WorkloadPage({
                     <section className="rounded-xl border border-border p-4">
                         <h2 className="text-sm font-semibold text-ink">
                             {chosen.name}, week of {open.week}: {hours(chosenCell.minutes)}
-                            {chosen.weekly_minutes !== null && ` of ${hours(chosen.weekly_minutes)}`}
+                            {chosenCell.capacity !== null && ` of ${hours(chosenCell.capacity)}`}
+                            {chosenCell.off > 0 && ` (${chosenCell.off} day${chosenCell.off === 1 ? '' : 's'} off)`}
                         </h2>
                         <ul className="mt-2 divide-y divide-border">
                             {chosenCell.issues.map((issue) => (
@@ -274,6 +426,8 @@ export default function WorkloadPage({
                         </ul>
                     </section>
                 )}
+
+                <TimeOffPanel rows={timeOff} staff={staff} me={me} canManage={canManage} />
 
                 <section className="rounded-xl border border-border p-4">
                     <div className="flex flex-wrap items-center gap-2">

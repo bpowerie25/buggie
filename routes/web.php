@@ -374,6 +374,10 @@ Route::domain('{workspace}.'.$host)
             ->name('insights');
         Route::get('workload', \App\Http\Controllers\WorkloadController::class)
             ->name('workload');
+        Route::post('time-off', [\App\Http\Controllers\TimeOffController::class, 'store'])
+            ->name('time-off.store');
+        Route::delete('time-off/{timeOff}', [\App\Http\Controllers\TimeOffController::class, 'destroy'])
+            ->name('time-off.destroy');
 
         // --- timeline ---------------------------------------------------------
         // Issues as bars on a date axis. Staff only, enforced in the controller
@@ -457,6 +461,14 @@ Route::domain('{workspace}.'.$host)
             ->name('members.tier');
         Route::patch('settings/members/{user}/capacity', [MemberController::class, 'capacity'])
             ->name('members.capacity');
+        Route::post('settings/disciplines', [\App\Http\Controllers\DisciplineController::class, 'store'])
+            ->name('disciplines.store');
+        Route::patch('settings/disciplines', [\App\Http\Controllers\DisciplineController::class, 'update'])
+            ->name('disciplines.update');
+        Route::put('settings/disciplines/order', [\App\Http\Controllers\DisciplineController::class, 'reorder'])
+            ->name('disciplines.reorder');
+        Route::delete('settings/disciplines', [\App\Http\Controllers\DisciplineController::class, 'destroy'])
+            ->name('disciplines.destroy');
         Route::delete('settings/members/{user}', [MemberController::class, 'remove'])
             ->name('members.remove');
 

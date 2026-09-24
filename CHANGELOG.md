@@ -12,6 +12,15 @@ today you are running `main`, which is honest rather than ideal — see
 
 ### Added
 
+- **Holidays and leave on Workload.**
+  - A *Time off* panel: staff book their own leave, and admins book anybody's and add
+    public holidays.
+  - Days off reduce that week's hours ("3d off"), and work is spread only over the days
+    its assignee is in. Work that falls entirely on days off moves to their next working
+    day.
+- **A list of disciplines.** Managed under *Disciplines* on the Members screen: add,
+  rename (which renames it for everyone who has it), reorder, or remove. Each member's
+  discipline is now chosen from the list, and Workload groups people in its order.
 - **Workload.** A staff-only screen: each person's remaining estimates, week by week,
   across every project or filtered to one.
   - Work is spread over its working days, and late open work counts from today.

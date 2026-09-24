@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\WorkspaceRole;
 use App\Models\Invitation;
 use App\Models\Project;
+use App\Models\TimeOff;
 use App\Support\Tenancy\Tenancy;
 use App\Support\Workload\Workload;
 use Carbon\CarbonImmutable;
@@ -48,7 +50,31 @@ class WorkloadController extends Controller
             'today' => CarbonImmutable::today()->toDateString(),
             'filters' => ['from' => $from->toDateString(), 'weeks' => $weeks, 'project_id' => $projectId, 'since' => $since],
             'projects' => Project::active()->orderBy('name')->get(['id', 'name']),
-            'canManage' => $request->user()->can('create', Invitation::class),
+            'canManage' => $canManage = $request->user()->can('create', Invitation::class),
+
+            // Time off from last week onwards, holidays first, then by date.
+            'timeOff' => TimeOff::query()
+                ->where('ends_on', '>=', CarbonImmutable::today()->subWeek()->toDateString())
+                ->with('user:id,name')
+                ->orderByRaw('user_id IS NOT NULL')
+                ->orderBy('starts_on')
+                ->limit(200)
+                ->get()
+                ->map(fn (TimeOff $off) => [
+                    'id' => $off->id,
+                    'who' => $off->user?->name,
+                    'starts_on' => $off->starts_on->toDateString(),
+                    'ends_on' => $off->ends_on->toDateString(),
+                    'note' => $off->note,
+                    'can_delete' => $canManage || $off->user_id === $request->user()->id,
+                ]),
+            // Whose leave can be booked from this screen: anybody's for an admin, your
+            // own otherwise.
+            'staff' => $workspace->members()->wherePivot('role', '!=', WorkspaceRole::Client->value)
+                ->unless($canManage, fn ($q) => $q->whereKey($request->user()->id))
+                ->orderBy('name')->get(['users.id', 'users.name'])
+                ->map->only(['id', 'name']),
+            'me' => $request->user()->id,
         ]);
     }
 }

@@ -86,7 +86,8 @@ class WorkloadTest extends TestCase
         $props = $this->page();
         $dana = collect($props['groups'])->flatMap(fn ($g) => $g['people'])->firstWhere('name', 'Dana');
 
-        $this->assertSame(['Designer', 'Developer', 'No discipline set'], array_column($props['groups'], 'discipline'));
+        // In the order of the workspace's list of disciplines, which starts Developer, Designer.
+        $this->assertSame(['Developer', 'Designer', 'No discipline set'], array_column($props['groups'], 'discipline'));
         $this->assertSame(1200, $dana['weekly_minutes']);
         $this->assertSame(22 * 60, $dana['cells']['2026-10-05']['minutes'], 'Over her 20 hours: 12 + 10.');
         $this->assertSame(12 * 60, $dana['cells']['2026-10-12']['minutes']);
@@ -134,19 +135,24 @@ class WorkloadTest extends TestCase
         $dana = collect($this->page(['since' => 30])['actuals'])->firstWhere('name', 'Dana');
 
         $this->assertSame([1, 600, 900, 900], [$dana['closed'], $dana['estimated'], $dana['actual'], $dana['logged']]);
-        // 20 hours a week over 30 days.
-        $this->assertSame((int) round(20 * 60 * 30 / 7), $dana['available']);
+        // 20 hours a week is 4 a day, over the 21 weekdays from 6 September to 5 October.
+        $this->assertSame(4 * 60 * 21, $dana['available']);
     }
 
     #[Test]
     public function an_admin_sets_hours_and_discipline_and_nobody_else_can(): void
     {
         $this->actingAs($this->owner)
-            ->patch($this->workspaceUrl($this->workspace, "/settings/members/{$this->sam->id}/capacity"), ['weekly_hours' => 30, 'discipline' => ' UX '])
+            ->patch($this->workspaceUrl($this->workspace, "/settings/members/{$this->sam->id}/capacity"), ['weekly_hours' => 30, 'discipline' => 'QA'])
             ->assertSessionHasNoErrors();
 
         $sam = $this->workspace->members()->whereKey($this->sam->id)->first();
-        $this->assertSame(['30.00', 'UX'], [$sam->pivot->weekly_hours, $sam->pivot->discipline]);
+        $this->assertSame(['30.00', 'QA'], [$sam->pivot->weekly_hours, $sam->pivot->discipline]);
+
+        // Only from the workspace's list.
+        $this->actingAs($this->owner)
+            ->patch($this->workspaceUrl($this->workspace, "/settings/members/{$this->sam->id}/capacity"), ['weekly_hours' => 30, 'discipline' => 'Astronaut'])
+            ->assertSessionHasErrors('discipline');
 
         $this->actingAs($this->dana)
             ->patch($this->workspaceUrl($this->workspace, "/settings/members/{$this->sam->id}/capacity"), ['weekly_hours' => 80])

@@ -6,6 +6,7 @@ use App\Enums\StatusCategory;
 use App\Enums\WorkspaceRole;
 use App\Models\Issue;
 use App\Models\TimeEntry;
+use App\Models\TimeOff;
 use App\Models\User;
 use App\Models\Workspace;
 use Carbon\CarbonImmutable;
@@ -26,6 +27,11 @@ use Illuminate\Support\Collection;
  * is not left in the past, where nobody would see it: an open issue whose dates have
  * gone by lands on today, because that is when it is actually being done.
  *
+ * **Days off.** Public holidays and each person's leave (TimeOff) are days with no
+ * hours in them: work is spread only over the days its assignee is in, and a week's
+ * capacity is their weekly hours times the share of its five weekdays they are
+ * working. Three days' leave leaves two-fifths of a week.
+ *
  * **What it deliberately does not guess.** Work with no estimate, or no dates, has no
  * honest place in a week. It is counted per person instead, beside the grid, so a
  * plan full of holes looks like one rather than looking light.
@@ -43,6 +49,11 @@ class Workload
         $this->from = $from->startOfWeek();
         $this->today = ($today ?? CarbonImmutable::today())->startOfDay();
     }
+
+    /** @var array{holidays: array<string, true>, leave: array<int, array<string, true>>}|null */
+    private ?array $calendar = null;
+
+    private bool $gridCalendar = false;
 
     /** @return array<int, string> the Monday of each week shown */
     public function weeks(): array
@@ -66,7 +77,7 @@ class Workload
             $cells = array_fill_keys($weeks, ['minutes' => 0, 'issues' => []]);
 
             foreach ($theirs as $issue) {
-                foreach ($this->spread($issue) as $week => $minutes) {
+                foreach ($this->spread($issue, $person->id) as $week => $minutes) {
                     if (! isset($cells[$week])) {
                         continue;
                     }
@@ -81,12 +92,19 @@ class Workload
                 }
             }
 
-            foreach ($cells as &$cell) {
+            $hours = $person->pivot->weekly_hours;
+
+            foreach ($cells as $week => &$cell) {
                 $cell['minutes'] = (int) round($cell['minutes']);
                 usort($cell['issues'], fn ($a, $b) => $b['minutes'] <=> $a['minutes']);
-            }
 
-            $hours = $person->pivot->weekly_hours;
+                // Weekdays off this week, and what is left of their hours for it.
+                $monday = CarbonImmutable::parse($week);
+                $off = count(array_filter(range(0, 4), fn (int $i) => ! $this->works($person->id, $monday->addDays($i))));
+                $cell['off'] = $off;
+                $cell['capacity'] = $hours === null ? null : (int) round((float) $hours * 60 * (5 - $off) / 5);
+            }
+            unset($cell);
 
             return [
                 'id' => $person->id,
@@ -100,11 +118,13 @@ class Workload
             ];
         });
 
+        // In the workspace's own order of disciplines; anybody without one last, under
+        // a heading that says so.
+        $order = array_flip($this->workspace->disciplines());
+
         return $rows
             ->groupBy(fn (array $row) => $row['discipline'] ?? '')
-            ->sortKeys()
-            // Nobody given a discipline yet: last, under a heading that says so.
-            ->sortBy(fn ($people, string $discipline) => $discipline === '' ? 1 : 0)
+            ->sortBy(fn ($people, string $discipline) => $discipline === '' ? PHP_INT_MAX : ($order[$discipline] ?? PHP_INT_MAX - 1))
             ->map(fn (Collection $people, string $discipline) => [
                 'discipline' => $discipline === '' ? 'No discipline set' : $discipline,
                 'people' => $people->values()->all(),
@@ -129,7 +149,7 @@ class Workload
             ->withSum('timeEntries as logged_minutes', 'minutes')
             ->get()
             ->each(function (Issue $issue) use (&$cells) {
-                foreach ($this->spread($issue) as $week => $minutes) {
+                foreach ($this->spread($issue, null) as $week => $minutes) {
                     if (isset($cells[$week])) {
                         $cells[$week] += $minutes;
                     }
@@ -154,7 +174,7 @@ class Workload
     public function actuals(CarbonImmutable $since, CarbonImmutable $until): array
     {
         $people = $this->staff();
-        $weeks = max($since->diffInDays($until) + 1, 1) / 7;
+        $this->loadCalendar($since, $until);
 
         $closed = $this->scoped()
             ->whereIn('assignee_id', $people->pluck('id'))
@@ -172,7 +192,7 @@ class Workload
             ->selectRaw('user_id, sum(minutes) as minutes')
             ->pluck('minutes', 'user_id');
 
-        return $people->map(function (User $person) use ($closed, $logged, $weeks) {
+        return $people->map(function (User $person) use ($closed, $logged, $since, $until) {
             $theirs = $closed->where('assignee_id', $person->id);
             $hours = $person->pivot->weekly_hours;
 
@@ -184,7 +204,9 @@ class Workload
                 'estimated' => (int) $theirs->sum('estimate_minutes'),
                 'actual' => (int) $theirs->sum('logged_minutes'),
                 'logged' => (int) ($logged[$person->id] ?? 0),
-                'available' => $hours === null ? null : (int) round((float) $hours * 60 * $weeks),
+                // Their weekly hours over the weekdays they were in: leave and holidays
+                // are not hours anybody had.
+                'available' => $hours === null ? null : (int) round((float) $hours * 60 / 5 * $this->workingDays($person->id, $since, $until)),
             ];
         })->values()->all();
     }
@@ -196,7 +218,7 @@ class Workload
      *
      * @return array<string, float>
      */
-    public function spread(Issue $issue): array
+    public function spread(Issue $issue, ?int $personId = null): array
     {
         $remaining = max((int) $issue->estimate_minutes - (int) ($issue->logged_minutes ?? 0), 0);
         $first = $issue->start_on ?? $issue->due_on;
@@ -211,6 +233,7 @@ class Workload
             CarbonImmutable::parse($first->toDateString()),
             CarbonImmutable::parse($last->toDateString()),
             $this->today,
+            fn (CarbonImmutable $day) => $this->works($personId, $day),
         );
     }
 
@@ -218,13 +241,17 @@ class Workload
      * Spread minutes evenly over the working days from $start to $end, moved up to
      * today when they have gone by, and add them up by week.
      *
-     * A span with no working day in it — a weekend — goes on the Monday after, which
-     * is when anybody will actually pick it up.
+     * A working day is a weekday unless $works says otherwise — a holiday, or the
+     * assignee's leave. A span with no working day in it at all goes on the next one
+     * after it, which is when anybody will actually pick it up.
      *
+     * @param  (callable(CarbonImmutable): bool)|null  $works
      * @return array<string, float>
      */
-    public static function distribute(int $minutes, CarbonImmutable $start, CarbonImmutable $end, CarbonImmutable $today): array
+    public static function distribute(int $minutes, CarbonImmutable $start, CarbonImmutable $end, CarbonImmutable $today, ?callable $works = null): array
     {
+        $works ??= fn (CarbonImmutable $day) => ! $day->isWeekend();
+
         if ($end->lessThan($start)) {
             [$start, $end] = [$end, $start];
         }
@@ -235,15 +262,21 @@ class Workload
         $days = [];
 
         for ($day = $start; $day->lessThanOrEqualTo($end); $day = $day->addDay()) {
-            if (! $day->isWeekend()) {
+            if ($works($day)) {
                 $days[] = $day;
             }
         }
 
-        if ($days === []) {
-            $days = [$start->next(CarbonImmutable::MONDAY)];
+        // Nothing in the span: the next day they are in, within a quarter. Beyond
+        // that the answer is somebody on very long leave, and the day after the span
+        // is as good as any.
+        for ($day = $end->addDay(), $tries = 0; $days === [] && $tries < 90; $day = $day->addDay(), $tries++) {
+            if ($works($day)) {
+                $days[] = $day;
+            }
         }
 
+        $days = $days ?: [$end->addDay()];
         $weeks = [];
 
         foreach ($days as $day) {
@@ -252,6 +285,60 @@ class Workload
         }
 
         return $weeks;
+    }
+
+    /** Whether somebody is working on a day. Null is nobody in particular: holidays only. */
+    private function works(?int $personId, CarbonImmutable $day): bool
+    {
+        // The grid's own window, once, whatever else has been loaded already.
+        if (! $this->gridCalendar) {
+            $this->gridCalendar = true;
+            $this->loadCalendar($this->today->min($this->from), $this->from->addWeeks($this->weeks));
+        }
+
+        $calendar = $this->calendar;
+        $date = $day->toDateString();
+
+        return ! $day->isWeekend()
+            && ! isset($calendar['holidays'][$date])
+            && ($personId === null || ! isset($calendar['leave'][$personId][$date]));
+    }
+
+    private function workingDays(int $personId, CarbonImmutable $from, CarbonImmutable $to): int
+    {
+        $count = 0;
+
+        for ($day = $from; $day->lessThanOrEqualTo($to); $day = $day->addDay()) {
+            $count += $this->works($personId, $day) ? 1 : 0;
+        }
+
+        return $count;
+    }
+
+    /**
+     * Every day off between two dates, as sets of ISO dates. Widened rather than
+     * replaced when asked again, so the grid and the actuals share one calendar.
+     *
+     * @return array{holidays: array<string, true>, leave: array<int, array<string, true>>}
+     */
+    private function loadCalendar(CarbonImmutable $from, CarbonImmutable $to): array
+    {
+        $calendar = $this->calendar ?? ['holidays' => [], 'leave' => []];
+        // Everything a spread might reach: a span moved to today can run past the
+        // grid, and one with no working day looks up to a quarter beyond its end.
+        $to = $to->addDays(120);
+
+        foreach (TimeOff::overlapping($from->toDateString(), $to->toDateString())->get() as $off) {
+            for ($day = CarbonImmutable::parse($off->starts_on->toDateString()); $day->lessThanOrEqualTo($off->ends_on); $day = $day->addDay()) {
+                if ($off->user_id === null) {
+                    $calendar['holidays'][$day->toDateString()] = true;
+                } else {
+                    $calendar['leave'][$off->user_id][$day->toDateString()] = true;
+                }
+            }
+        }
+
+        return $this->calendar = $calendar;
     }
 
     /** @return Collection<int, User> staff members, with their hours and discipline */
