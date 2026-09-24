@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Auth\Concerns\SendsUsersOnwards;
 use App\Http\Controllers\Controller;
+use App\Support\Registration\Registration;
 use App\Support\TwoFactor\PendingLogin;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -16,10 +17,12 @@ class AuthenticatedSessionController extends Controller
 {
     use SendsUsersOnwards;
 
-    public function create(): Response
+    public function create(Request $request, Registration $registration): Response
     {
         return Inertia::render('auth/login', [
             'status' => session('status'),
+            // A link to a page that refuses is worse than no link.
+            'canRegister' => $registration->admits($request) !== null,
         ]);
     }
 

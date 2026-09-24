@@ -6,7 +6,9 @@ use App\Enums\WorkspaceRole;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Support\Tenancy\Tenancy;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 
 class CreateWorkspace
 {
@@ -14,6 +16,10 @@ class CreateWorkspace
 
     public function handle(User $owner, string $name, string $slug): Workspace
     {
+        if (Gate::forUser($owner)->denies('create', Workspace::class)) {
+            throw new AuthorizationException('Workspaces on this server are created by its operators.');
+        }
+
         return DB::transaction(function () use ($owner, $name, $slug) {
             $workspace = Workspace::create([
                 'name' => $name,

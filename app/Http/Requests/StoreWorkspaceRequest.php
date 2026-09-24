@@ -8,6 +8,12 @@ use Illuminate\Validation\Rule;
 
 class StoreWorkspaceRequest extends FormRequest
 {
+    /** Before validation, so a refused visitor learns nothing about which slugs exist. */
+    public function authorize(): bool
+    {
+        return $this->user()?->can('create', Workspace::class) ?? false;
+    }
+
     public function rules(): array
     {
         return [

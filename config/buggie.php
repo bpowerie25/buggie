@@ -22,6 +22,24 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Registration
+    |--------------------------------------------------------------------------
+    |
+    | Who may create an account, and who may create a workspace: `open`, `invite` or
+    | `request`. Normally chosen on Settings → Instance; set here, it wins over the
+    | screen, for installs configured from the command line.
+    |
+    | Unset, a hosted install is `open` and a self-hosted one `invite`, because a
+    | stranger registering on somebody else's server gets their storage, their
+    | outbound mail and a subdomain of their domain. An unrecognised value is treated
+    | as `invite`: a typo should close the door rather than open it.
+    |
+    */
+
+    'registration' => env('BUGGIE_REGISTRATION'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Central domain
     |--------------------------------------------------------------------------
     |

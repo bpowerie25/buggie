@@ -2,11 +2,14 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\RegistrationMode;
+use App\Support\Registration\Registration;
 use App\Support\Settings\Settings;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\Enum;
 use Inertia\Inertia;
 use Inertia\Response;
 use Throwable;
@@ -20,7 +23,10 @@ use Throwable;
  */
 class InstanceSettingsController extends Controller
 {
-    public function __construct(private Settings $settings) {}
+    public function __construct(
+        private Settings $settings,
+        private Registration $registration,
+    ) {}
 
     public function edit(Request $request): Response
     {
@@ -41,7 +47,57 @@ class InstanceSettingsController extends Controller
                 'has_password' => $this->settings->get('mail.password') !== null,
             ],
             'configured_by_env' => $this->settings->get('mail.mailer') === null,
+            'registration' => $this->registrationProps(),
         ]);
+    }
+
+    /**
+     * Who may sign up, and who may make a workspace.
+     *
+     * A separate form from mail, so that saving one can never quietly re-save the
+     * other with whatever the page happened to be holding.
+     */
+    public function registration(Request $request): RedirectResponse
+    {
+        $this->authorize('operate');
+
+        // The environment wins, so a value saved here would be a setting the screen
+        // claims to have applied and has not.
+        if ($this->registration->isSetByEnvironment()) {
+            return back()->withErrors([
+                'registration' => 'BUGGIE_REGISTRATION is set on the server, which overrides this screen. Change it there.',
+            ]);
+        }
+
+        $validated = $request->validate([
+            'mode' => ['required', new Enum(RegistrationMode::class)],
+        ]);
+
+        $mode = RegistrationMode::from($validated['mode']);
+
+        $this->registration->set($mode);
+
+        return back()->with('success', "Registration is now: {$mode->label()}.");
+    }
+
+    /** @return array<string, mixed> */
+    private function registrationProps(): array
+    {
+        return [
+            'mode' => $this->registration->mode()->value,
+            'default' => $this->registration->default()->value,
+            'from_env' => $this->registration->isSetByEnvironment(),
+            // Shown when it is not a mode at all, because the install is then quietly
+            // running as `invite` and the operator deserves to know why.
+            'env_invalid' => $this->registration->isSetByEnvironment()
+                && RegistrationMode::tryFrom((string) $this->registration->environmentValue()) === null,
+            'env_value' => $this->registration->environmentValue(),
+            'modes' => array_map(fn (RegistrationMode $mode) => [
+                'value' => $mode->value,
+                'label' => $mode->label(),
+                'description' => $mode->description(),
+            ], RegistrationMode::cases()),
+        ];
     }
 
     public function update(Request $request): RedirectResponse

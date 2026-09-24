@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Models\Workspace;
 use App\Support\Invitations\PendingInvitation;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\Request;
@@ -38,8 +39,12 @@ class RegisteredUserController extends Controller
         // than to "create a workspace", which is not what they came for.
         $invitation = PendingInvitation::destinationFor($request);
 
-        return $invitation
-            ? redirect_across_domains($invitation)
-            : redirect()->route('workspaces.create');
+        if ($invitation) {
+            return redirect_across_domains($invitation);
+        }
+
+        return $user->can('create', Workspace::class)
+            ? redirect()->route('workspaces.create')
+            : redirect()->route('workspaces.index');
     }
 }

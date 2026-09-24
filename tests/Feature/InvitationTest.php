@@ -273,6 +273,8 @@ class InvitationTest extends TestCase
     {
         // The invitation can be withdrawn between them leaving and coming back. That
         // should drop them somewhere sensible, not 404 them on their first page.
+        config(['buggie.registration' => 'open']);
+
         [$workspace, $owner] = $this->workspaceWithMember(slug: 'acme');
 
         $invitation = $this->inviteTo($workspace, $owner, 'client@shopper.test');
@@ -287,6 +289,33 @@ class InvitationTest extends TestCase
             'password' => 'correct-horse-battery',
             'password_confirmation' => 'correct-horse-battery',
         ])->assertRedirect(route('workspaces.create'));
+    }
+
+    #[Test]
+    public function a_revoked_invitation_on_an_invite_only_install_explains_itself(): void
+    {
+        // The invitation was their only way in, so without it registration is closed
+        // to them — with a page that says so, rather than a 404.
+        config(['buggie.hosted' => false, 'buggie.registration' => null]);
+
+        [$workspace, $owner] = $this->workspaceWithMember(slug: 'acme');
+
+        $invitation = $this->inviteTo($workspace, $owner, 'client@shopper.test');
+
+        $this->get($this->workspaceUrl($workspace, '/invitations/'.$invitation->token));
+
+        $invitation->delete();
+
+        $this->post($this->centralUrl('/register'), [
+            'name' => 'Ana Power',
+            'email' => 'client@shopper.test',
+            'password' => 'correct-horse-battery',
+            'password_confirmation' => 'correct-horse-battery',
+        ])
+            ->assertForbidden()
+            ->assertInertia(fn ($page) => $page->component('auth/registration-closed'));
+
+        $this->assertDatabaseMissing('users', ['email' => 'client@shopper.test']);
     }
 
     /**

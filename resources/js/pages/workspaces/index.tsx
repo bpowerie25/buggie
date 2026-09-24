@@ -6,12 +6,21 @@ import { ChevronRight } from 'lucide-react';
 
 export default function Workspaces({
     workspaces,
+    canCreate,
 }: {
     workspaces: WorkspaceListing[];
+    canCreate: boolean;
 }) {
     return (
-        <AuthLayout title="Choose a workspace">
+        <AuthLayout title={workspaces.length > 0 ? 'Choose a workspace' : 'No workspace yet'}>
             <Head title="Workspaces" />
+
+            {workspaces.length === 0 && !canCreate && (
+                <p className="text-sm text-ink-muted">
+                    You are signed in, but nobody has added you to a workspace. Ask whoever
+                    invited you, or whoever runs this server, to send you an invitation.
+                </p>
+            )}
 
             <ul className="space-y-1.5">
                 {workspaces.map((w) => (
@@ -37,11 +46,13 @@ export default function Workspaces({
                 ))}
             </ul>
 
-            <Link href="/workspaces/create" className="mt-4 block">
-                <Button variant="secondary" className="w-full">
-                    Create a workspace
-                </Button>
-            </Link>
+            {canCreate && (
+                <Link href="/workspaces/create" className="mt-4 block">
+                    <Button variant="secondary" className="w-full">
+                        Create a workspace
+                    </Button>
+                </Link>
+            )}
         </AuthLayout>
     );
 }

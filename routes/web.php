@@ -66,8 +66,11 @@ Route::domain($host)->group(function () {
         Route::get('login', [AuthenticatedSessionController::class, 'create'])->name('login');
         Route::post('login', [AuthenticatedSessionController::class, 'store']);
 
-        Route::get('register', [RegisteredUserController::class, 'create'])->name('register');
-        Route::post('register', [RegisteredUserController::class, 'store']);
+        // Open, closed or by invitation depending on the install; see Registration.
+        Route::middleware('registration')->group(function () {
+            Route::get('register', [RegisteredUserController::class, 'create'])->name('register');
+            Route::post('register', [RegisteredUserController::class, 'store']);
+        });
 
         Route::get('forgot-password', [PasswordResetLinkController::class, 'create'])
             ->name('password.request');
@@ -353,6 +356,8 @@ Route::domain('{workspace}.'.$host)
             ->name('instance.update');
         Route::post('settings/instance/test-mail', [\App\Http\Controllers\InstanceSettingsController::class, 'test'])
             ->name('instance.test-mail');
+        Route::patch('settings/instance/registration', [\App\Http\Controllers\InstanceSettingsController::class, 'registration'])
+            ->name('instance.registration');
 
         // API tokens. Created and revoked here; the API itself lives in routes/api.php.
         Route::post('settings/tokens', [\App\Http\Controllers\ApiTokenController::class, 'store'])

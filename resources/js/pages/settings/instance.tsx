@@ -5,6 +5,15 @@ import { Head, router, useForm, usePage } from '@inertiajs/react';
 import { Send } from 'lucide-react';
 import type { FormEvent } from 'react';
 
+interface RegistrationSettings {
+    mode: string;
+    default: string;
+    from_env: boolean;
+    env_invalid: boolean;
+    env_value: string | null;
+    modes: { value: string; label: string; description: string }[];
+}
+
 interface MailSettings {
     mailer: string;
     host: string | null;
@@ -19,9 +28,11 @@ interface MailSettings {
 export default function InstanceSettings({
     mail,
     configured_by_env,
+    registration,
 }: {
     mail: MailSettings;
     configured_by_env: boolean;
+    registration: RegistrationSettings;
 }) {
     // The test-mail failure arrives as a shared error rather than a form one: it is
     // a different request, and the provider's own message is the useful part.
@@ -192,6 +203,78 @@ export default function InstanceSettings({
                     </p>
                 )}
             </form>
+
+            <RegistrationSection registration={registration} />
         </AppLayout>
+    );
+}
+
+function RegistrationSection({ registration }: { registration: RegistrationSettings }) {
+    const error = (usePage().props.errors as Record<string, string>)?.registration;
+    const { data, setData, patch, processing } = useForm({ mode: registration.mode });
+
+    function submit(e: FormEvent) {
+        e.preventDefault();
+        patch('/settings/instance/registration', { preserveScroll: true });
+    }
+
+    return (
+        <section className="mt-12 max-w-2xl">
+            <h2 className="text-xl font-semibold tracking-tight text-ink">Who can join</h2>
+            <p className="mt-1 text-sm text-ink-muted">
+                Whether strangers can make an account on this server, and who may create
+                workspaces. Workspace invitations work in every mode.
+            </p>
+
+            {registration.from_env && (
+                <p className="mt-4 rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink-muted">
+                    Set on the server by{' '}
+                    <code className="font-mono text-xs">
+                        BUGGIE_REGISTRATION={registration.env_value}
+                    </code>
+                    , which overrides this screen.
+                    {registration.env_invalid &&
+                        ' That is not a mode Buggie knows, so it is treating the server as invitation-only.'}
+                </p>
+            )}
+
+            <form onSubmit={submit} className="mt-6 space-y-2">
+                {registration.modes.map((mode) => (
+                    <label
+                        key={mode.value}
+                        className="flex cursor-pointer items-start gap-3 rounded-lg border border-border px-3 py-2.5 has-[:checked]:border-accent has-[:disabled]:cursor-default"
+                    >
+                        <input
+                            type="radio"
+                            name="registration"
+                            value={mode.value}
+                            checked={data.mode === mode.value}
+                            disabled={registration.from_env}
+                            onChange={() => setData('mode', mode.value)}
+                            className="mt-1"
+                        />
+                        <span>
+                            <span className="block text-sm font-medium text-ink">
+                                {mode.label}
+                                {mode.value === registration.default && (
+                                    <span className="ml-2 text-xs font-normal text-ink-subtle">
+                                        default here
+                                    </span>
+                                )}
+                            </span>
+                            <span className="block text-sm text-ink-muted">{mode.description}</span>
+                        </span>
+                    </label>
+                ))}
+
+                {error && <p className="text-sm text-danger">{error}</p>}
+
+                {!registration.from_env && (
+                    <Button type="submit" disabled={processing || data.mode === registration.mode}>
+                        {processing ? 'Saving…' : 'Save'}
+                    </Button>
+                )}
+            </form>
+        </section>
     );
 }

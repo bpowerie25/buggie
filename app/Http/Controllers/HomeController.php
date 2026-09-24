@@ -53,6 +53,7 @@ class HomeController extends Controller
                 ),
                 'pricesExcludeTax' => (bool) config('plans.prices_exclude_tax'),
                 'hosted' => (bool) config('buggie.hosted'),
+                'canRegister' => app(\App\Support\Registration\Registration::class)->admits($request) !== null,
                 'repository' => 'https://github.com/bpowerie25/buggie',
             ]);
         }
@@ -65,7 +66,9 @@ class HomeController extends Controller
             return redirect_across_domains(workspace_url($workspace->slug));
         }
 
-        return $user->workspaces()->exists()
+        // The picker also explains having no workspace, for someone who may not
+        // create one.
+        return $user->workspaces()->exists() || $user->cannot('create', Workspace::class)
             ? redirect()->route('workspaces.index')
             : redirect()->route('workspaces.create');
     }

@@ -4,7 +4,13 @@ import { AuthLayout } from '@/layouts/auth-layout';
 import { Head, Link, useForm } from '@inertiajs/react';
 import type { FormEvent } from 'react';
 
-export default function Login({ status }: { status?: string }) {
+export default function Login({
+    status,
+    canRegister,
+}: {
+    status?: string;
+    canRegister: boolean;
+}) {
     const { data, setData, post, processing, errors, reset } = useForm({
         email: '',
         password: '',
@@ -71,12 +77,14 @@ export default function Login({ status }: { status?: string }) {
                 </Button>
             </form>
 
-            <p className="mt-6 text-center text-sm text-ink-muted">
-                No account?{' '}
-                <Link href="/register" className="text-accent hover:underline">
-                    Create one
-                </Link>
-            </p>
+            {canRegister && (
+                <p className="mt-6 text-center text-sm text-ink-muted">
+                    No account?{' '}
+                    <Link href="/register" className="text-accent hover:underline">
+                        Create one
+                    </Link>
+                </p>
+            )}
         </AuthLayout>
     );
 }

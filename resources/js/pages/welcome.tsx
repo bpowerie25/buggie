@@ -166,6 +166,7 @@ export default function Welcome({
     interval = 'month',
     intervals = [],
     pricesExcludeTax = true,
+    canRegister = true,
 }: {
     plans?: Plan[];
     hosted?: boolean;
@@ -175,6 +176,8 @@ export default function Welcome({
     interval?: string;
     intervals?: { key: string; label: string }[];
     pricesExcludeTax?: boolean;
+    /** False on an install where sign-up is by invitation. */
+    canRegister?: boolean;
 }) {
     // self_hosted is shown alongside the paid plans rather than hidden: it is the
     // honest comparison, and a visitor who would rather run it themselves is not a
@@ -221,9 +224,11 @@ export default function Welcome({
                                 Sign in
                             </Button>
                         </Link>
-                        <Link href="/register">
-                            <Button size="sm">Get started</Button>
-                        </Link>
+                        {canRegister && (
+                            <Link href="/register">
+                                <Button size="sm">Get started</Button>
+                            </Link>
+                        )}
                     </nav>
                 </header>
 
@@ -249,9 +254,15 @@ export default function Welcome({
                         </p>
 
                         <div className="mt-8 flex flex-wrap items-center gap-3">
-                            <Link href="/register">
-                                <Button>{hosted ? 'Start free' : 'Get started'}</Button>
-                            </Link>
+                            {canRegister ? (
+                                <Link href="/register">
+                                    <Button>{hosted ? 'Start free' : 'Get started'}</Button>
+                                </Link>
+                            ) : (
+                                <Link href="/login">
+                                    <Button>Sign in</Button>
+                                </Link>
+                            )}
                             {repository && (
                                 <a href={repository}>
                                     <Button variant="ghost">

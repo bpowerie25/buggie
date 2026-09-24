@@ -31,11 +31,16 @@ class WorkspaceController extends Controller
                 'url' => workspace_url($w->slug),
                 'role' => $w->pivot->role,
             ]),
+            // Offered only to those who may: on an invite-only install, a button that
+            // leads to a refusal is a button that should not be there.
+            'canCreate' => $request->user()->can('create', Workspace::class),
         ]);
     }
 
     public function create(): Response
     {
+        $this->authorize('create', Workspace::class);
+
         return Inertia::render('workspaces/create', [
             'domain' => config('buggie.domain'),
         ]);
@@ -43,6 +48,8 @@ class WorkspaceController extends Controller
 
     public function store(StoreWorkspaceRequest $request, CreateWorkspace $action): SymfonyResponse
     {
+        $this->authorize('create', Workspace::class);
+
         $workspace = $action->handle(
             $request->user(),
             $request->string('name')->toString(),
