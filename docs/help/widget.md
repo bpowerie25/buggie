@@ -275,7 +275,14 @@ client becomes the issue's reporter — so they can see it and hear about it, by
 ordinary rule that clients see what they reported. An unverified or identified email
 grants nothing unless **Settings → Workspace → Trust unverified emails** is on; the name
 and address are kept on the issue, and staff can choose **Link to client** in the
-sidebar. Reports always go to Triage first, never straight to the backlog.
+sidebar.
+
+Turning *Trust unverified emails* on also links the widget issues already accepted, by
+the same rule — including ones accepted before identities were recorded, whose address
+comes from the report they were accepted from. A report *merged* into an existing issue
+never makes its sender that issue's reporter. From the command line,
+`php artisan buggie:link-widget-reporters --dry-run` shows what would be linked, and
+without `--dry-run` links it. Reports always go to Triage first, never straight to the backlog.
 
 ## The npm package
 

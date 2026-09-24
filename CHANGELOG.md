@@ -118,6 +118,11 @@ today you are running `main`, which is honest rather than ideal — see
 
 ### Fixed
 
+- A client on "own issues only" did not see issues they had reported through the widget
+  with their own address, because the link to their account was only made when a
+  report was accepted, and only for a trusted identity. Turning on *Trust unverified
+  emails* now links the widget issues already accepted as well, and
+  `buggie:link-widget-reporters` does the same from the command line, with a dry run.
 - Marking up a screenshot was hard to aim. The capture carried its own inline size,
   which beat the widget's styles: the preview in the panel showed a zoomed-in crop of
   one corner, and the full-screen editor squashed the image to fit, so a box never

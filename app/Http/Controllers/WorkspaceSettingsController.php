@@ -132,6 +132,19 @@ class WorkspaceSettingsController extends Controller
             $workspace->forceFill(['settings' => [...($workspace->settings ?? []), ...$settings]])->save();
         }
 
+        // Trusting typed addresses applies to what is already here as well as to what
+        // arrives next: the widget issues accepted earlier are linked now, by the same
+        // rule, rather than staying invisible to the clients who reported them.
+        if (\App\Support\Reports\ReporterLink::trustsUnverified($workspace)) {
+            $linked = \App\Support\Reports\ReporterLink::backfill($workspace)['linked'];
+
+            if ($linked > 0) {
+                return back()->with('success', $linked === 1
+                    ? 'Workspace updated. 1 existing widget issue was linked to the client who reported it.'
+                    : "Workspace updated. {$linked} existing widget issues were linked to the clients who reported them.");
+            }
+        }
+
         return back()->with('success', 'Workspace updated.');
     }
 
