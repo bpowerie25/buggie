@@ -31,26 +31,28 @@ class HorizonServiceProvider extends HorizonApplicationServiceProvider
      */
     protected function gate(): void
     {
-        // Who operates this install, as opposed to who owns a workspace in it.
+        // Who operates this install, as opposed to who owns a workspace in it:
+        // whoever is named in BUGGIE_OPERATORS, and whoever is marked as one.
         //
-        // On the hosted service that is whoever is named in BUGGIE_OPERATORS, and an
-        // empty list means nobody — failing closed. A self-hosted install with nobody
-        // named falls back to the first account created: it is somebody's own server,
-        // and making them edit .env before they can configure mail is exactly the
-        // friction worth removing.
+        // Marked by `buggie:operator`, or by being the account that registered first
+        // on a self-hosted install — it is somebody's own server, and making them edit
+        // .env before they can configure mail is exactly the friction worth removing.
+        // Nothing marks anybody on the hosted service except that command, so there
+        // an empty list still means nobody.
+        //
+        // This used to be "the lowest user id" whenever nobody was named, worked out
+        // on every check. Deleting that account would have promoted the next one.
         Gate::define('operate', function (?\App\Models\User $user = null) {
             if ($user === null) {
                 return false;
             }
 
-            $operators = array_map('strtolower', (array) config('buggie.operators'));
-
-            if ($operators !== []) {
-                return in_array(strtolower($user->email), $operators, true);
-            }
-
-            return ! config('buggie.hosted')
-                && $user->id === \App\Models\User::query()->min('id');
+            return $user->is_operator
+                || in_array(
+                    strtolower($user->email),
+                    array_map('strtolower', (array) config('buggie.operators')),
+                    true,
+                );
         });
 
         Gate::define('viewHorizon', function ($user = null) {

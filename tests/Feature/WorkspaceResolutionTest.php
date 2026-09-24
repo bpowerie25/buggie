@@ -41,7 +41,7 @@ class WorkspaceResolutionTest extends TestCase
     #[Test]
     public function reserved_subdomains_cannot_be_registered(): void
     {
-        $user = \App\Models\User::factory()->create();
+        $user = \App\Models\User::factory()->operator()->create();
 
         $this->actingAs($user)
             ->post($this->centralUrl('/workspaces'), [
@@ -54,7 +54,7 @@ class WorkspaceResolutionTest extends TestCase
     #[Test]
     public function workspace_slugs_must_be_subdomain_safe(): void
     {
-        $user = \App\Models\User::factory()->create();
+        $user = \App\Models\User::factory()->operator()->create();
 
         foreach (['Has Spaces', '-leading', 'trailing-', 'dots.here', 'a', 'under_score'] as $slug) {
             $this->actingAs($user)
@@ -66,7 +66,7 @@ class WorkspaceResolutionTest extends TestCase
     #[Test]
     public function slugs_are_normalised_to_lowercase_rather_than_rejected(): void
     {
-        $user = \App\Models\User::factory()->create();
+        $user = \App\Models\User::factory()->operator()->create();
 
         $this->actingAs($user)->post($this->centralUrl('/workspaces'), [
             'name' => 'Acme Ltd',
@@ -79,7 +79,7 @@ class WorkspaceResolutionTest extends TestCase
     #[Test]
     public function signing_up_creates_a_workspace_and_lands_the_owner_in_it(): void
     {
-        $user = \App\Models\User::factory()->create();
+        $user = \App\Models\User::factory()->operator()->create();
 
         $response = $this->actingAs($user)->post($this->centralUrl('/workspaces'), [
             'name' => 'Acme Ltd',

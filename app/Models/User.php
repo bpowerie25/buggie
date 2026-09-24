@@ -31,12 +31,24 @@ class User extends Authenticatable
     /** @use HasFactory<UserFactory> */
     use HasApiTokens, HasFactory, HasTwoFactorAuthentication, Notifiable;
 
+    /**
+     * Stated, so a freshly created user answers the operator gate without a reload;
+     * strict mode throws on reading an attribute the model was never given.
+     *
+     * Deliberately not fillable. The first account on a self-hosted install and
+     * `buggie:operator` are the only things that set it, both with forceFill.
+     */
+    protected $attributes = [
+        'is_operator' => false,
+    ];
+
     protected function casts(): array
     {
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'notification_settings' => 'array',
+            'is_operator' => 'boolean',
 
             // Encrypted at rest for the same reason mail.password is: a stolen
             // database dump must not be a stolen second factor. The recovery codes

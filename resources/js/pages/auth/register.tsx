@@ -4,7 +4,7 @@ import { AuthLayout } from '@/layouts/auth-layout';
 import { Head, Link, useForm } from '@inertiajs/react';
 import type { FormEvent } from 'react';
 
-export default function Register() {
+export default function Register({ firstRun = false }: { firstRun?: boolean }) {
     const { data, setData, post, processing, errors, reset } = useForm({
         name: '',
         email: '',
@@ -25,6 +25,13 @@ export default function Register() {
             description="You'll set up your workspace next."
         >
             <Head title="Create account" />
+
+            {firstRun && (
+                <p className="mb-4 rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink-muted">
+                    Nobody has an account on this server yet. This one will run it: it
+                    configures mail, decides who can join, and creates the workspaces.
+                </p>
+            )}
 
             <form onSubmit={submit} className="space-y-4">
                 <Field label="Name" error={errors.name}>

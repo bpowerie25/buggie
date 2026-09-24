@@ -33,6 +33,7 @@ class UserFactory extends Factory
             'avatar_path' => null,
             'timezone' => 'UTC',
             'last_workspace_id' => null,
+            'is_operator' => false,
 
             // Stated rather than left out. Strict mode throws on reading an attribute
             // that was never loaded, and anything asking whether an account has a
@@ -42,6 +43,14 @@ class UserFactory extends Factory
             'two_factor_confirmed_at' => null,
             'two_factor_last_step' => null,
         ];
+    }
+
+    /** Runs the install: configures it, decides who can join, creates workspaces. */
+    public function operator(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'is_operator' => true,
+        ]);
     }
 
     /**

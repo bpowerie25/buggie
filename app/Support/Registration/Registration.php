@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Support\Invitations\PendingInvitation;
 use App\Support\Settings\Settings;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 
 /**
@@ -19,6 +20,9 @@ use Illuminate\Support\Facades\Gate;
 class Registration
 {
     public const SETTING = 'registration.mode';
+
+    /** Written once, by whichever registration takes the first-run exception. */
+    public const FIRST_RUN_CLAIM = 'registration.first_run_claimed';
 
     public function __construct(private Settings $settings) {}
 
@@ -60,10 +64,39 @@ class Registration
         $this->settings->put([self::SETTING => $mode->value]);
     }
 
-    /** Nobody has an account yet, so somebody has to be allowed to make the first. */
+    /**
+     * Nobody has an account yet, so somebody has to be allowed to make the first.
+     *
+     * Read from the table rather than the settings cache, which is shared across
+     * requests and would be the wrong thing to trust on the one question two
+     * visitors may be racing to answer.
+     */
     public function isFirstRun(): bool
     {
-        return ! User::query()->exists();
+        return ! User::query()->exists()
+            && ! DB::table('app_settings')->where('key', self::FIRST_RUN_CLAIM)->exists();
+    }
+
+    /**
+     * Take the first-run exception, or learn that somebody else already has.
+     *
+     * Call inside the transaction that creates the account. The key is the table's
+     * primary key, so of two registrations racing on an empty install, Postgres makes
+     * the second wait on the first's insert and then do nothing: exactly one gets a
+     * row back. If the winner's transaction fails, its claim rolls back with it and
+     * the exception is still there to be taken.
+     *
+     * Never cleared. An install whose accounts have all been deleted does not reopen
+     * to the next stranger; `buggie:operator` is the way back in.
+     */
+    public function claimFirstRun(): bool
+    {
+        return DB::table('app_settings')->insertOrIgnore([
+            'key' => self::FIRST_RUN_CLAIM,
+            'value' => json_encode(now()->toIso8601String()),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]) === 1;
     }
 
     /**
@@ -78,6 +111,12 @@ class Registration
             return Admission::FirstRun;
         }
 
+        return $this->admitsOtherwise($request);
+    }
+
+    /** As admits(), for somebody who has just lost the race for the first run. */
+    public function admitsOtherwise(Request $request): ?Admission
+    {
         if ($this->mode()->allowsAnyoneToRegister()) {
             return Admission::Open;
         }

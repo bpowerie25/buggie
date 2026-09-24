@@ -62,7 +62,7 @@ class CrossDomainRedirectTest extends TestCase
     #[Test]
     public function creating_a_workspace_moves_to_its_subdomain(): void
     {
-        $user = \App\Models\User::factory()->create();
+        $user = \App\Models\User::factory()->operator()->create();
 
         $this->actingAs($user)
             ->withHeader('X-Inertia', 'true')

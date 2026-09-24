@@ -126,14 +126,39 @@ class InstanceSettingsTest extends TestCase
     public function a_self_hosted_install_lets_its_first_account_operate_it(): void
     {
         // It is somebody's own server. Making them edit .env before they can
-        // configure mail is exactly the friction this removes.
+        // configure mail is exactly the friction this removes. The account made on
+        // first run is marked as the operator, rather than "whichever has the lowest
+        // id" being worked out on every check.
+        config(['buggie.hosted' => false, 'buggie.operators' => [], 'buggie.registration' => null]);
+
+        $this->post($this->centralUrl('/register'), [
+            'name' => 'Matrix Ops',
+            'email' => 'ops@matrix.test',
+            'password' => 'correct-horse-battery',
+            'password_confirmation' => 'correct-horse-battery',
+        ]);
+
+        $this->post($this->centralUrl('/workspaces'), ['name' => 'Matrix', 'slug' => 'matrix'])
+            ->assertRedirect(workspace_url('matrix'));
+
+        $this->get('http://matrix.'.config('buggie.host').'/settings/instance')->assertOk();
+    }
+
+    #[Test]
+    public function deleting_the_first_account_promotes_nobody(): void
+    {
+        // What the old lowest-id rule got wrong: the next account up inherited the
+        // install without anybody deciding it should.
         config(['buggie.hosted' => false, 'buggie.operators' => []]);
 
-        [$workspace, $first] = $this->workspaceWithMember(slug: 'acme');
+        $first = User::factory()->operator()->create();
+        [$workspace, $second] = $this->workspaceWithMember(slug: 'acme');
 
-        $this->actingAs($first)
+        $first->delete();
+
+        $this->actingAs($second)
             ->get($this->workspaceUrl($workspace, '/settings/instance'))
-            ->assertOk();
+            ->assertForbidden();
     }
 
     #[Test]
