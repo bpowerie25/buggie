@@ -118,6 +118,12 @@ today you are running `main`, which is honest rather than ideal — see
 
 ### Fixed
 
+- Marking up a screenshot was hard to aim. The capture carried its own inline size,
+  which beat the widget's styles: the preview in the panel showed a zoomed-in crop of
+  one corner, and the full-screen editor squashed the image to fit, so a box never
+  seemed to land where it was drawn. The image now keeps its shape in both, the editor's
+  tools sit at the top right of the screen where they are always visible, and on a
+  touch screen a drag draws instead of scrolling the page.
 - The widget key settings card called its routes with the numeric id while the routes
   bind by public key, so every toggle, the allowed origins and the revoke button failed
   with a 404 while looking saved. A failed save now says so on the card.

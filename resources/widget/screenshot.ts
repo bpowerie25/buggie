@@ -86,6 +86,14 @@ export async function capture(hide: HTMLElement): Promise<HTMLCanvasElement | nu
             windowHeight: window.innerHeight,
         });
 
+        // html2canvas sizes the canvas inline to the page's CSS pixels, which beats
+        // any stylesheet: the panel then showed a zoomed-in crop of the top-left
+        // corner, and the editor clamped width and height separately and squashed
+        // the image. Without it the canvas takes its size from our CSS and keeps its
+        // shape everywhere.
+        canvas.style.removeProperty('width');
+        canvas.style.removeProperty('height');
+
         return canvas;
     } catch {
         return null;
@@ -122,15 +130,31 @@ export function attachAnnotator(canvas: HTMLCanvasElement, getTool: () => Tool) 
     let start: { x: number; y: number } | null = null;
     let snapshot: ImageData | null = null;
 
+    /*
+     * The pointer against the image as it is drawn on screen, scaled to its pixels.
+     * clientX and the element's screen rectangle are in the same coordinates even on
+     * a page that uses CSS zoom; offsetX is not — under zoom Chrome reports it in a
+     * different space, and the box landed well to the left of the pointer. The image
+     * has no border in the editor, so its rectangle is exactly the drawing surface.
+     */
     const position = (event: PointerEvent) => {
         const box = canvas.getBoundingClientRect();
-        return {
-            x: ((event.clientX - box.left) / box.width) * canvas.width,
-            y: ((event.clientY - box.top) / box.height) * canvas.height,
-        };
+
+        return toCanvasPoint(event.clientX - box.left, event.clientY - box.top, box.width, box.height, canvas.width, canvas.height);
     };
 
+    // A drag interrupted — by the browser taking the touch for a scroll, or the
+    // pointer leaving the window — leaves the image as it was before it started.
+    const cancel = () => {
+        if (snapshot) context.putImageData(snapshot, 0, 0);
+        start = null;
+        snapshot = null;
+    };
+
+    canvas.addEventListener('pointercancel', cancel);
+
     canvas.addEventListener('pointerdown', (event) => {
+        event.preventDefault();
         canvas.setPointerCapture(event.pointerId);
         start = position(event);
         snapshot = context.getImageData(0, 0, canvas.width, canvas.height);
@@ -154,6 +178,23 @@ export function attachAnnotator(canvas: HTMLCanvasElement, getTool: () => Tool) 
         start = null;
         snapshot = null;
     });
+}
+
+/** From a point in the canvas's displayed size to the same point in its pixels. */
+export function toCanvasPoint(
+    shownX: number,
+    shownY: number,
+    shownWidth: number,
+    shownHeight: number,
+    pixelWidth: number,
+    pixelHeight: number,
+): { x: number; y: number } {
+    const clamp = (value: number, max: number) => Math.min(Math.max(value, 0), max);
+
+    return {
+        x: clamp(shownWidth > 0 ? (shownX / shownWidth) * pixelWidth : 0, pixelWidth),
+        y: clamp(shownHeight > 0 ? (shownY / shownHeight) * pixelHeight : 0, pixelHeight),
+    };
 }
 
 function draw(

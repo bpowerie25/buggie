@@ -78,17 +78,24 @@ canvas { width: 100%; border: 1px solid #e2e8f0; border-radius: 8px; cursor: cro
    takes over the viewport. */
 .editor {
   position: fixed; inset: 0; z-index: 2147483001;
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 12px; padding: 20px; background: rgba(2,6,23,.88);
+  display: flex; align-items: center; justify-content: center;
+  padding: 72px 20px 20px; background: rgba(2,6,23,.88);
 }
+/* Width and height both auto, so the image keeps its shape as it is fitted; no
+   border, so the drawing surface is exactly the element; and the page does not
+   scroll or zoom under a finger that is trying to draw. */
 .editor canvas {
-  max-width: min(94vw, 1400px); max-height: 76vh;
-  width: auto; height: auto; cursor: crosshair;
+  max-width: min(94vw, 1400px); max-height: calc(100vh - 100px);
+  width: auto; height: auto; cursor: crosshair; border: 0;
   border-radius: 10px; box-shadow: 0 24px 60px rgba(0,0,0,.5);
-  background: #fff; pointer-events: auto;
+  background: #fff; pointer-events: auto; touch-action: none;
 }
+/* The tools stay where they can always be seen and reached: the top right of the
+   screen, not under an image that may run off the bottom of it. */
 .editor-bar {
-  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  position: fixed; top: 16px; right: 16px; z-index: 1;
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end;
+  max-width: calc(100vw - 32px);
   padding: 8px 12px; border-radius: 999px; background: #fff;
   box-shadow: 0 8px 24px rgba(0,0,0,.3);
 }
