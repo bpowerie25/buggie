@@ -30,7 +30,3 @@ Homestead.yaml
 Thumbs.db
 packages/swift/.build/
 
-# Local tooling scratch space. Git does not ignore a linked worktree placed inside its
-# own repository, so without this a `git add -A` can sweep in whatever is scaffolded
-# there — in practice a vendor/ copy and a .env.
-/.claude/
