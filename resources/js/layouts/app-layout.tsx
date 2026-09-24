@@ -16,6 +16,7 @@ import {
     FolderKanban,
     Inbox,
     Keyboard,
+    LayoutGrid,
     LayoutDashboard,
     LogOut,
     Server,
@@ -97,6 +98,8 @@ export function AppLayout({
 
     const url = new URL(ziggy.location);
     const path = url.pathname;
+    // Inertia's own URL carries the query string; the shared location does not.
+    const onBoard = new URLSearchParams(usePage().url.split('?')[1] ?? '').get('layout') === 'board';
     const currentQuery = url.searchParams.get('q');
 
     useHotkeys({
@@ -150,9 +153,18 @@ export function AppLayout({
                     <NavLink
                         href="/issues"
                         icon={CircleDot}
-                        active={path.startsWith('/issues')}
+                        active={path.startsWith('/issues') && !onBoard}
                     >
                         Issues
+                    </NavLink>
+                    {/* The same issues as columns. It was only a small unlabelled icon on
+                        the issue list, which is to say most people never found it. */}
+                    <NavLink
+                        href="/issues?layout=board"
+                        icon={LayoutGrid}
+                        active={path === '/issues' && onBoard}
+                    >
+                        Board
                     </NavLink>
                     {auth.role !== 'client' && (
                         <NavLink
