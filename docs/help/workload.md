@@ -31,12 +31,17 @@ The **Time off** panel on the Workload screen lists upcoming leave and public ho
 - **Public holidays:** owners and admins choose *Everyone: public holiday*. A holiday
   takes that day from everybody.
 
-Days off are whole days, inclusive at both ends, and they do two things:
+Time off is either whole days, inclusive at both ends, or **half a day**: choose
+*Morning only* or *Afternoon only* for a single date. A half day counts as half. A
+morning and an afternoon on the same day add up to a full day off.
 
-- **They reduce that week's hours.** Three days' leave in a 20-hour week leaves 8 hours.
-  The cell shows "3d off", or "Off" for a whole week away.
+Days off do two things:
+
+- **They reduce that week's hours.** Three days' leave in a 20-hour week leaves 8 hours,
+  and a half day leaves 18. The cell shows "3d off" or "0.5d off", or "Off" for a
+  whole week away.
 - **No work is planned onto them.** An issue's remaining hours are spread only over the
-  days its assignee is in. Work due on a holiday, or entirely inside somebody's leave,
+  days its assignee is in, and a half day takes half a day's share. Work due on a holiday, or entirely inside somebody's leave,
   moves to their next working day.
 
 Hours available under *Estimates against actuals* also leave out days off.

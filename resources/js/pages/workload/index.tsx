@@ -5,7 +5,7 @@ import { Fragment, useState, type FormEvent } from 'react';
 
 interface Cell {
     minutes: number;
-    /** Weekdays off this week: leave or public holidays. */
+    /** Weekdays off this week: leave or public holidays, a half day as 0.5. */
     off: number;
     /** Their hours for this week once days off are taken out; null when not set. */
     capacity: number | null;
@@ -39,6 +39,8 @@ interface TimeOffRow {
     who: string | null;
     starts_on: string;
     ends_on: string;
+    /** A morning or an afternoon off; null for whole days. */
+    part: 'am' | 'pm' | null;
     note: string | null;
     can_delete: boolean;
 }
@@ -62,6 +64,7 @@ function TimeOffPanel({
         user_id: String(me) as string,
         starts_on: '',
         ends_on: '',
+        part: '' as '' | 'am' | 'pm',
         note: '',
     });
 
@@ -69,12 +72,16 @@ function TimeOffPanel({
         event.preventDefault();
         post('/time-off', {
             preserveScroll: true,
-            onSuccess: () => reset('starts_on', 'ends_on', 'note'),
+            onSuccess: () => reset('starts_on', 'ends_on', 'part', 'note'),
         });
     }
 
     const range = (row: TimeOffRow) =>
-        row.starts_on === row.ends_on ? row.starts_on : `${row.starts_on} to ${row.ends_on}`;
+        row.part
+            ? `${row.starts_on}, ${row.part === 'am' ? 'morning' : 'afternoon'}`
+            : row.starts_on === row.ends_on
+              ? row.starts_on
+              : `${row.starts_on} to ${row.ends_on}`;
     const input = 'rounded-lg border border-border bg-surface px-2 py-1 text-sm text-ink';
 
     return (
@@ -128,19 +135,39 @@ function TimeOffPanel({
                     value={data.starts_on}
                     aria-label="From"
                     onChange={(e) => {
-                        setData('starts_on', e.target.value);
-                        if (!data.ends_on || data.ends_on < e.target.value) setData('ends_on', e.target.value);
+                        const day = e.target.value;
+                        // A half day is that one day; otherwise keep the end no earlier.
+                        setData((d) => ({
+                            ...d,
+                            starts_on: day,
+                            ends_on: d.part || !d.ends_on || d.ends_on < day ? day : d.ends_on,
+                        }));
                     }}
                     className={input}
                 />
-                <input
-                    type="date"
-                    value={data.ends_on}
-                    min={data.starts_on || undefined}
-                    aria-label="To"
-                    onChange={(e) => setData('ends_on', e.target.value)}
+                <select
+                    value={data.part}
+                    aria-label="Whole or half day"
+                    onChange={(e) => {
+                        const part = e.target.value as '' | 'am' | 'pm';
+                        setData((d) => ({ ...d, part, ends_on: part ? d.starts_on : d.ends_on }));
+                    }}
                     className={input}
-                />
+                >
+                    <option value="">Whole days</option>
+                    <option value="am">Morning only</option>
+                    <option value="pm">Afternoon only</option>
+                </select>
+                {!data.part && (
+                    <input
+                        type="date"
+                        value={data.ends_on}
+                        min={data.starts_on || undefined}
+                        aria-label="To"
+                        onChange={(e) => setData('ends_on', e.target.value)}
+                        className={input}
+                    />
+                )}
                 <input
                     value={data.note}
                     maxLength={80}
@@ -157,8 +184,10 @@ function TimeOffPanel({
                     Add
                 </button>
             </form>
-            {(errors.ends_on || errors.user_id || errors.starts_on) && (
-                <p className="mt-1 text-xs text-danger">{errors.ends_on ?? errors.user_id ?? errors.starts_on}</p>
+            {(errors.ends_on || errors.user_id || errors.starts_on || errors.part) && (
+                <p className="mt-1 text-xs text-danger">
+                    {errors.ends_on ?? errors.user_id ?? errors.starts_on ?? errors.part}
+                </p>
             )}
         </section>
     );

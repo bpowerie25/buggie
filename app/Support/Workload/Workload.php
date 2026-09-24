@@ -50,7 +50,7 @@ class Workload
         $this->today = ($today ?? CarbonImmutable::today())->startOfDay();
     }
 
-    /** @var array{holidays: array<string, true>, leave: array<int, array<string, true>>}|null */
+    /** @var array{holidays: array<string, float>, leave: array<int, array<string, float>>, seen: array<int, true>}|null */
     private ?array $calendar = null;
 
     private bool $gridCalendar = false;
@@ -98,10 +98,12 @@ class Workload
                 $cell['minutes'] = (int) round($cell['minutes']);
                 usort($cell['issues'], fn ($a, $b) => $b['minutes'] <=> $a['minutes']);
 
-                // Weekdays off this week, and what is left of their hours for it.
+                // Weekdays off this week, half days as halves, and what is left of
+                // their hours for it.
                 $monday = CarbonImmutable::parse($week);
-                $off = count(array_filter(range(0, 4), fn (int $i) => ! $this->works($person->id, $monday->addDays($i))));
-                $cell['off'] = $off;
+                $off = 5 - array_sum(array_map(fn (int $i) => $this->available($person->id, $monday->addDays($i)), range(0, 4)));
+                // Whole numbers stay whole: "3d off", not "3.0d off".
+                $cell['off'] = floor($off) === $off ? (int) $off : $off;
                 $cell['capacity'] = $hours === null ? null : (int) round((float) $hours * 60 * (5 - $off) / 5);
             }
             unset($cell);
@@ -233,24 +235,26 @@ class Workload
             CarbonImmutable::parse($first->toDateString()),
             CarbonImmutable::parse($last->toDateString()),
             $this->today,
-            fn (CarbonImmutable $day) => $this->works($personId, $day),
+            fn (CarbonImmutable $day) => $this->available($personId, $day),
         );
     }
 
     /**
-     * Spread minutes evenly over the working days from $start to $end, moved up to
-     * today when they have gone by, and add them up by week.
+     * Spread minutes over the working days from $start to $end, moved up to today
+     * when they have gone by, and add them up by week.
      *
-     * A working day is a weekday unless $works says otherwise — a holiday, or the
-     * assignee's leave. A span with no working day in it at all goes on the next one
-     * after it, which is when anybody will actually pick it up.
+     * $available says how much of a day somebody is in: 1 for a normal weekday, 0
+     * for a weekend, a holiday or leave, and a half for a half day. Each day takes a
+     * share of the work in proportion, so a morning off takes half a day's share. A
+     * span with no working time in it at all goes on the next day that has some,
+     * which is when anybody will actually pick it up.
      *
-     * @param  (callable(CarbonImmutable): bool)|null  $works
+     * @param  (callable(CarbonImmutable): (float|bool))|null  $available
      * @return array<string, float>
      */
-    public static function distribute(int $minutes, CarbonImmutable $start, CarbonImmutable $end, CarbonImmutable $today, ?callable $works = null): array
+    public static function distribute(int $minutes, CarbonImmutable $start, CarbonImmutable $end, CarbonImmutable $today, ?callable $available = null): array
     {
-        $works ??= fn (CarbonImmutable $day) => ! $day->isWeekend();
+        $available ??= fn (CarbonImmutable $day) => ! $day->isWeekend();
 
         if ($end->lessThan($start)) {
             [$start, $end] = [$end, $start];
@@ -259,11 +263,12 @@ class Workload
         $start = $start->max($today);
         $end = $end->max($today);
 
+        /** @var array<string, float> $days ISO date => share of a day */
         $days = [];
 
         for ($day = $start; $day->lessThanOrEqualTo($end); $day = $day->addDay()) {
-            if ($works($day)) {
-                $days[] = $day;
+            if (($share = (float) $available($day)) > 0) {
+                $days[$day->toDateString()] = $share;
             }
         }
 
@@ -271,24 +276,28 @@ class Workload
         // that the answer is somebody on very long leave, and the day after the span
         // is as good as any.
         for ($day = $end->addDay(), $tries = 0; $days === [] && $tries < 90; $day = $day->addDay(), $tries++) {
-            if ($works($day)) {
-                $days[] = $day;
+            if (($share = (float) $available($day)) > 0) {
+                $days[$day->toDateString()] = $share;
             }
         }
 
-        $days = $days ?: [$end->addDay()];
+        $days = $days ?: [$end->addDay()->toDateString() => 1.0];
+        $total = array_sum($days);
         $weeks = [];
 
-        foreach ($days as $day) {
-            $week = $day->startOfWeek()->toDateString();
-            $weeks[$week] = ($weeks[$week] ?? 0) + $minutes / count($days);
+        foreach ($days as $date => $share) {
+            $week = CarbonImmutable::parse($date)->startOfWeek()->toDateString();
+            $weeks[$week] = ($weeks[$week] ?? 0) + $minutes * $share / $total;
         }
 
         return $weeks;
     }
 
-    /** Whether somebody is working on a day. Null is nobody in particular: holidays only. */
-    private function works(?int $personId, CarbonImmutable $day): bool
+    /**
+     * How much of a day somebody is working: 1, 0, or a half for a half day off.
+     * Null is nobody in particular, for whom only holidays count.
+     */
+    private function available(?int $personId, CarbonImmutable $day): float
     {
         // The grid's own window, once, whatever else has been loaded already.
         if (! $this->gridCalendar) {
@@ -296,44 +305,59 @@ class Workload
             $this->loadCalendar($this->today->min($this->from), $this->from->addWeeks($this->weeks));
         }
 
-        $calendar = $this->calendar;
-        $date = $day->toDateString();
-
-        return ! $day->isWeekend()
-            && ! isset($calendar['holidays'][$date])
-            && ($personId === null || ! isset($calendar['leave'][$personId][$date]));
-    }
-
-    private function workingDays(int $personId, CarbonImmutable $from, CarbonImmutable $to): int
-    {
-        $count = 0;
-
-        for ($day = $from; $day->lessThanOrEqualTo($to); $day = $day->addDay()) {
-            $count += $this->works($personId, $day) ? 1 : 0;
+        if ($day->isWeekend()) {
+            return 0.0;
         }
 
-        return $count;
+        $date = $day->toDateString();
+        $off = ($this->calendar['holidays'][$date] ?? 0)
+            + ($personId === null ? 0 : ($this->calendar['leave'][$personId][$date] ?? 0));
+
+        return max(0.0, 1 - $off);
+    }
+
+    /** Working days between two dates, counting a half day as half. */
+    private function workingDays(int $personId, CarbonImmutable $from, CarbonImmutable $to): float
+    {
+        $days = 0.0;
+
+        for ($day = $from; $day->lessThanOrEqualTo($to); $day = $day->addDay()) {
+            $days += $this->available($personId, $day);
+        }
+
+        return $days;
     }
 
     /**
-     * Every day off between two dates, as sets of ISO dates. Widened rather than
-     * replaced when asked again, so the grid and the actuals share one calendar.
+     * Every day off between two dates, as how much of each date is off. Widened
+     * rather than replaced when asked again, so the grid and the actuals share one
+     * calendar — and each entry is added once, or a half day loaded by both would be
+     * counted as a whole one. A morning and an afternoon on the same day make a day;
+     * nothing makes more than one.
      *
-     * @return array{holidays: array<string, true>, leave: array<int, array<string, true>>}
+     * @return array{holidays: array<string, float>, leave: array<int, array<string, float>>, seen: array<int, true>}
      */
     private function loadCalendar(CarbonImmutable $from, CarbonImmutable $to): array
     {
-        $calendar = $this->calendar ?? ['holidays' => [], 'leave' => []];
+        $calendar = $this->calendar ?? ['holidays' => [], 'leave' => [], 'seen' => []];
         // Everything a spread might reach: a span moved to today can run past the
         // grid, and one with no working day looks up to a quarter beyond its end.
         $to = $to->addDays(120);
 
         foreach (TimeOff::overlapping($from->toDateString(), $to->toDateString())->get() as $off) {
+            if (isset($calendar['seen'][$off->id])) {
+                continue;
+            }
+
+            $calendar['seen'][$off->id] = true;
+
             for ($day = CarbonImmutable::parse($off->starts_on->toDateString()); $day->lessThanOrEqualTo($off->ends_on); $day = $day->addDay()) {
+                $date = $day->toDateString();
+
                 if ($off->user_id === null) {
-                    $calendar['holidays'][$day->toDateString()] = true;
+                    $calendar['holidays'][$date] = min(1.0, ($calendar['holidays'][$date] ?? 0) + $off->share());
                 } else {
-                    $calendar['leave'][$off->user_id][$day->toDateString()] = true;
+                    $calendar['leave'][$off->user_id][$date] = min(1.0, ($calendar['leave'][$off->user_id][$date] ?? 0) + $off->share());
                 }
             }
         }

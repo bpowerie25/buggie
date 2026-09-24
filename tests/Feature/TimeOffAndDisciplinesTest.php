@@ -75,6 +75,43 @@ class TimeOffAndDisciplinesTest extends TestCase
     }
 
     #[Test]
+    public function a_half_day_takes_half_the_hours_and_half_the_work(): void
+    {
+        // Friday afternoon off: Friday takes half a share, Monday a whole one.
+        $this->book($this->dana, $this->dana, '2026-10-09', '2026-10-09', part: 'pm')->assertSessionHasNoErrors();
+        $this->issue('Across the weekend', $this->dana, '2026-10-09', '2026-10-12', 6);
+
+        $dana = $this->person('Dana');
+
+        $this->assertSame(0.5, $dana['cells']['2026-10-05']['off']);
+        $this->assertSame(18 * 60, $dana['cells']['2026-10-05']['capacity']);
+        $this->assertSame([2 * 60, 4 * 60], [$dana['cells']['2026-10-05']['minutes'], $dana['cells']['2026-10-12']['minutes']]);
+    }
+
+    #[Test]
+    public function a_morning_and_an_afternoon_make_a_day_and_nothing_is_counted_twice(): void
+    {
+        // Today, so the grid and the actuals period both load it.
+        $this->book($this->dana, $this->dana, '2026-10-05', '2026-10-05', part: 'am')->assertSessionHasNoErrors();
+
+        $page = $this->page();
+        $dana = collect($page['groups'])->flatMap(fn ($g) => $g['people'])->firstWhere('name', 'Dana');
+        $this->assertSame(0.5, $dana['cells']['2026-10-05']['off']);
+        // 4 hours a day over the 64 weekdays of the last 90 days, less half of one.
+        $this->assertSame((int) round(4 * 60 * 63.5), collect($page['actuals'])->firstWhere('name', 'Dana')['available']);
+
+        $this->book($this->dana, $this->dana, '2026-10-05', '2026-10-05', part: 'pm')->assertSessionHasNoErrors();
+        $this->assertSame(1, $this->person('Dana')['cells']['2026-10-05']['off']);
+    }
+
+    #[Test]
+    public function a_half_day_is_one_day(): void
+    {
+        $this->book($this->dana, $this->dana, '2026-10-07', '2026-10-09', part: 'am')->assertSessionHasErrors('part');
+        $this->book($this->dana, $this->dana, '2026-10-07', '2026-10-07', part: 'noon')->assertSessionHasErrors('part');
+    }
+
+    #[Test]
     public function staff_book_their_own_leave_and_only_admins_book_anybody_elses_or_holidays(): void
     {
         $sam = User::factory()->create(['name' => 'Sam']);
@@ -136,10 +173,10 @@ class TimeOffAndDisciplinesTest extends TestCase
         $this->assertSame(['Developer', 'Designer', 'No discipline set'], array_column($this->page()['groups'], 'discipline'));
     }
 
-    private function book(User $as, ?User $for, string $from, string $to, ?string $note = null)
+    private function book(User $as, ?User $for, string $from, string $to, ?string $note = null, ?string $part = null)
     {
         return $this->actingAs($as)->post($this->workspaceUrl($this->workspace, '/time-off'), [
-            'user_id' => $for?->id, 'starts_on' => $from, 'ends_on' => $to, 'note' => $note,
+            'user_id' => $for?->id, 'starts_on' => $from, 'ends_on' => $to, 'note' => $note, 'part' => $part,
         ]);
     }
 

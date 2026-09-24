@@ -65,6 +65,7 @@ class WorkloadController extends Controller
                     'who' => $off->user?->name,
                     'starts_on' => $off->starts_on->toDateString(),
                     'ends_on' => $off->ends_on->toDateString(),
+                    'part' => $off->part,
                     'note' => $off->note,
                     'can_delete' => $canManage || $off->user_id === $request->user()->id,
                 ]),

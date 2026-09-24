@@ -10,9 +10,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * Leave for one member of staff, or — with nobody named — a public holiday for all
- * of them. Whole days, inclusive at both ends.
+ * of them. Whole days, inclusive at both ends, or half of a single day: `part` is am
+ * or pm.
  */
-#[Fillable(['user_id', 'starts_on', 'ends_on', 'note', 'created_by_id'])]
+#[Fillable(['user_id', 'starts_on', 'ends_on', 'part', 'note', 'created_by_id'])]
 class TimeOff extends Model
 {
     use BelongsToWorkspace;
@@ -27,6 +28,12 @@ class TimeOff extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    /** How much of each of its days it takes: all of it, or half. */
+    public function share(): float
+    {
+        return $this->part === null ? 1.0 : 0.5;
     }
 
     public function isHoliday(): bool

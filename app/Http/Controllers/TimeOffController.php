@@ -32,6 +32,8 @@ class TimeOffController extends Controller
             'user_id' => ['nullable', 'integer'],
             'starts_on' => ['required', 'date_format:Y-m-d'],
             'ends_on' => ['required', 'date_format:Y-m-d', 'after_or_equal:starts_on'],
+            // A morning or an afternoon off. Half of one day, never of a range.
+            'part' => ['nullable', 'in:am,pm'],
             'note' => ['nullable', 'string', 'max:80'],
         ]);
 
@@ -46,6 +48,10 @@ class TimeOffController extends Controller
             $this->authorize('create', Invitation::class);
         }
 
+        if (isset($validated['part']) && $validated['starts_on'] !== $validated['ends_on']) {
+            throw ValidationException::withMessages(['part' => 'A half day is one day. Book the rest as whole days.']);
+        }
+
         // A year at most in one go: longer is a typo far more often than a sabbatical.
         if (CarbonImmutable::parse($validated['starts_on'])->diffInDays($validated['ends_on']) > 366) {
             throw ValidationException::withMessages(['ends_on' => 'Time off is booked a year at most at a time.']);
@@ -55,6 +61,7 @@ class TimeOffController extends Controller
             'user_id' => $for?->id,
             'starts_on' => $validated['starts_on'],
             'ends_on' => $validated['ends_on'],
+            'part' => $validated['part'] ?? null,
             'note' => trim($validated['note'] ?? '') ?: null,
             'created_by_id' => $request->user()->id,
         ]);
