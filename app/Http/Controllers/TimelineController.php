@@ -37,16 +37,37 @@ class TimelineController extends Controller
         // invent for drawing the same rows differently.
         $this->authorize('viewAny', Issue::class);
 
-        abort_unless(
-            $request->user()->membershipIn($this->tenancy->currentOrFail())?->isStaff() ?? false,
-            403,
-        );
+        $staff = $request->user()->membershipIn($this->tenancy->currentOrFail())?->isStaff() ?? false;
 
         [$from, $to] = $this->range($request);
 
         $query = IssueQuery::parse($request->string('q')->toString());
 
-        $timeline = new Timeline($from, $to, $query, $request->user(), $this->filter);
+        /*
+         * A client sees one project's timeline at a time, and only a project they hold
+         * whose team has chosen to show it: a plan across the workspace is a plan
+         * across every client in it, and a plan is not something to reveal by
+         * surprise. With none to show, there is no timeline at all — a 404, like
+         * anything else a client has no business knowing exists.
+         */
+        $projects = $staff
+            ? Project::active()->orderBy('name')->get(['id', 'name', 'slug', 'settings'])
+            : Project::active()->visibleTo($request->user())->orderBy('name')
+                ->get(['id', 'name', 'slug', 'settings'])
+                ->filter(fn (Project $project) => $project->showsTimelineToClients())
+                ->values();
+
+        if (! $staff) {
+            abort_if($projects->isEmpty(), 404);
+
+            $asked = $query->first('project');
+            $query = $query->without('project')->with(
+                'project',
+                $projects->contains('slug', $asked) ? $asked : $projects->first()->slug,
+            );
+        }
+
+        $timeline = new Timeline($from, $to, $query, $request->user(), $this->filter, forClient: ! $staff);
 
         return Inertia::render('timeline/index', [
             'rows' => $timeline->rows(),
@@ -74,8 +95,9 @@ class TimelineController extends Controller
              * statement about an issue: they decide what is drawn, not what matches.
              */
             'query' => $query->toArray(),
-            'projects' => Project::active()->orderBy('name')->get(['id', 'name', 'slug'])
-                ->map->only(['id', 'name', 'slug']),
+            'projects' => $projects->map->only(['id', 'name', 'slug'])->values(),
+            // Staff drag; a client reads.
+            'editable' => $staff,
         ]);
     }
 

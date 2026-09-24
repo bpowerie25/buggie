@@ -89,6 +89,12 @@ class HandleInertiaRequests extends Middleware
                 ? Report::awaitingTriage()->count() + \App\Models\Issue::forTriage()->count()
                 : 0,
 
+            // A client's Timeline link, shown only when a project they hold shares one.
+            'clientTimeline' => fn () => $user && $workspace
+                && $user->membershipIn($workspace) === \App\Enums\WorkspaceRole::Client
+                && \App\Models\Project::active()->visibleTo($user)->get(['id', 'settings'])
+                    ->contains(fn (\App\Models\Project $p) => $p->showsTimelineToClients()),
+
             // Only for the people who can decide them, and only this workspace's.
             'accessRequests' => fn () => $user && $workspace
                 && ($user->membershipIn($workspace)?->canManageWorkspace() ?? false)

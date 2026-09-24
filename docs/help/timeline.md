@@ -7,10 +7,19 @@ The issue list answers "what is outstanding" and the board answers "what is movi
 Neither has ever answered "what is meant to land in October", because a list sorted by
 priority has no room for a date in it.
 
-**Staff only.** A timeline is a plan across the whole workspace. Drawn for a client
-who holds two projects out of twenty it would either tell them about the other
-eighteen or stop being a plan, so it is not in their navigation and the page refuses
-them outright.
+**For clients, one project at a time, and only where you choose.** A timeline across
+the workspace is a plan across every client in it, so a client never sees that. Tick
+**Show the timeline to clients** in a project's settings, and clients who hold that
+project get a *Timeline* link showing that project alone:
+
+- only the issues they could already open — the same visibility rule as everywhere
+  else, so internal work and other clients' issues are not on it;
+- read-only: nothing drags, and the scheduling endpoint refuses them;
+- no estimates, the team shown as the workspace (unless *Show clients the names of
+  individual staff* is on), and a blocker named only if it is on their chart too.
+
+A client asking for another project, or for all of them, is shown their own. With no
+project shared, there is no timeline for them at all.
 
 ## Two dates, and why the start is a real field
 

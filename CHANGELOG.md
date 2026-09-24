@@ -12,6 +12,10 @@ today you are running `main`, which is honest rather than ideal — see
 
 ### Added
 
+- **A timeline for clients**, per project and off by default: *Show the timeline to
+  clients* in project settings gives clients who hold the project a read-only view of it,
+  with only the issues they can already open, no estimates, and no blockers they cannot
+  see.
 - **Drag on the timeline.** Move a bar, stretch either end, move a one-date diamond, or
   drag an undated issue onto a day; arrow keys do the same for a focused bar. A drag
   made on top of somebody else's change to the same issue is refused and says who, rather

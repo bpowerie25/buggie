@@ -86,6 +86,7 @@ export function AppLayout({
         inboxCount,
         notificationCount,
         accessRequests,
+        clientTimeline,
         billing,
         mail,
         backups,
@@ -185,6 +186,17 @@ export function AppLayout({
                     >
                         Board
                     </NavLink>
+                    {/* A client's view of the plan, where a project they hold shares one.
+                        Staff reach the Timeline from their own section below. */}
+                    {clientTimeline && (
+                        <NavLink
+                            href="/timeline"
+                            icon={ChartGantt}
+                            active={path.startsWith('/timeline')}
+                        >
+                            Timeline
+                        </NavLink>
+                    )}
                     {auth.role !== 'client' && (
                         <NavLink
                             href="/inbox"

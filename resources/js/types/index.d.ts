@@ -63,6 +63,8 @@ export interface SharedProps {
     inboxCount: number;
     /** Unread in-app notifications for this person, in this workspace. */
     notificationCount: number;
+    /** A client whose projects include one sharing its timeline. */
+    clientTimeline?: boolean;
     /** For those who can invite: whether requests are taken, and how many wait. */
     accessRequests: { enabled: boolean; pending: number } | null;
     billing: {

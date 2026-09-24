@@ -25,6 +25,7 @@ export default function TimelinePage({
     axis,
     query,
     projects,
+    editable = false,
 }: {
     rows: TimelineRow[];
     undated: UndatedRow[];
@@ -32,6 +33,8 @@ export default function TimelinePage({
     axis: TimelineAxis;
     query: ParsedQuery;
     projects: { id: number; name: string; slug: string }[];
+    /** Staff drag; a client reads, one project at a time. */
+    editable?: boolean;
 }) {
     const [raw, setRaw] = useState(query.query);
 
@@ -112,7 +115,8 @@ export default function TimelinePage({
                         }
                         className={control}
                     >
-                        <option value="">Every project</option>
+                        {/* A client is always looking at one project. */}
+                        {editable && <option value="">Every project</option>}
                         {projects.map((p) => (
                             <option key={p.id} value={p.slug}>
                                 {p.name}
@@ -172,17 +176,18 @@ export default function TimelinePage({
                 <TimelineChart
                     rows={rows}
                     axis={axis}
-                    // The page is staff only, and staff can change dates.
-                    editable
-                    onReschedule={(row, dates) => schedule(row.key, dates, row.version)}
+                    editable={editable}
+                    onReschedule={editable ? (row, dates) => schedule(row.key, dates, row.version) : undefined}
                     // Dropped on a day: a one-day bar there, ready to be stretched.
-                    onPlace={(key, version, day) => schedule(key, { start_on: day, due_on: day }, version)}
+                    onPlace={editable ? (key, version, day) => schedule(key, { start_on: day, due_on: day }, version) : undefined}
                 />
 
-                <p className="text-xs text-ink-subtle">
-                    Drag a bar to move it, or either end to change its dates. With a bar
-                    selected, the arrow keys move it a day and Shift moves its due date.
-                </p>
+                {editable && (
+                    <p className="text-xs text-ink-subtle">
+                        Drag a bar to move it, or either end to change its dates. With a bar
+                        selected, the arrow keys move it a day and Shift moves its due date.
+                    </p>
+                )}
 
                 <div className="flex flex-wrap gap-4 text-xs text-ink-muted">
                     <Key className="bg-accent" label="Open" />
@@ -212,15 +217,15 @@ export default function TimelinePage({
                     <section className="rounded-xl border border-border p-4">
                         <h2 className="text-sm font-semibold text-ink">No dates</h2>
                         <p className="mt-1 text-xs text-ink-subtle">
-                            Matched the filter, but has neither a start nor a due date. Drag one
-                            onto the chart to give it a day, then stretch it to the length it
-                            needs.
+                            {editable
+                                ? 'Matched the filter, but has neither a start nor a due date. Drag one onto the chart to give it a day, then stretch it to the length it needs.'
+                                : 'Not scheduled yet.'}
                         </p>
                         <ul className="mt-3 divide-y divide-border">
                             {undated.map((issue) => (
                                 <li
                                     key={issue.key}
-                                    draggable
+                                    draggable={editable}
                                     onDragStart={(event) => {
                                         event.dataTransfer.setData(
                                             'application/x-buggie-issue',
@@ -228,8 +233,8 @@ export default function TimelinePage({
                                         );
                                         event.dataTransfer.effectAllowed = 'move';
                                     }}
-                                    title="Drag onto the chart to give it dates"
-                                    className="flex cursor-grab items-center gap-3 py-2 active:cursor-grabbing"
+                                    title={editable ? 'Drag onto the chart to give it dates' : undefined}
+                                    className={`flex items-center gap-3 py-2 ${editable ? 'cursor-grab active:cursor-grabbing' : ''}`}
                                 >
                                     <Link
                                         href={`/issues/${issue.key}`}

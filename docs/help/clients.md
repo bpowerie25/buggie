@@ -138,6 +138,12 @@ audience, time and estimates never reach their browser at all. The team is shown
 clients as the workspace ("Matrix") unless **Settings → Workspace → Show clients the
 names of individual staff** is on.
 
+## The timeline
+
+Off by default. **Project settings → Show the timeline to clients** gives clients who
+hold that project a read-only timeline of it — only the issues they can already see,
+without estimates. See [Timeline](timeline.md).
+
 ## Whose turn it is
 
 The **assignee is always somebody on the team**, and never changes on its own. Whose

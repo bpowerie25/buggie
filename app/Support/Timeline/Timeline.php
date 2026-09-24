@@ -57,6 +57,12 @@ class Timeline
         private IssueQuery $query,
         private User $viewer,
         private IssueQueryFilter $filter,
+        /*
+         * Drawn for a client: only what the visibility scope lets them open, with
+         * nothing on a row they could not read on the issue itself — no estimate, the
+         * team named as the workspace, and no blocker they cannot see.
+         */
+        private bool $forClient = false,
     ) {}
 
     /**
@@ -237,6 +243,10 @@ class Timeline
         // a blocker rather than as a line.
         $rows = array_map(fn (array $row) => $this->withConnectors($row, $visible), $rows);
 
+        if ($this->forClient) {
+            $rows = array_map(fn (array $row) => $this->forClientRow($row, $visible), $rows);
+        }
+
         return $this->built = [
             'rows' => $rows,
             'undated' => $undated,
@@ -272,7 +282,9 @@ class Timeline
     /** @return Builder<Issue> */
     private function filtered(): Builder
     {
-        return $this->filter->apply(Issue::query(), $this->query, $this->viewer);
+        $base = Issue::query()->when($this->forClient, fn (Builder $q) => $q->visibleToClient($this->viewer));
+
+        return $this->filter->apply($base, $this->query, $this->viewer);
     }
 
     /**
@@ -403,6 +415,30 @@ class Timeline
     private function withConnectors(array $row, array $visible): array
     {
         $row['conflicts'] = array_values(array_intersect($row['conflicts'], $visible));
+
+        return $row;
+    }
+
+    /**
+     * A row as a client may see it. A blocker is named only if it is on this chart —
+     * which the scope has already decided they may see — because a key is itself a
+     * fact about somebody else's work. Estimates never reach a client. The assignee is
+     * named as AuthorLabel would name them.
+     *
+     * @param  array<string, mixed>  $row
+     * @param  array<int, string>  $visible
+     * @return array<string, mixed>
+     */
+    private function forClientRow(array $row, array $visible): array
+    {
+        $row['blocked_by'] = array_values(array_intersect($row['blocked_by'], $visible));
+        $row['estimate'] = null;
+        $row['version'] = null;
+
+        if ($row['assignee'] !== null) {
+            $workspace = app(\App\Support\Tenancy\Tenancy::class)->currentOrFail();
+            $row['assignee'] = \App\Support\Issues\AuthorLabel::showsStaffNames($workspace) ? $row['assignee'] : $workspace->name;
+        }
 
         return $row;
     }

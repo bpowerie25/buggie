@@ -64,11 +64,12 @@ class TimelineTest extends TestCase
     }
 
     #[Test]
-    public function a_client_cannot_reach_it(): void
+    public function a_client_cannot_reach_it_unless_a_project_shares_it(): void
     {
         // A timeline is a plan across the workspace. A client scoped to one project
         // out of twenty either learns about the other nineteen or is not looking at
-        // a plan.
+        // a plan — so a client sees one project's, and only where the team has chosen
+        // to show it (ClientTimelineTest). Unshared, there is nothing to find: 404.
         [$workspace, $staff] = $this->workspaceWithMember(WorkspaceRole::Member, 'acme');
         $project = $this->project($workspace);
 
@@ -86,7 +87,7 @@ class TimelineTest extends TestCase
 
         $this->actingAs($client)
             ->get($this->workspaceUrl($workspace, '/timeline'))
-            ->assertForbidden();
+            ->assertNotFound();
 
         // The positive control: the same URL, the same workspace, the same issue.
         $this->actingAs($staff)

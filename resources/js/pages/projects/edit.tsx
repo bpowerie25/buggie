@@ -63,6 +63,7 @@ export default function EditProject({
     clientWait,
     widgetModes = [],
     revealedSecret = null,
+    clientTimeline = false,
 }: {
     project: ProjectSummary;
     widgetKeys: WidgetKeyRow[];
@@ -78,6 +79,8 @@ export default function EditProject({
     widgetModes?: { value: string; label: string }[];
     /** Present only on the page load straight after creating or rotating a secret. */
     revealedSecret?: { key: string; secret: string } | null;
+    /** Whether clients who hold this project can see its timeline. */
+    clientTimeline?: boolean;
 }) {
     const { data, setData, put, processing, errors } = useForm({
         name: project.name,
@@ -86,6 +89,7 @@ export default function EditProject({
         is_archived: project.is_archived ?? false,
         awaiting_reminder_days: clientWait.reminder_days === null ? '' : String(clientWait.reminder_days),
         awaiting_close_days: clientWait.close_days === null ? '' : String(clientWait.close_days),
+        client_timeline: clientTimeline,
     });
     const [confirmingDelete, setConfirmingDelete] = useState(false);
 
@@ -165,6 +169,23 @@ export default function EditProject({
                         </Field>
                     </div>
                 </fieldset>
+
+                <label className="flex items-start gap-2 text-sm text-ink-muted">
+                    <input
+                        type="checkbox"
+                        checked={data.client_timeline}
+                        onChange={(e) => setData('client_timeline', e.target.checked)}
+                        className="mt-0.5 rounded border-border-strong"
+                    />
+                    <span>
+                        Show the timeline to clients
+                        <span className="block text-xs text-ink-subtle">
+                            Clients who hold this project see its issues on a read-only
+                            timeline — only the ones they can already open, with no estimates
+                            and the team shown as the workspace unless you choose otherwise.
+                        </span>
+                    </span>
+                </label>
 
                 <label className="flex items-center gap-2 text-sm text-ink-muted">
                     <input

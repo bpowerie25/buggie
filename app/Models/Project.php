@@ -155,6 +155,12 @@ class Project extends Model
         return $this->statuses()->where('is_awaiting_client', true)->first();
     }
 
+    /** Whether clients who hold this project may see its timeline. Off unless the team says so. */
+    public function showsTimelineToClients(): bool
+    {
+        return (bool) ($this->settings['client_timeline'] ?? false);
+    }
+
     /** A project's reminder and auto-close settings, each off unless a day count is set. */
     public function clientWaitDays(string $which): ?int
     {
