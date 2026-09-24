@@ -210,6 +210,13 @@ class IssueController extends Controller
                 'description' => $issue->description,
                 'reporter' => $issue->reporter?->only(['id', 'name']),
                 'visibility' => $issue->visibility->value,
+                'client_audience' => $issue->client_audience->value,
+                // Staff only: both name clients, and a client must not learn who
+                // else the agency works with. A client is told only that it is theirs.
+                'client_share_ids' => $staff ? $issue->clientShares()->pluck('users.id') : [],
+                'audience_label' => $staff
+                    ? app(\App\Support\Issues\ClientAudienceSummary::class)->label($issue)
+                    : null,
                 'start_on' => $issue->start_on?->toDateString(),
                 'due_on' => $issue->due_on?->toDateString(),
                 'version' => $issue->version?->only(['id', 'name']),
@@ -234,6 +241,12 @@ class IssueController extends Controller
             // own users. Clients never see the triage inbox either.
             'diagnostics' => $staff ? $this->diagnostics($issue) : null,
             'relationTypes' => \App\Enums\RelationType::options(),
+
+            // Who can be named in a "specific clients" audience. Staff only.
+            'projectClients' => $staff
+                ? app(\App\Support\Issues\ClientAudienceSummary::class)->candidates($issue)
+                    ->map(fn ($client) => ['id' => $client->id, 'name' => $client->name])
+                : [],
 
             // The releases this issue could belong to: its own project's, and the
             // unreleased ones first, because that is what anybody is choosing between.
@@ -297,7 +310,14 @@ class IssueController extends Controller
     {
         $this->authorize('update', $issue);
 
-        $action->handle($issue, $request->validated(), $request->user());
+        $updated = $action->handle($issue, $request->validated(), $request->user());
+
+        // Who can see an issue is the one sidebar change worth confirming out loud:
+        // getting it wrong shows a client something, and nothing else on the page
+        // would say so.
+        if ($request->hasAny(['visibility', 'client_audience', 'client_share_ids'])) {
+            return back()->with('success', app(\App\Support\Issues\ClientAudienceSummary::class)->label($updated).'.');
+        }
 
         // Inertia turns this into a partial reload of the page the edit came from,
         // so inline edits in the list do not navigate anywhere.

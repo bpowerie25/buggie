@@ -16,8 +16,11 @@ class InviteToWorkspace
 {
     public function __construct(private Tenancy $tenancy) {}
 
-    /** @param array<int, int> $projectIds */
-    public function handle(string $email, WorkspaceRole $role, array $projectIds, User $invitedBy): Invitation
+    /**
+     * @param  array<int, int>  $projectIds
+     * @param  array<int|string, string>  $projectRoles  project id => tier; a project left out gets the narrowest
+     */
+    public function handle(string $email, WorkspaceRole $role, array $projectIds, User $invitedBy, array $projectRoles = []): Invitation
     {
         $email = strtolower(trim($email));
         $workspace = $this->tenancy->currentOrFail();
@@ -31,7 +34,13 @@ class InviteToWorkspace
             throw LimitExceeded::members($workspace->plan()->limit('members'));
         }
 
-        return DB::transaction(function () use ($email, $role, $projectIds, $invitedBy) {
+        // Only for projects actually granted, and only tiers that mean something.
+        $projectRoles = collect($projectRoles)
+            ->only($projectIds)
+            ->filter(fn ($tier) => in_array($tier, array_column(\App\Enums\ProjectRole::grantable(), 'value'), true))
+            ->all();
+
+        return DB::transaction(function () use ($email, $role, $projectIds, $invitedBy, $projectRoles) {
             // Re-inviting refreshes the existing invitation rather than failing on the
             // unique index or leaving two live tokens for one address.
             $invitation = Invitation::where('email', $email)->first();
@@ -40,6 +49,7 @@ class InviteToWorkspace
                 $invitation->forceFill([
                     'role' => $role->value,
                     'project_ids' => $projectIds,
+                    'project_roles' => $projectRoles,
                     'invited_by_id' => $invitedBy->id,
                     'expires_at' => now()->addDays(Invitation::LIFETIME_DAYS),
                     'accepted_at' => null,
@@ -49,6 +59,7 @@ class InviteToWorkspace
                     'email' => $email,
                     'role' => $role->value,
                     'project_ids' => $projectIds,
+                    'project_roles' => $projectRoles,
                     'invited_by_id' => $invitedBy->id,
                 ]);
             }
@@ -85,7 +96,9 @@ class InviteToWorkspace
                 $projects = Project::whereIn('id', $invitation->project_ids ?? [])->get();
 
                 foreach ($projects as $project) {
-                    $project->clients()->syncWithoutDetaching([$user->id => ['role' => 'client']]);
+                    $project->clients()->syncWithoutDetaching([$user->id => [
+                        'role' => $invitation->project_roles[$project->id] ?? \App\Enums\ProjectRole::Client->value,
+                    ]]);
                 }
             }
 

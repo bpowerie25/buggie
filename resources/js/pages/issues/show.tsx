@@ -51,10 +51,17 @@ interface Event {
     created_at: string;
 }
 
+type ClientAudience = 'default' | 'project' | 'specific';
+
 interface Issue extends IssueRow {
     description: JSONContent | null;
     reporter: Person | null;
     visibility: VisibilityValue;
+    client_audience: ClientAudience;
+    /** Staff only; empty for a client. */
+    client_share_ids: number[];
+    /** Who among the clients can see it, in words. Staff only; null for a client. */
+    audience_label: string | null;
     start_on: string | null;
     due_on: string | null;
     version: { id: number; name: string } | null;
@@ -67,6 +74,118 @@ interface Issue extends IssueRow {
         label: string;
         issue: { key: string; title: string; status: string; open: boolean };
     }[];
+}
+
+const AUDIENCE_OPTIONS: { value: 'internal' | ClientAudience; label: string; hint: string }[] = [
+    { value: 'internal', label: 'Internal only', hint: 'No client sees it.' },
+    { value: 'default', label: 'Default', hint: 'Client managers, the reporter and watchers.' },
+    { value: 'project', label: 'All clients on this project', hint: 'Every client who holds the project.' },
+    { value: 'specific', label: 'Specific clients', hint: 'The default, plus the clients you pick.' },
+];
+
+/**
+ * Who sees the issue: internal, or which clients. Saves as it changes, like the
+ * rest of the sidebar. Only clients on this project are offered, and the server
+ * refuses anybody else.
+ */
+function AudienceControl({
+    issue,
+    clients,
+    onChange,
+}: {
+    issue: Issue;
+    clients: Person[];
+    onChange: (payload: RequestPayload) => void;
+}) {
+    const error = (usePage().props.errors as Record<string, string>)?.client_share_ids;
+    const current = issue.visibility === 'internal' ? 'internal' : issue.client_audience;
+    const [picking, setPicking] = useState(current === 'specific');
+    const shared = issue.client_share_ids;
+
+    function choose(value: 'internal' | ClientAudience) {
+        if (value === 'internal') {
+            setPicking(false);
+            onChange({ visibility: 'internal' });
+            return;
+        }
+
+        if (value === 'specific') {
+            // Nothing is saved until somebody is picked: "specific" with nobody named
+            // is refused, and would only be the default by another name.
+            setPicking(true);
+            return;
+        }
+
+        setPicking(false);
+        onChange({ visibility: 'client', client_audience: value });
+    }
+
+    function toggle(id: number) {
+        const next = shared.includes(id) ? shared.filter((x) => x !== id) : [...shared, id];
+
+        if (next.length === 0) return;
+
+        onChange({ visibility: 'client', client_audience: 'specific', client_share_ids: next });
+    }
+
+    const shown = picking ? 'specific' : current;
+
+    return (
+        <div className="space-y-1.5">
+            <Popover
+                align="right"
+                label="Change who can see this"
+                trigger={() => (
+                    <span className="flex items-center gap-1.5 rounded-lg border border-border px-2 py-1 text-xs text-ink-muted transition hover:text-ink">
+                        {shown === 'internal' ? <EyeOff className="size-3" /> : <Eye className="size-3" />}
+                        {AUDIENCE_OPTIONS.find((o) => o.value === shown)?.label}
+                    </span>
+                )}
+            >
+                {(close) =>
+                    AUDIENCE_OPTIONS.map((option) => (
+                        <PopoverItem
+                            key={option.value}
+                            selected={option.value === shown}
+                            onSelect={() => {
+                                close();
+                                choose(option.value);
+                            }}
+                        >
+                            <span className="min-w-0">
+                                <span className="block">{option.label}</span>
+                                <span className="block text-[11px] text-ink-subtle">{option.hint}</span>
+                            </span>
+                        </PopoverItem>
+                    ))
+                }
+            </Popover>
+
+            {picking && (
+                <div className="rounded-lg border border-border bg-surface p-2">
+                    {clients.length === 0 ? (
+                        <p className="text-xs text-ink-subtle">No clients hold this project.</p>
+                    ) : (
+                        clients.map((client) => (
+                            <label key={client.id} className="flex items-center gap-2 py-0.5 text-xs text-ink-muted">
+                                <input
+                                    type="checkbox"
+                                    checked={shared.includes(client.id)}
+                                    // The last one cannot be unticked here: choose another
+                                    // audience instead.
+                                    disabled={shared.length === 1 && shared.includes(client.id)}
+                                    onChange={() => toggle(client.id)}
+                                />
+                                {client.name}
+                            </label>
+                        ))
+                    )}
+                </div>
+            )}
+
+            {error && <p className="text-xs text-danger">{error}</p>}
+        </div>
+    );
 }
 
 /** Renders one activity event as a sentence. */
@@ -100,6 +219,16 @@ function eventSentence(event: Event): string {
             return `${actor} added the label ${d.name as string}`;
         case 'label_removed':
             return `${actor} removed the label ${d.name as string}`;
+        case 'audience_changed': {
+            const clients = (d.clients as string[] | undefined) ?? [];
+            const to =
+                d.to === 'project'
+                    ? 'all clients on this project'
+                    : d.to === 'specific'
+                      ? `the default audience plus ${clients.join(', ')}`
+                      : 'the default audience';
+            return `${actor} shared this with ${to}`;
+        }
         case 'visibility_changed':
             return d.to === 'client'
                 ? `${actor} made this visible to the client`
@@ -359,6 +488,7 @@ export default function ShowIssue({
     can,
     diagnostics,
     relationTypes = [],
+    projectClients = [],
     versions = [],
     customFields = [],
     time = null,
@@ -374,6 +504,8 @@ export default function ShowIssue({
     /** Null for clients, and for issues with no captured context. */
     diagnostics: DiagnosticsData | null;
     relationTypes?: { value: string; label: string }[];
+    /** Clients on this project who can be named in a specific audience. Staff only. */
+    projectClients?: Person[];
     versions?: { id: number; name: string; released: boolean }[];
     customFields?: CustomFieldWithValue[];
     parent?: { key: string; title: string } | null;
@@ -453,7 +585,9 @@ export default function ShowIssue({
                         {issue.visibility === 'client' && (
                             <span className="ml-1 flex items-center gap-1 rounded bg-accent-soft px-1.5 py-0.5 text-accent">
                                 <Eye className="size-3" />
-                                Client can see this
+                                {/* A client is told only that it is theirs: the names
+                                    of other clients are not theirs to know. */}
+                                {issue.audience_label ?? 'Shared with you'}
                             </span>
                         )}
                     </div>
@@ -924,26 +1058,11 @@ export default function ShowIssue({
 
                     {can.update && (
                         <SidebarRow label="Visibility">
-                            <button
-                                type="button"
-                                onClick={() =>
-                                    patch({
-                                        visibility:
-                                            issue.visibility === 'client' ? 'internal' : 'client',
-                                    })
-                                }
-                                className="flex items-center gap-1.5 rounded-lg border border-border px-2 py-1 text-xs text-ink-muted transition hover:text-ink"
-                            >
-                                {issue.visibility === 'client' ? (
-                                    <>
-                                        <Eye className="size-3" /> Client can see this
-                                    </>
-                                ) : (
-                                    <>
-                                        <EyeOff className="size-3" /> Internal only
-                                    </>
-                                )}
-                            </button>
+                            <AudienceControl
+                                issue={issue}
+                                clients={projectClients}
+                                onChange={patch}
+                            />
                         </SidebarRow>
                     )}
 

@@ -425,6 +425,8 @@ Route::domain('{workspace}.'.$host)
             ->name('invitations.destroy');
         Route::patch('settings/members/{user}/projects', [MemberController::class, 'grants'])
             ->name('members.grants');
+        Route::patch('settings/members/{user}/projects/{project:id}/tier', [MemberController::class, 'tier'])
+            ->name('members.tier');
         Route::delete('settings/members/{user}', [MemberController::class, 'remove'])
             ->name('members.remove');
 

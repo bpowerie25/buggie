@@ -6,6 +6,7 @@ use App\Actions\InviteToWorkspace;
 use App\Enums\ProjectRole;
 use App\Enums\WorkspaceRole;
 use App\Models\Invitation;
+use App\Models\MemberEvent;
 use App\Models\Project;
 use App\Models\User;
 use App\Support\Mail\Deliverability;
@@ -63,6 +64,21 @@ class MemberController extends Controller
                 fn (WorkspaceRole $role) => ['value' => $role->value, 'label' => $role->label()],
                 WorkspaceRole::cases(),
             ),
+
+            // Who changed what a client sees. Only for those who could change it.
+            'memberEvents' => $request->user()->can('manageClientAccess', Invitation::class)
+                ? MemberEvent::with(['actor:id,name', 'subject:id,name', 'project:id,name'])
+                    ->latest('created_at')->limit(20)->get()
+                    ->map(fn (MemberEvent $event) => [
+                        'id' => $event->id,
+                        'actor' => $event->actor?->name,
+                        'subject' => $event->subject?->name,
+                        'project' => $event->project?->name,
+                        'from' => ProjectRole::tryFrom((string) ($event->data['from'] ?? ''))?->label(),
+                        'to' => ProjectRole::tryFrom((string) ($event->data['to'] ?? ''))?->label(),
+                        'created_at' => $event->created_at->toIso8601String(),
+                    ])
+                : [],
         ]);
     }
 
@@ -76,6 +92,9 @@ class MemberController extends Controller
             'project_ids' => ['array'],
             'project_ids.*' => [Rule::exists('projects', 'id')
                 ->where('workspace_id', $this->tenancy->id())],
+            // project id => tier, for a client. Left out means their own issues only.
+            'tiers' => ['array'],
+            'tiers.*' => [Rule::in(array_column(ProjectRole::grantable(), 'value'))],
         ]);
 
         $role = WorkspaceRole::from($validated['role']);
@@ -102,6 +121,7 @@ class MemberController extends Controller
             $role,
             $validated['project_ids'] ?? [],
             $request->user(),
+            $role === WorkspaceRole::Client ? ($validated['tiers'] ?? []) : [],
         );
 
         // "Invitation sent" is a lie on an install that cannot send mail, and it is
@@ -196,7 +216,48 @@ class MemberController extends Controller
         // the screen offers a choice it does not honour.
         $user->projects()->sync($sync);
 
+        foreach ($sync as $id => $pivot) {
+            if (isset($existing[$id]) && $existing[$id] !== $pivot['role']) {
+                MemberEvent::tierChanged($request->user(), $user, Project::findOrFail($id), $existing[$id], $pivot['role']);
+            }
+        }
+
         return back()->with('success', "Updated what {$user->name} can see.");
+    }
+
+    /**
+     * How much of one project a client sees, changed on its own and saved at once.
+     *
+     * Only for a project they already hold: granting a project is a separate
+     * decision, made where the projects are ticked.
+     */
+    public function tier(Request $request, User $user, Project $project): RedirectResponse
+    {
+        $this->authorize('manageClientAccess', Invitation::class);
+
+        $workspace = $this->tenancy->currentOrFail();
+
+        abort_unless($user->membershipIn($workspace) === WorkspaceRole::Client, 404);
+
+        $validated = $request->validate([
+            'tier' => ['required', Rule::in(array_column(ProjectRole::grantable(), 'value'))],
+        ]);
+
+        $current = $user->projects()->whereKey($project->id)->value('project_user.role');
+
+        abort_if($current === null, 404);
+
+        if ($current !== $validated['tier']) {
+            $user->projects()->updateExistingPivot($project->id, ['role' => $validated['tier']]);
+
+            MemberEvent::tierChanged($request->user(), $user, $project, $current, $validated['tier']);
+        }
+
+        $label = ProjectRole::from($validated['tier']) === ProjectRole::ClientManager
+            ? 'all client-visible issues'
+            : 'only their own issues';
+
+        return back()->with('success', "{$user->name} now sees {$label} on {$project->name}.");
     }
 
     /** Remove someone from the workspace. */

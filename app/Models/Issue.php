@@ -35,6 +35,7 @@ class Issue extends Model
             'type' => IssueType::class,
             'priority' => IssuePriority::class,
             'visibility' => IssueVisibility::class,
+            'client_audience' => \App\Enums\ClientAudience::class,
             'number' => 'integer',
             'occurrence_count' => 'integer',
             'first_seen_at' => 'datetime',
@@ -143,6 +144,16 @@ class Issue extends Model
     public function relations(): HasMany
     {
         return $this->hasMany(IssueRelation::class);
+    }
+
+    /**
+     * Clients this issue is shared with by name. Access, not notification: see the
+     * migration for why this is not the watchers table.
+     */
+    public function clientShares(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'issue_client_shares')
+            ->withPivot(['shared_by_id', 'created_at']);
     }
 
     public function watchers(): BelongsToMany
@@ -269,15 +280,27 @@ class Issue extends Model
 
         $granted = $user->projects()->select('projects.id');
 
+        /*
+         * The issue's audience can widen that default, never narrow it, and never
+         * past the project: every branch below sits inside "holds the project", so a
+         * share naming somebody who has since lost the grant gives them nothing.
+         *
+         * - project:  every client holding the project, whatever their tier.
+         * - specific: the default audience, plus the clients named in the shares.
+         *   Shares count only while the issue says `specific`, so switching back to
+         *   the default takes them away even if the rows are still there.
+         */
         return $query
             ->where('visibility', IssueVisibility::Client->value)
-            ->where(fn (Builder $scoped) => $scoped
+            ->whereIn('issues.project_id', $granted)
+            ->where(fn (Builder $audience) => $audience
                 ->whereIn('issues.project_id', $managed)
-                ->orWhere(fn (Builder $own) => $own
-                    ->whereIn('issues.project_id', $granted)
-                    ->where(fn (Builder $mine) => $mine
-                        ->where('issues.reporter_id', $user->id)
-                        ->orWhereHas('watchers', fn ($w) => $w->whereKey($user->id)))));
+                ->orWhere('issues.client_audience', \App\Enums\ClientAudience::Project->value)
+                ->orWhere('issues.reporter_id', $user->id)
+                ->orWhereHas('watchers', fn ($w) => $w->whereKey($user->id))
+                ->orWhere(fn (Builder $shared) => $shared
+                    ->where('issues.client_audience', \App\Enums\ClientAudience::Specific->value)
+                    ->whereHas('clientShares', fn ($s) => $s->whereKey($user->id))));
     }
 
     /** Weighted full-text search over title and flattened description. */

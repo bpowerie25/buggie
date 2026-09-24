@@ -32,6 +32,15 @@ class InvitationPolicy
         return $this->create($user);
     }
 
+    /**
+     * Which projects a client holds, and how much of each they see. The same people
+     * who invite them, because it is the same decision made later.
+     */
+    public function manageClientAccess(User $user): bool
+    {
+        return $this->create($user);
+    }
+
     private function role(User $user): ?WorkspaceRole
     {
         $workspace = $this->tenancy->current();

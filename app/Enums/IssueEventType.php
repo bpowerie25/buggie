@@ -14,6 +14,8 @@ enum IssueEventType: string
     case LabelAdded = 'label_added';
     case LabelRemoved = 'label_removed';
     case VisibilityChanged = 'visibility_changed';
+    /** Which clients see it. Always internal: it names clients, to each other. */
+    case AudienceChanged = 'audience_changed';
     case VersionChanged = 'version_changed';
     case Related = 'related';
     case Unrelated = 'unrelated';

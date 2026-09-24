@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Str;
 
-#[Fillable(['email', 'role', 'project_ids', 'invited_by_id', 'expires_at'])]
+#[Fillable(['email', 'role', 'project_ids', 'project_roles', 'invited_by_id', 'expires_at'])]
 class Invitation extends Model
 {
     use BelongsToWorkspace, HasFactory;
@@ -23,6 +23,7 @@ class Invitation extends Model
         return [
             'role' => WorkspaceRole::class,
             'project_ids' => 'array',
+            'project_roles' => 'array',
             'expires_at' => 'datetime',
             'accepted_at' => 'datetime',
         ];

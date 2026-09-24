@@ -26,6 +26,11 @@ class UpdateIssueRequest extends FormRequest
             'type' => ['sometimes', new Enum(IssueType::class)],
             'priority' => ['sometimes', Rule::in(array_column(IssuePriority::cases(), 'value'))],
             'visibility' => ['sometimes', new Enum(IssueVisibility::class)],
+            'client_audience' => ['sometimes', new Enum(\App\Enums\ClientAudience::class)],
+            // Whether each one is a client on this issue's project is checked in the
+            // action, which knows the issue.
+            'client_share_ids' => ['sometimes', 'array', 'max:100'],
+            'client_share_ids.*' => ['integer'],
             // Not validated against each other. A start after its due date is a
             // typo somebody should see on the timeline and fix, not a rejected
             // request that leaves them unable to correct the other date first.

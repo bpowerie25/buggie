@@ -2,6 +2,7 @@
 
 namespace App\Actions;
 
+use App\Enums\ClientAudience;
 use App\Enums\IssueEventType;
 use App\Enums\IssueVisibility;
 use App\Enums\NotificationReason;
@@ -64,6 +65,12 @@ class UpdateIssue
                     'version_id' => $this->version($issue, $value === null ? null : (int) $value, $actor),
                     default => null,
                 };
+            }
+
+            // After the loop, and as one change: the audience and the people named in
+            // it arrive together from the sidebar, and are only meaningful together.
+            if (array_key_exists('client_audience', $attributes) || array_key_exists('client_share_ids', $attributes)) {
+                $this->audience($issue, $attributes, $actor);
             }
 
             $issue->save();
@@ -283,6 +290,68 @@ class UpdateIssue
 
         $issue->recordEvent($type, ['from' => $currentValue, 'to' => $value], $actor);
         $issue->{$field} = $value;
+    }
+
+    /**
+     * Which clients see a client-visible issue: the tier default, every client on
+     * the project, or the default plus named clients.
+     *
+     * Only clients who hold this issue's project can be named. The scope would give
+     * anybody else nothing anyway, but a share that does nothing is a screen that
+     * lies about who can see the issue.
+     *
+     * @param  array<string, mixed>  $attributes
+     */
+    private function audience(Issue $issue, array $attributes, ?User $actor): void
+    {
+        $from = $issue->client_audience;
+        $to = array_key_exists('client_audience', $attributes)
+            ? ClientAudience::from($attributes['client_audience'])
+            : $from;
+
+        $current = $issue->clientShares()->orderBy('users.id')->pluck('users.id')->all();
+
+        $wanted = $to === ClientAudience::Specific
+            ? collect($attributes['client_share_ids'] ?? $current)->map(fn ($id) => (int) $id)->unique()->sort()->values()->all()
+            : [];
+
+        if ($to === ClientAudience::Specific) {
+            if ($wanted === []) {
+                throw ValidationException::withMessages(['client_share_ids' => 'Choose at least one client.']);
+            }
+
+            $eligible = $issue->loadMissing('project')->project->clients()
+                ->whereIn('users.id', $wanted)
+                ->whereHas('workspaces', fn ($w) => $w
+                    ->where('workspaces.id', $issue->workspace_id)
+                    ->where('workspace_user.role', \App\Enums\WorkspaceRole::Client->value))
+                ->pluck('users.id')
+                ->all();
+
+            if (array_diff($wanted, $eligible) !== []) {
+                throw ValidationException::withMessages([
+                    'client_share_ids' => 'Only clients who can see this project can be chosen.',
+                ]);
+            }
+        }
+
+        if ($from === $to && $current === $wanted) {
+            return;
+        }
+
+        $issue->clientShares()->sync(collect($wanted)->mapWithKeys(fn (int $id) => [
+            $id => ['shared_by_id' => $actor?->id, 'created_at' => now()],
+        ])->all());
+
+        $issue->client_audience = $to;
+
+        // Internal, as every event is by default — and this one must be: it names
+        // clients, and one client learning another's name is a leak.
+        $issue->recordEvent(IssueEventType::AudienceChanged, [
+            'from' => $from->value,
+            'to' => $to->value,
+            'clients' => User::whereIn('id', $wanted)->orderBy('name')->pluck('name')->all(),
+        ], $actor);
     }
 
     /** @param array<int, int> $labelIds */

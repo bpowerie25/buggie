@@ -2,8 +2,6 @@
 
 namespace App\Policies;
 
-use App\Enums\IssueVisibility;
-use App\Enums\ProjectRole;
 use App\Enums\WorkspaceRole;
 use App\Models\Issue;
 use App\Models\User;
@@ -43,37 +41,15 @@ class IssuePolicy
             return Response::allow();
         }
 
-        // Client-visible and in a project they hold. Either one alone is not enough,
-        // and this is true for every client tier.
-        if ($issue->visibility !== IssueVisibility::Client) {
-            return Response::denyAsNotFound();
-        }
-
-        $grant = $user->projects()->whereKey($issue->project_id)->first();
-
-        if ($grant === null) {
-            return Response::denyAsNotFound();
-        }
-
         /*
-         * A client manager sees the whole client-visible project. Anybody else sees
-         * the part of it they are in — what they reported, or were drawn into.
-         *
-         * The same rule as Issue::scopeVisibleToClient, expressed for one issue
-         * rather than for a list. Two expressions of one rule is a risk, so both are
-         * tested against the same cases and a change to either without the other
-         * fails those tests.
+         * The client rule lives in exactly one place, Issue::scopeVisibleToClient,
+         * and this asks it about one issue. It used to be written out a second time
+         * here, and with four audiences and two tiers the two copies would be one
+         * edit away from disagreeing — which is to say one edit away from a leak.
          */
-        $tier = ProjectRole::tryFrom((string) $grant->pivot->role) ?? ProjectRole::Client;
-
-        if ($tier->seesEveryClientIssue()) {
-            return Response::allow();
-        }
-
-        $theirs = $issue->reporter_id === $user->id
-            || $issue->watchers()->whereKey($user->id)->exists();
-
-        return $theirs ? Response::allow() : Response::denyAsNotFound();
+        return Issue::query()->whereKey($issue->getKey())->visibleToClient($user)->exists()
+            ? Response::allow()
+            : Response::denyAsNotFound();
     }
 
     public function create(User $user): bool

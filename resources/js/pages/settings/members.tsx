@@ -1,6 +1,6 @@
 import { Button } from '@/components/button';
 import { Field, Input } from '@/components/field';
-import { Avatar } from '@/components/issue-bits';
+import { Avatar, relativeTime } from '@/components/issue-bits';
 import { AppLayout } from '@/layouts/app-layout';
 import type { SharedProps } from '@/types';
 import { Head, router, useForm, usePage } from '@inertiajs/react';
@@ -19,6 +19,22 @@ interface Member {
     tiers?: Record<number, string>;
 }
 
+/** A client's access to one project, in the words the screen uses for it. */
+const TIERS = [
+    { value: 'client', label: 'Own issues only' },
+    { value: 'client_manager', label: 'All client-visible issues' },
+];
+
+interface MemberEvent {
+    id: number;
+    actor: string | null;
+    subject: string | null;
+    project: string | null;
+    from: string | null;
+    to: string | null;
+    created_at: string;
+}
+
 interface PendingInvitation {
     id: number;
     email: string;
@@ -32,11 +48,14 @@ export default function Members({
     invitations,
     projects,
     roles,
+    memberEvents = [],
 }: {
     members: Member[];
     invitations: PendingInvitation[];
     projects: { id: number; name: string; key: string }[];
     roles: { value: string; label: string }[];
+    /** Recent changes to what clients can see. Empty for those who cannot change it. */
+    memberEvents?: MemberEvent[];
 }) {
     const { auth } = usePage<SharedProps>().props;
     const canManage = auth.role === 'owner' || auth.role === 'admin';
@@ -45,7 +64,9 @@ export default function Members({
         email: string;
         role: string;
         project_ids: number[];
-    }>({ email: '', role: 'member', project_ids: [] });
+        /** project id => tier; a project left out is "own issues only". */
+        tiers: Record<number, string>;
+    }>({ email: '', role: 'member', project_ids: [], tiers: {} });
 
     function submit(e: FormEvent) {
         e.preventDefault();
@@ -133,6 +154,28 @@ export default function Members({
                                 {errors.project_ids && (
                                     <p className="mt-1 text-xs text-danger">{errors.project_ids}</p>
                                 )}
+
+                                {data.project_ids.length > 0 && (
+                                    <div className="mt-2 space-y-1">
+                                        {projects
+                                            .filter((project) => data.project_ids.includes(project.id))
+                                            .map((project) => (
+                                                <label
+                                                    key={project.id}
+                                                    className="flex items-center gap-2 text-xs text-ink-muted"
+                                                >
+                                                    <span className="min-w-0 flex-1 truncate">{project.name}</span>
+                                                    <TierSelect
+                                                        label={`What they see on ${project.name}`}
+                                                        value={data.tiers[project.id] ?? 'client'}
+                                                        onChange={(tier) =>
+                                                            setData('tiers', { ...data.tiers, [project.id]: tier })
+                                                        }
+                                                    />
+                                                </label>
+                                            ))}
+                                    </div>
+                                )}
                             </fieldset>
                         )}
                     </form>
@@ -166,6 +209,21 @@ export default function Members({
                     ))}
                 </ul>
             </section>
+
+            {memberEvents.length > 0 && (
+                <section className="mt-10 max-w-2xl">
+                    <h2 className="text-sm font-semibold text-ink">Recent changes</h2>
+                    <ul className="mt-3 space-y-1.5 text-xs text-ink-muted">
+                        {memberEvents.map((event) => (
+                            <li key={event.id}>
+                                {event.actor ?? 'Someone'} changed {event.subject ?? 'a client'} on{' '}
+                                {event.project ?? 'a deleted project'} from {event.from} to {event.to}
+                                <span className="text-ink-subtle"> · {relativeTime(event.created_at)}</span>
+                            </li>
+                        ))}
+                    </ul>
+                </section>
+            )}
         </AppLayout>
     );
 }
@@ -245,9 +303,7 @@ function MemberRow({
     const [tiers, setTiers] = useState<Record<number, string>>(member.tiers ?? {});
 
     const isClient = member.role === 'client';
-    const names = projects
-        .filter((project) => member.projects.includes(project.id))
-        .map((project) => project.name);
+    const granted = projects.filter((project) => member.projects.includes(project.id));
 
     function save() {
         router.patch(
@@ -272,8 +328,36 @@ function MemberRow({
                     <p className="truncate text-xs text-ink-subtle">{member.email}</p>
 
                     {isClient && !editing && (
-                        <p className="mt-0.5 truncate text-[11px] text-ink-subtle">
-                            Sees: {names.length > 0 ? names.join(', ') : 'nothing'}
+                        <div className="mt-1 space-y-0.5">
+                            {granted.length === 0 && (
+                                <p className="text-[11px] text-ink-subtle">Sees: nothing</p>
+                            )}
+
+                            {/* One row per project, with what they see on it. Changing the
+                                tier saves at once, like the issue sidebar. */}
+                            {granted.map((project) => (
+                                <div key={project.id} className="flex items-center gap-2 text-[11px] text-ink-subtle">
+                                    <span className="min-w-0 truncate">{project.name}</span>
+                                    {canManage ? (
+                                        <TierSelect
+                                            label={`What ${member.name} sees on ${project.name}`}
+                                            value={member.tiers?.[project.id] ?? 'client'}
+                                            onChange={(tier) =>
+                                                router.patch(
+                                                    `/settings/members/${member.id}/projects/${project.id}/tier`,
+                                                    { tier },
+                                                    { preserveScroll: true },
+                                                )
+                                            }
+                                        />
+                                    ) : (
+                                        <span>
+                                            · {TIERS.find((t) => t.value === (member.tiers?.[project.id] ?? 'client'))?.label}
+                                        </span>
+                                    )}
+                                </div>
+                            ))}
+
                             {canManage && (
                                 <button
                                     type="button"
@@ -281,12 +365,12 @@ function MemberRow({
                                         setChosen(member.projects);
                                         setEditing(true);
                                     }}
-                                    className="ml-1.5 text-accent hover:underline"
+                                    className="text-[11px] text-accent hover:underline"
                                 >
-                                    Change
+                                    Change projects
                                 </button>
                             )}
-                        </p>
+                        </div>
                     )}
                 </div>
 
@@ -312,9 +396,9 @@ function MemberRow({
                 <div className="mt-3 rounded-lg border border-border bg-surface p-3">
                     <p className="text-xs text-ink-muted">
                         {member.name} sees only the projects ticked here, and only issues
-                        marked visible to the client within them. <strong>Their own
-                        issues</strong> means the ones they reported or were brought
-                        into; <strong>all client issues</strong> is for a project
+                        marked visible to the client within them. <strong>Own issues
+                        only</strong> means the ones they reported or were brought
+                        into; <strong>all client-visible issues</strong> is for a project
                         manager on the client side who needs the whole picture.
                     </p>
 
@@ -351,8 +435,11 @@ function MemberRow({
                                         }
                                         className="shrink-0 rounded border border-border bg-raised px-1.5 py-0.5 text-[11px] text-ink"
                                     >
-                                        <option value="client">Their own issues</option>
-                                        <option value="client_manager">All client issues</option>
+                                        {TIERS.map((tier) => (
+                                            <option key={tier.value} value={tier.value}>
+                                                {tier.label}
+                                            </option>
+                                        ))}
                                     </select>
                                 )}
                             </label>
@@ -376,5 +463,30 @@ function MemberRow({
                 </div>
             )}
         </li>
+    );
+}
+
+function TierSelect({
+    label,
+    value,
+    onChange,
+}: {
+    label: string;
+    value: string;
+    onChange: (tier: string) => void;
+}) {
+    return (
+        <select
+            aria-label={label}
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            className="shrink-0 rounded border border-border bg-raised px-1.5 py-0.5 text-[11px] text-ink"
+        >
+            {TIERS.map((tier) => (
+                <option key={tier.value} value={tier.value}>
+                    {tier.label}
+                </option>
+            ))}
+        </select>
     );
 }

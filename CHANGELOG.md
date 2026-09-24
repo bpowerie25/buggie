@@ -12,6 +12,17 @@ today you are running `main`, which is honest rather than ideal — see
 
 ### Added
 
+- **Choosing which clients see an issue.** Visibility is now *Internal only*,
+  *Default* (client managers, the reporter and watchers), *All clients on this
+  project*, or *Specific clients* (the default plus people you name). Named sharing is
+  stored separately from watching, so un-watching never takes access away. The badge
+  says who can actually see the issue — "Visible to: Jane, Mia", "All Kennco clients" —
+  and only staff are shown it; a client sees "Shared with you". The rule lives in one
+  scope that the list, the issue page, search, export, the API and notifications all
+  use, and the issue policy now asks that scope rather than repeating it.
+- **A client's tier is set per project on the members screen**, saving as it changes,
+  and chosen when the client is invited (defaulting to their own issues only). Every
+  change is listed under *Recent changes* on the same screen.
 - **An issue's type can be changed from its sidebar**, like status and priority, and
   the activity feed says what it changed from and to. Staff only; a client sees it.
 - **Client issues start in "New" and appear in Triage.** An issue a client filed used
