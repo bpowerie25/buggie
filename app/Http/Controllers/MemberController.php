@@ -43,6 +43,9 @@ class MemberController extends Controller
                     'tiers' => $user->projects->mapWithKeys(
                         fn ($project) => [$project->id => $project->pivot->role],
                     ),
+                    // For the workload screen. Staff only; a client's hours are not planned here.
+                    'weekly_hours' => $user->pivot->weekly_hours === null ? null : (float) $user->pivot->weekly_hours,
+                    'discipline' => $user->pivot->discipline,
                     'is_owner' => $user->id === $workspace->owner_id,
                     'is_you' => $user->id === $request->user()->id,
                     // Ids as well as names: the screen needs to tick boxes, not just
@@ -60,6 +63,11 @@ class MemberController extends Controller
                     'url' => $invitation->url(),
                 ]),
             'projects' => Project::active()->orderBy('name')->get(['id', 'name', 'key']),
+            // What people have typed before, first, then the common ones.
+            'disciplines' => $workspace->members()->wherePivotNotNull('discipline')->pluck('workspace_user.discipline')
+                ->merge(['Developer', 'Designer', 'Project manager', 'QA', 'Content'])
+                ->unique(fn ($d) => mb_strtolower($d))->values(),
+            'canManage' => $request->user()->can('create', Invitation::class),
             'roles' => array_map(
                 fn (WorkspaceRole $role) => ['value' => $role->value, 'label' => $role->label()],
                 WorkspaceRole::cases(),
@@ -231,6 +239,31 @@ class MemberController extends Controller
      * Only for a project they already hold: granting a project is a separate
      * decision, made where the projects are ticked.
      */
+    /**
+     * A member of staff's weekly hours and discipline, for the workload screen. Set
+     * by whoever manages members; a client has neither.
+     */
+    public function capacity(Request $request, User $user): RedirectResponse
+    {
+        $this->authorize('create', Invitation::class);
+
+        $workspace = $this->tenancy->currentOrFail();
+
+        abort_unless($user->membershipIn($workspace)?->isStaff(), 404);
+
+        $validated = $request->validate([
+            'weekly_hours' => ['nullable', 'numeric', 'min:0', 'max:168'],
+            'discipline' => ['nullable', 'string', 'max:40'],
+        ]);
+
+        $workspace->members()->updateExistingPivot($user->id, [
+            'weekly_hours' => $validated['weekly_hours'] ?? null,
+            'discipline' => trim($validated['discipline'] ?? '') ?: null,
+        ]);
+
+        return back()->with('success', "Saved {$user->name}'s hours.");
+    }
+
     public function tier(Request $request, User $user, Project $project): RedirectResponse
     {
         $this->authorize('manageClientAccess', Invitation::class);

@@ -17,6 +17,9 @@ interface Member {
     projects: number[];
     /** project id => tier, for clients only. */
     tiers?: Record<number, string>;
+    /** For the workload screen; staff only. */
+    weekly_hours?: number | null;
+    discipline?: string | null;
 }
 
 /** A client's access to one project, in the words the screen uses for it. */
@@ -49,6 +52,7 @@ export default function Members({
     projects,
     roles,
     memberEvents = [],
+    disciplines = [],
 }: {
     members: Member[];
     invitations: PendingInvitation[];
@@ -56,6 +60,8 @@ export default function Members({
     roles: { value: string; label: string }[];
     /** Recent changes to what clients can see. Empty for those who cannot change it. */
     memberEvents?: MemberEvent[];
+    /** Suggestions for the discipline field: ones already used, then common ones. */
+    disciplines?: string[];
 }) {
     const { auth } = usePage<SharedProps>().props;
     const canManage = auth.role === 'owner' || auth.role === 'admin';
@@ -198,6 +204,11 @@ export default function Members({
                     Members ({members.length})
                 </h2>
 
+                <datalist id="disciplines">
+                    {disciplines.map((d) => (
+                        <option key={d} value={d} />
+                    ))}
+                </datalist>
                 <ul className="mt-3 divide-y divide-border overflow-hidden rounded-xl border border-border bg-raised">
                     {members.map((member) => (
                         <MemberRow
@@ -280,6 +291,64 @@ function InvitationRow({
 }
 
 /**
+ * A member of staff's weekly hours and what they do, for the workload screen. Saved
+ * when a field is left, like the issue sidebar. Blank hours means "not set", which the
+ * workload screen shows without a limit rather than against a guess.
+ */
+function Capacity({ member, canManage }: { member: Member; canManage: boolean }) {
+    const [hours, setHours] = useState(member.weekly_hours == null ? '' : String(member.weekly_hours));
+    const [discipline, setDiscipline] = useState(member.discipline ?? '');
+
+    function save() {
+        const next = { weekly_hours: hours === '' ? null : Number(hours), discipline: discipline.trim() || null };
+
+        if (next.weekly_hours === (member.weekly_hours ?? null) && next.discipline === (member.discipline ?? null)) return;
+
+        router.patch(`/settings/members/${member.id}/capacity`, next, { preserveScroll: true });
+    }
+
+    if (!canManage) {
+        return member.weekly_hours != null || member.discipline ? (
+            <p className="mt-0.5 text-[11px] text-ink-subtle">
+                {[member.discipline, member.weekly_hours != null ? `${member.weekly_hours}h a week` : null]
+                    .filter(Boolean)
+                    .join(' · ')}
+            </p>
+        ) : null;
+    }
+
+    const field =
+        'rounded-md border border-transparent bg-transparent px-1.5 py-0.5 text-[11px] text-ink-muted transition hover:border-border focus:border-border focus:outline-none';
+
+    return (
+        <div className="mt-0.5 flex flex-wrap items-center gap-1">
+            <input
+                value={discipline}
+                list="disciplines"
+                maxLength={40}
+                placeholder="Discipline"
+                aria-label={`What ${member.name} does`}
+                onChange={(e) => setDiscipline(e.target.value)}
+                onBlur={save}
+                className={`w-32 ${field}`}
+            />
+            <input
+                value={hours}
+                type="number"
+                min={0}
+                max={168}
+                step={0.5}
+                placeholder="Hours a week"
+                aria-label={`${member.name}'s hours a week`}
+                onChange={(e) => setHours(e.target.value)}
+                onBlur={save}
+                className={`w-28 ${field}`}
+            />
+        </div>
+    );
+}
+
+/**
  * One member, and for a client the projects they can see.
  *
  * Grants could be given at invitation and never changed: adding one meant
@@ -326,6 +395,8 @@ function MemberRow({
                         )}
                     </p>
                     <p className="truncate text-xs text-ink-subtle">{member.email}</p>
+
+                    {!isClient && <Capacity member={member} canManage={canManage} />}
 
                     {isClient && !editing && (
                         <div className="mt-1 space-y-0.5">

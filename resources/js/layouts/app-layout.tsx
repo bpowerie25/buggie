@@ -26,6 +26,7 @@ import {
     ChartLine,
     ChartGantt,
     Clock,
+    Gauge,
     Tag,
     Trash2,
     UserPlus,
@@ -278,6 +279,9 @@ export function AppLayout({
                             )}
                             <NavLink href="/time" icon={Clock} active={path.startsWith('/time')}>
                                 Time
+                            </NavLink>
+                            <NavLink href="/workload" icon={Gauge} active={path.startsWith('/workload')}>
+                                Workload
                             </NavLink>
                             <NavLink
                                 href="/settings/members"

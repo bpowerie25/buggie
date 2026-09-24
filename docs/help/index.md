@@ -32,6 +32,7 @@ else. See [Billing and plans](billing.md) and [Self-hosting](self-hosting.md).
 11. [Insights](insights.md) — throughput, backlog and how long things take.
 12. [Timeline](timeline.md) — when the work is meant to happen, as bars on a date axis.
 13. [Time tracking](time-tracking.md) — hours against issues, and what they add up to.
+    [Workload](workload.md) — who has how much on, week by week, against their hours.
 14. [White-labelling](branding.md) — putting your client's name on what they see.
 15. [Releases and versions](releases.md) — what a bug was found in, and fixed in.
 16. [Email](email.md) and [Notifications](notifications.md).

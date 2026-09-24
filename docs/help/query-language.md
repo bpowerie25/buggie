@@ -34,7 +34,7 @@ Values containing spaces are quoted: `label:"needs repro"`.
 | `label` | a label name | Repeatable. |
 | `type` | `bug`, `feature`, `task`, `question` | |
 | `priority` | `none`, `low`, `medium`, `high`, `urgent`, or `0`–`4` | |
-| `no` | `assignee`, `label`, `description`, `priority` | The "needs attention" filters. |
+| `no` | `assignee`, `label`, `description`, `priority`, `version`, `phase`, `parent`, `estimate`, `dates` | The "needs attention" filters. `no:estimate` and `no:dates` are the work the workload screen cannot place in a week. |
 
 Free text runs against a Postgres full-text index over the title and the flattened
 description. Typing an issue key on its own (`WEB-142`) matches that issue directly.

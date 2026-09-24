@@ -344,6 +344,9 @@ class IssueQueryFilter
                 'version' => $query->whereNull('version_id'),
                 // Work not yet placed in a stage of the job.
                 'phase' => $query->whereNull('phase_id'),
+                // The holes the workload screen cannot put in a week.
+                'estimate' => $query->whereNull('estimate_minutes'),
+                'dates' => $query->whereNull('start_on')->whereNull('due_on'),
                 // Work that is not part of anything. The useful half of the parent
                 // filter: a backlog of orphans is what a planning board looks like
                 // before somebody groups it.

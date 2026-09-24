@@ -12,6 +12,16 @@ today you are running `main`, which is honest rather than ideal — see
 
 ### Added
 
+- **Workload.** A staff-only screen: each person's remaining estimates, week by week,
+  across every project or filtered to one.
+  - Work is spread over its working days, and late open work counts from today.
+  - Cells are coloured against the weekly hours set on Members, where each member of
+    staff now also has a discipline to group by.
+  - Open work with no estimate or no dates is counted beside each person, with links to
+    the new `no:estimate` and `no:dates` filters. Planned work with nobody on it has its
+    own row.
+  - Below the grid, estimates are compared with what finished work actually took, and
+    logged hours with hours available.
 - **Blocker reporting.**
   - Three new filters: `is:blocked`, `is:blocking` and `is:delaying`. A blocker is
     *delaying* when the work waiting on it can't start when planned. An open blocker

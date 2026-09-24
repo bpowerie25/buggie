@@ -372,6 +372,8 @@ Route::domain('{workspace}.'.$host)
             ->name('time.estimate');
         Route::get('insights', \App\Http\Controllers\InsightsController::class)
             ->name('insights');
+        Route::get('workload', \App\Http\Controllers\WorkloadController::class)
+            ->name('workload');
 
         // --- timeline ---------------------------------------------------------
         // Issues as bars on a date axis. Staff only, enforced in the controller
@@ -453,6 +455,8 @@ Route::domain('{workspace}.'.$host)
             ->name('members.grants');
         Route::patch('settings/members/{user}/projects/{project:id}/tier', [MemberController::class, 'tier'])
             ->name('members.tier');
+        Route::patch('settings/members/{user}/capacity', [MemberController::class, 'capacity'])
+            ->name('members.capacity');
         Route::delete('settings/members/{user}', [MemberController::class, 'remove'])
             ->name('members.remove');
 
