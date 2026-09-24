@@ -20,8 +20,59 @@ import {
     type DragStartEvent,
 } from '@dnd-kit/core';
 import { Link } from '@inertiajs/react';
-import { Pin, Plus } from 'lucide-react';
-import { useRef, useState, type FormEvent } from 'react';
+import { ChevronLeft, ChevronRight, Pin, Plus } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState, type FormEvent, type RefObject } from 'react';
+
+/**
+ * Which columns are on screen, and whether there is more to either side.
+ *
+ * Scrollbars are hidden until you scroll on a Mac and on most phones, so a board
+ * wider than the screen gave no sign that it was: the columns to the right simply
+ * did not exist as far as anybody could tell. Everything that says "there is more
+ * this way" — the fades, the arrows, the strip, the count — reads from here.
+ */
+function useColumnsInView(scroller: RefObject<HTMLDivElement | null>, columnCount: number) {
+    const [state, setState] = useState({ canLeft: false, canRight: false, visible: [] as string[] });
+
+    const measure = useCallback(() => {
+        const el = scroller.current;
+        if (!el) return;
+
+        const box = el.getBoundingClientRect();
+        const visible = [...el.querySelectorAll<HTMLElement>('[data-column]')]
+            .filter((column) => {
+                const r = column.getBoundingClientRect();
+                const shown = Math.min(r.right, box.right) - Math.max(r.left, box.left);
+
+                // Mostly on screen counts; a sliver at the edge does not.
+                return shown >= r.width * 0.6;
+            })
+            .map((column) => column.dataset.column ?? '');
+
+        setState({
+            canLeft: el.scrollLeft > 4,
+            canRight: el.scrollLeft + el.clientWidth < el.scrollWidth - 4,
+            visible,
+        });
+    }, [scroller]);
+
+    useEffect(() => {
+        const el = scroller.current;
+        if (!el) return;
+
+        measure();
+        el.addEventListener('scroll', measure, { passive: true });
+        const resize = new ResizeObserver(measure);
+        resize.observe(el);
+
+        return () => {
+            el.removeEventListener('scroll', measure);
+            resize.disconnect();
+        };
+    }, [measure, scroller, columnCount]);
+
+    return state;
+}
 
 function Card({
     issue,
@@ -378,12 +429,42 @@ export function IssueBoard({
         useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 8 } }),
     );
     const scroller = useRef<HTMLDivElement>(null);
+    const strip = useRef<HTMLDivElement>(null);
+    const { canLeft, canRight, visible } = useColumnsInView(scroller, columns.length);
+    const overflowing = canLeft || canRight;
 
     function jumpTo(name: string) {
         scroller.current
             ?.querySelector(`[data-column="${CSS.escape(name)}"]`)
             ?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
     }
+
+    /** One column along, whatever width columns are at this screen size. */
+    function step(direction: -1 | 1) {
+        const el = scroller.current;
+        const column = el?.querySelector<HTMLElement>('[data-column]');
+        if (!el || !column) return;
+
+        el.scrollBy({ left: direction * (column.offsetWidth + 12), behavior: 'smooth' });
+    }
+
+    // Keep the highlighted part of the strip in view as the board scrolls under it.
+    useEffect(() => {
+        const first = visible[0];
+        if (!first) return;
+
+        strip.current
+            ?.querySelector(`[data-chip="${CSS.escape(first)}"]`)
+            ?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    }, [visible]);
+
+    const indices = visible.map((name) => columns.findIndex((c) => c.name === name)).filter((i) => i >= 0);
+    const inView =
+        indices.length === 0
+            ? ''
+            : indices.length === 1
+              ? `Column ${indices[0] + 1} of ${columns.length}`
+              : `Columns ${Math.min(...indices) + 1}–${Math.max(...indices) + 1} of ${columns.length}`;
 
     function onDragStart(event: DragStartEvent) {
         setDragging((event.active.data.current?.issue as IssueRow) ?? null);
@@ -436,36 +517,106 @@ export function IssueBoard({
 
     return (
         <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd}>
-            {/* On a phone only one column is in view, so say which exist and jump. */}
-            <nav aria-label="Columns" className="-mx-4 mb-3 flex gap-1.5 overflow-x-auto px-4 sm:hidden">
-                {columns.map(({ name, issues }) => (
-                    <button
-                        key={name}
-                        type="button"
-                        onClick={() => jumpTo(name)}
-                        className="shrink-0 rounded-full border border-border bg-surface px-2.5 py-1 text-xs text-ink-muted"
+            {/*
+                Every column, with the ones on screen highlighted: a map of the board
+                that says how much of it you are looking at, and a way to get to the
+                rest. Only when the board does not fit — otherwise it says nothing
+                the columns do not.
+            */}
+            {overflowing && (
+                <div className="mb-3 flex items-center gap-3">
+                    <nav
+                        ref={strip}
+                        aria-label="Columns"
+                        className="-mx-4 flex min-w-0 flex-1 gap-1.5 overflow-x-auto px-4 sm:mx-0 sm:px-0"
                     >
-                        {name} <span className="text-ink-subtle">{issues.length}</span>
-                    </button>
-                ))}
-            </nav>
+                        {columns.map(({ name, issues }) => {
+                            const shown = visible.includes(name);
 
-            <div
-                ref={scroller}
-                className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-4 sm:mx-0 sm:snap-none sm:px-0"
-            >
-                {columns.map(({ name, status, issues }) => (
-                    <Column
-                        key={name}
-                        name={name}
-                        status={status}
-                        editable={editable}
-                        issues={issues}
-                        addTargets={addTargets?.(name) ?? []}
-                        onAdd={onAdd}
-                        onTogglePin={onTogglePin}
-                    />
-                ))}
+                            return (
+                                <button
+                                    key={name}
+                                    type="button"
+                                    data-chip={name}
+                                    aria-current={shown ? 'true' : undefined}
+                                    onClick={() => jumpTo(name)}
+                                    className={`shrink-0 rounded-full border px-2.5 py-1 text-xs transition ${
+                                        shown
+                                            ? 'border-accent/40 bg-accent-soft text-accent'
+                                            : 'border-border bg-surface text-ink-muted hover:text-ink'
+                                    }`}
+                                >
+                                    {name} <span className={shown ? '' : 'text-ink-subtle'}>{issues.length}</span>
+                                </button>
+                            );
+                        })}
+                    </nav>
+                    <span className="hidden shrink-0 text-[11px] text-ink-subtle sm:inline">{inView}</span>
+                </div>
+            )}
+
+            <div className="relative">
+                {/* Fades say "more this way"; the arrows act on it. Both disappear at
+                    the end they point at. */}
+                <div
+                    aria-hidden
+                    className={`pointer-events-none absolute inset-y-0 left-0 z-10 w-10 bg-linear-to-r from-canvas to-transparent transition-opacity ${
+                        canLeft ? 'opacity-100' : 'opacity-0'
+                    }`}
+                />
+                <div
+                    aria-hidden
+                    className={`pointer-events-none absolute inset-y-0 right-0 z-10 w-10 bg-linear-to-l from-canvas to-transparent transition-opacity ${
+                        canRight ? 'opacity-100' : 'opacity-0'
+                    }`}
+                />
+                {canLeft && (
+                    <button
+                        type="button"
+                        onClick={() => step(-1)}
+                        aria-label="Previous column"
+                        className="absolute top-24 left-1 z-20 hidden size-9 items-center justify-center rounded-full border border-border bg-raised text-ink-muted shadow-md transition hover:text-ink sm:flex"
+                    >
+                        <ChevronLeft className="size-5" />
+                    </button>
+                )}
+                {canRight && (
+                    <button
+                        type="button"
+                        onClick={() => step(1)}
+                        aria-label="Next column"
+                        className="absolute top-24 right-1 z-20 hidden size-9 items-center justify-center rounded-full border border-border bg-raised text-ink-muted shadow-md transition hover:text-ink sm:flex"
+                    >
+                        <ChevronRight className="size-5" />
+                    </button>
+                )}
+
+                <div
+                    ref={scroller}
+                    tabIndex={0}
+                    role="region"
+                    aria-label={`Board, ${inView || `${columns.length} columns`}. Use the arrow keys to move between columns.`}
+                    onKeyDown={(e) => {
+                        // Only the board itself: arrow keys in the add-card box move the caret.
+                        if (e.target !== e.currentTarget) return;
+                        if (e.key === 'ArrowRight') step(1);
+                        if (e.key === 'ArrowLeft') step(-1);
+                    }}
+                    className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-4 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 sm:mx-0 sm:snap-none sm:px-0"
+                >
+                    {columns.map(({ name, status, issues }) => (
+                        <Column
+                            key={name}
+                            name={name}
+                            status={status}
+                            editable={editable}
+                            issues={issues}
+                            addTargets={addTargets?.(name) ?? []}
+                            onAdd={onAdd}
+                            onTogglePin={onTogglePin}
+                        />
+                    ))}
+                </div>
             </div>
 
             <DragOverlay dropAnimation={null}>
