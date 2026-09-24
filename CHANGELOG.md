@@ -12,6 +12,11 @@ today you are running `main`, which is honest rather than ideal — see
 
 ### Added
 
+- **Drag on the timeline.** Move a bar, stretch either end, move a one-date diamond, or
+  drag an undated issue onto a day; arrow keys do the same for a focused bar. A drag
+  made on top of somebody else's change to the same issue is refused and says who, rather
+  than overwriting them. Date changes, from the timeline or the issue, now appear in its
+  activity for staff.
 - **Mark as duplicate.** Closes an issue as not done, says why in its thread, and moves
   its reporter and watchers onto the original, so whoever raised it keeps hearing about
   the fix. A "duplicates" link existed before, but left the duplicate open and its

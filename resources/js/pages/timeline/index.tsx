@@ -5,11 +5,12 @@ import {
 } from '@/components/timeline-chart';
 import { AppLayout } from '@/layouts/app-layout';
 import { withTerm, withoutTerm, type ParsedQuery } from '@/lib/issue-query';
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import { useEffect, useState } from 'react';
 
 interface UndatedRow {
     key: string;
+    version: string;
     title: string;
     project: string;
     status: string;
@@ -55,6 +56,18 @@ export default function TimelinePage({
     }
 
     const control = 'rounded-lg border border-border bg-surface px-2.5 py-1.5 text-sm text-ink';
+
+    // Refused because somebody else changed the issue first; the reload that comes
+    // with the refusal already shows their version.
+    const conflict = (usePage().props.errors as Record<string, string>)?.schedule;
+
+    function schedule(key: string, dates: { start_on: string | null; due_on: string | null }, version: string) {
+        router.patch(
+            `/issues/${key}/schedule`,
+            { ...dates, version },
+            { preserveScroll: true, preserveState: true, only: ['rows', 'undated', 'errors', 'flash'] },
+        );
+    }
     const project = query.include.project?.[0] ?? '';
 
     return (
@@ -150,7 +163,26 @@ export default function TimelinePage({
                     ))}
                 </div>
 
-                <TimelineChart rows={rows} axis={axis} />
+                {conflict && (
+                    <p role="alert" className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-700 dark:text-amber-400">
+                        {conflict}
+                    </p>
+                )}
+
+                <TimelineChart
+                    rows={rows}
+                    axis={axis}
+                    // The page is staff only, and staff can change dates.
+                    editable
+                    onReschedule={(row, dates) => schedule(row.key, dates, row.version)}
+                    // Dropped on a day: a one-day bar there, ready to be stretched.
+                    onPlace={(key, version, day) => schedule(key, { start_on: day, due_on: day }, version)}
+                />
+
+                <p className="text-xs text-ink-subtle">
+                    Drag a bar to move it, or either end to change its dates. With a bar
+                    selected, the arrow keys move it a day and Shift moves its due date.
+                </p>
 
                 <div className="flex flex-wrap gap-4 text-xs text-ink-muted">
                     <Key className="bg-accent" label="Open" />
@@ -180,13 +212,25 @@ export default function TimelinePage({
                     <section className="rounded-xl border border-border p-4">
                         <h2 className="text-sm font-semibold text-ink">No dates</h2>
                         <p className="mt-1 text-xs text-ink-subtle">
-                            Matched the filter, but has neither a start nor a due date. Listed
-                            rather than drawn — there is no honest place to put them on a date
-                            axis.
+                            Matched the filter, but has neither a start nor a due date. Drag one
+                            onto the chart to give it a day, then stretch it to the length it
+                            needs.
                         </p>
                         <ul className="mt-3 divide-y divide-border">
                             {undated.map((issue) => (
-                                <li key={issue.key} className="flex items-center gap-3 py-2">
+                                <li
+                                    key={issue.key}
+                                    draggable
+                                    onDragStart={(event) => {
+                                        event.dataTransfer.setData(
+                                            'application/x-buggie-issue',
+                                            JSON.stringify({ key: issue.key, version: issue.version }),
+                                        );
+                                        event.dataTransfer.effectAllowed = 'move';
+                                    }}
+                                    title="Drag onto the chart to give it dates"
+                                    className="flex cursor-grab items-center gap-3 py-2 active:cursor-grabbing"
+                                >
                                     <Link
                                         href={`/issues/${issue.key}`}
                                         className="shrink-0 font-mono text-xs text-accent"

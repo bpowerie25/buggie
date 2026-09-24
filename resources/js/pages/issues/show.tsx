@@ -396,6 +396,11 @@ function eventSentence(event: Event): string {
             return 'The client was reminded that a reply is waiting';
         case 'auto_closed':
             return `Closed after ${d.days as number} days without a reply`;
+        case 'dates_changed': {
+            const to = d.to as { start_on: string | null; due_on: string | null };
+            const span = [to.start_on, to.due_on].filter(Boolean).join(' – ');
+            return span ? `${actor} rescheduled this to ${span}` : `${actor} cleared the dates`;
+        }
         case 'marked_duplicate':
             return d.of ? `${actor} closed this as a duplicate of ${d.of as string}` : `${actor} closed this as a duplicate`;
         case 'audience_changed': {

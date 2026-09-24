@@ -351,6 +351,8 @@ class Timeline
             'project' => $issue->project->name,
             'status' => $issue->status->name,
             'assignee' => $issue->assignee?->name,
+            // Sent back with a drag, so one made on top of somebody else's is refused.
+            'version' => $issue->scheduleVersion(),
             'depth' => $depth,
             'start' => $extent[0]->toDateString(),
             'end' => $extent[1]->toDateString(),
@@ -444,6 +446,7 @@ class Timeline
     {
         return [
             'key' => $issue->key,
+            'version' => $issue->scheduleVersion(),
             'title' => $issue->title,
             'project' => $issue->project->name,
             'status' => $issue->status->name,

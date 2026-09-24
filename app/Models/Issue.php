@@ -156,6 +156,23 @@ class Issue extends Model
         return $this->hasMany(IssueRelation::class);
     }
 
+    /**
+     * What this issue's schedule was when somebody loaded it, for refusing a change
+     * made on top of somebody else's.
+     *
+     * The dates as well as updated_at, because timestamps are whole seconds: two
+     * drags in the same second still disagree unless they chose the same dates, and
+     * then there is nothing to lose.
+     */
+    public function scheduleVersion(): string
+    {
+        return substr(sha1(implode('|', [
+            $this->updated_at?->format('Y-m-d H:i:s'),
+            $this->start_on?->toDateString(),
+            $this->due_on?->toDateString(),
+        ])), 0, 16);
+    }
+
     /** Where it was before it started waiting on the client, to go back to. */
     public function statusBeforeWaiting(): BelongsTo
     {

@@ -1,4 +1,5 @@
 import { Link } from '@inertiajs/react';
+import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react';
 
 /**
  * The Gantt, drawn by hand.
@@ -35,6 +36,48 @@ export interface TimelineRow {
     estimate: string | null;
     blocked_by: string[];
     conflicts: string[];
+    /** Sent back with a drag, so one made on top of somebody else's is refused. */
+    version: string;
+}
+
+/** What a drag is changing: the whole bar, or one end of it. */
+type DragMode = 'move' | 'start' | 'end';
+
+interface Drag {
+    key: string;
+    mode: DragMode;
+    originX: number;
+    delta: number;
+}
+
+/** The dates to save for a row after moving `mode` by `delta` days. */
+export function rescheduled(
+    row: Pick<TimelineRow, 'kind' | 'anchor' | 'start' | 'end' | 'start_on' | 'due_on'>,
+    mode: DragMode,
+    delta: number,
+): { start_on: string | null; due_on: string | null } {
+    if (row.kind === 'milestone') {
+        // One date: move that one, and leave the missing one missing.
+        return row.anchor === 'due'
+            ? { start_on: row.start_on, due_on: addDays(row.end, delta) }
+            : { start_on: addDays(row.start, delta), due_on: row.due_on };
+    }
+
+    const start = mode === 'end' ? row.start : addDays(row.start, delta);
+    const end = mode === 'start' ? row.end : addDays(row.end, delta);
+
+    // Dragging one end past the other stops at the other: a bar is at least a day.
+    if (mode === 'start' && start > end) return { start_on: end, due_on: end };
+    if (mode === 'end' && end < start) return { start_on: start, due_on: start };
+
+    return { start_on: start, due_on: end };
+}
+
+export function addDays(iso: string, days: number): string {
+    const date = new Date(`${iso}T00:00:00Z`);
+    date.setUTCDate(date.getUTCDate() + days);
+
+    return date.toISOString().slice(0, 10);
 }
 
 export interface TimelineAxis {
@@ -79,11 +122,27 @@ function tickLabel(iso: string, interval: string): string {
 export function TimelineChart({
     rows,
     axis,
+    editable = false,
+    onReschedule,
+    onPlace,
 }: {
     rows: TimelineRow[];
     axis: TimelineAxis;
+    /** Staff can drag; everybody else sees the same chart, still. */
+    editable?: boolean;
+    onReschedule?: (row: TimelineRow, dates: { start_on: string | null; due_on: string | null }) => void;
+    /** An undated issue dropped onto a day. */
+    onPlace?: (key: string, version: string, day: string) => void;
 }) {
-    if (rows.length === 0) {
+    const [drag, setDrag] = useState<Drag | null>(null);
+    // Where a dragged bar was dropped, shown until the server's answer replaces it —
+    // so a bar does not jump back for the length of a request and then forward again.
+    const [pending, setPending] = useState<Record<string, { start: string; end: string }>>({});
+    const scroller = useRef<HTMLDivElement>(null);
+
+    useEffect(() => setPending({}), [rows]);
+
+    if (rows.length === 0 && !onPlace) {
         return (
             <p className="rounded-xl border border-border px-4 py-8 text-center text-sm text-ink-subtle">
                 Nothing with dates in this range.
@@ -92,9 +151,85 @@ export function TimelineChart({
     }
 
     const perDay = PX_PER_DAY[axis.interval] ?? 6;
+    const canDrag = editable && Boolean(onReschedule);
+
+    /** The row as it should be drawn right now: mid-drag, just dropped, or as loaded. */
+    function shown(row: TimelineRow): TimelineRow {
+        if (drag?.key === row.key) {
+            const dates = rescheduled(row, drag.mode, drag.delta);
+            const start = dates.start_on ?? dates.due_on ?? row.start;
+            const end = dates.due_on ?? dates.start_on ?? row.end;
+
+            return { ...row, start, end };
+        }
+
+        return pending[row.key] ? { ...row, ...pending[row.key] } : row;
+    }
+
+    function begin(event: ReactPointerEvent, row: TimelineRow, mode: DragMode) {
+        if (!canDrag || row.kind === 'rollup' || event.button !== 0) return;
+
+        event.preventDefault();
+        event.stopPropagation();
+        (event.currentTarget as Element).closest('svg')?.setPointerCapture(event.pointerId);
+        setDrag({ key: row.key, mode, originX: event.clientX, delta: 0 });
+    }
+
+    function move(event: ReactPointerEvent) {
+        if (!drag) return;
+
+        // Whole days: a plan is in days, and half a day dragged is a day nobody chose.
+        const delta = Math.round((event.clientX - drag.originX) / perDay);
+
+        if (delta !== drag.delta) setDrag({ ...drag, delta });
+    }
+
+    function end() {
+        if (!drag) return;
+
+        const row = rows.find((r) => r.key === drag.key);
+        setDrag(null);
+
+        if (!row || drag.delta === 0) return;
+
+        commit(row, drag.mode, drag.delta);
+    }
+
+    function commit(row: TimelineRow, mode: DragMode, delta: number) {
+        const dates = rescheduled(row, mode, delta);
+
+        setPending((current) => ({
+            ...current,
+            [row.key]: {
+                start: dates.start_on ?? dates.due_on ?? row.start,
+                end: dates.due_on ?? dates.start_on ?? row.end,
+            },
+        }));
+
+        onReschedule?.(row, dates);
+    }
+
+    /** Arrow keys move a focused bar a day; with Shift they move its due date. */
+    function onKey(event: KeyboardEvent, row: TimelineRow) {
+        if (!canDrag || row.kind === 'rollup') return;
+        if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+
+        event.preventDefault();
+        commit(row, event.shiftKey && row.kind === 'bar' ? 'end' : 'move', event.key === 'ArrowRight' ? 1 : -1);
+    }
+
+    /** The day under a point in the chart, for dropping an undated issue onto. */
+    function dayAt(clientX: number): string {
+        const box = scroller.current?.getBoundingClientRect();
+        const offset = clientX - (box?.left ?? 0) + (scroller.current?.scrollLeft ?? 0);
+        const day = Math.max(0, Math.min(Math.floor(offset / perDay), dayNumber(axis.to, axis.from)));
+
+        return addDays(axis.from, day);
+    }
     const days = dayNumber(axis.to, axis.from) + 1;
     const width = Math.max(Math.round(days * perDay), 320);
-    const height = HEADER + rows.length * ROW;
+    // Room for at least a few rows, so an empty chart is still somewhere to drop.
+    const height = HEADER + Math.max(rows.length, onPlace ? 4 : 0) * ROW;
 
     // Clamped rather than dropped: a bar running out of the window still tells you
     // the work reaches the edge, which is the thing worth knowing about it.
@@ -143,13 +278,33 @@ export function TimelineChart({
                 ))}
             </div>
 
-            <div className="min-w-0 flex-1 overflow-x-auto">
+            <div
+                ref={scroller}
+                className="min-w-0 flex-1 overflow-x-auto"
+                onDragOver={(event) => {
+                    if (onPlace && event.dataTransfer.types.includes('application/x-buggie-issue')) {
+                        event.preventDefault();
+                        event.dataTransfer.dropEffect = 'move';
+                    }
+                }}
+                onDrop={(event) => {
+                    const raw = event.dataTransfer.getData('application/x-buggie-issue');
+                    if (!onPlace || !raw) return;
+
+                    event.preventDefault();
+                    const { key, version } = JSON.parse(raw) as { key: string; version: string };
+                    onPlace(key, version, dayAt(event.clientX));
+                }}
+            >
                 <svg
                     width={width}
                     height={height}
-                    role="img"
-                    aria-label={`${rows.length} issues from ${axis.from} to ${axis.to}`}
-                    className="block"
+                    role={canDrag ? 'application' : 'img'}
+                    aria-label={`${rows.length} issues from ${axis.from} to ${axis.to}${canDrag ? '. Drag a bar to move it, or its ends to change its dates; with a bar focused, the arrow keys move it a day and Shift moves its due date.' : ''}`}
+                    className={`block ${drag ? 'cursor-grabbing select-none' : ''}`}
+                    onPointerMove={move}
+                    onPointerUp={end}
+                    onPointerCancel={() => setDrag(null)}
                 >
                     {axis.ticks.map((tick) => (
                         <g key={tick}>
@@ -194,7 +349,17 @@ export function TimelineChart({
                     )}
 
                     {rows.map((row, i) => (
-                        <Bar key={row.key} row={row} y={rowY(i)} x={x} xEnd={xEnd} />
+                        <Bar
+                            key={row.key}
+                            row={shown(row)}
+                            y={rowY(i)}
+                            x={x}
+                            xEnd={xEnd}
+                            draggable={canDrag && row.kind !== 'rollup'}
+                            dragging={drag?.key === row.key}
+                            onBegin={(event, mode) => begin(event, row, mode)}
+                            onKey={(event) => onKey(event, row)}
+                        />
                     ))}
 
                     {/*
@@ -211,9 +376,9 @@ export function TimelineChart({
                             return (
                                 <Connector
                                     key={`${row.key}-${blockerKey}`}
-                                    fromX={xEnd(rows[j].end)}
+                                    fromX={xEnd(shown(rows[j]).end)}
                                     fromY={rowY(j) + ROW / 2}
-                                    toX={x(row.start)}
+                                    toX={x(shown(row).start)}
                                     toY={rowY(i) + ROW / 2}
                                 />
                             );
@@ -230,14 +395,40 @@ function Bar({
     y,
     x,
     xEnd,
+    draggable = false,
+    dragging = false,
+    onBegin,
+    onKey,
 }: {
     row: TimelineRow;
     y: number;
     x: (iso: string) => number;
     xEnd: (iso: string) => number;
+    draggable?: boolean;
+    dragging?: boolean;
+    onBegin?: (event: ReactPointerEvent, mode: DragMode) => void;
+    onKey?: (event: KeyboardEvent) => void;
 }) {
     const tone = row.overdue ? 'fill-danger' : row.open ? 'fill-accent' : 'fill-success';
     const label = `${row.key} ${row.start}${row.start === row.end ? '' : ` to ${row.end}`}`;
+    const grab = draggable ? { onPointerDown: (e: ReactPointerEvent) => onBegin?.(e, 'move') } : {};
+    const focus = draggable
+        ? {
+              tabIndex: 0,
+              role: 'button',
+              'aria-label': `${label}. Arrow keys move it a day.`,
+              onKeyDown: onKey,
+              className: 'outline-none focus-visible:[&>*:not(title)]:stroke-ink focus-visible:[&>*:not(title)]:stroke-2',
+          }
+        : {};
+
+    // The dates being chosen, above the bar while it moves: the whole point of
+    // dragging is to land on a day, and a bar alone does not say which.
+    const readout = dragging && (
+        <text x={x(row.start)} y={y + 6} className="fill-ink text-[10px] font-medium">
+            {row.start === row.end ? row.start : `${row.start} → ${row.end}`}
+        </text>
+    );
 
     if (row.kind === 'milestone') {
         // One date only. A diamond claims a moment and nothing either side of it,
@@ -247,11 +438,14 @@ function Bar({
         const r = 5;
 
         return (
-            <g>
+            <g {...focus}>
                 <title>{`${label} · ${row.anchor === 'due' ? 'due date only' : 'start date only'}`}</title>
+                {readout}
                 <polygon
                     points={`${centre},${mid - r} ${centre + r},${mid} ${centre},${mid + r} ${centre - r},${mid}`}
-                    className={tone}
+                    className={`${tone} ${draggable ? 'cursor-grab' : ''}`}
+                    style={draggable ? { touchAction: 'none' } : undefined}
+                    {...grab}
                 />
             </g>
         );
@@ -280,16 +474,34 @@ function Bar({
     }
 
     return (
-        <g>
+        <g {...focus}>
             <title>{label}</title>
+            {readout}
             <rect
                 x={left}
                 y={y + ROW / 2 - 6}
                 width={right - left}
                 height={12}
                 rx={3}
-                className={tone}
+                className={`${tone} ${draggable ? 'cursor-grab' : ''} ${dragging ? 'opacity-80' : ''}`}
+                style={draggable ? { touchAction: 'none' } : undefined}
+                {...grab}
             />
+            {/* The ends, a little wider than they look, so they can be caught. */}
+            {draggable &&
+                (['start', 'end'] as const).map((mode) => (
+                    <rect
+                        key={mode}
+                        x={(mode === 'start' ? left : right) - 4}
+                        y={y + ROW / 2 - 8}
+                        width={8}
+                        height={16}
+                        fill="transparent"
+                        className="cursor-ew-resize"
+                        style={{ touchAction: 'none' }}
+                        onPointerDown={(e) => onBegin?.(e, mode)}
+                    />
+                ))}
         </g>
     );
 }

@@ -28,6 +28,8 @@ enum IssueEventType: string
     case ReporterLinked = 'reporter_linked';
     /** Closed as a duplicate of another issue. Client-visible: it is why their issue closed. */
     case MarkedDuplicate = 'marked_duplicate';
+    /** Its start or due date moved — on the issue, or by dragging on the timeline. Internal. */
+    case DatesChanged = 'dates_changed';
     case VersionChanged = 'version_changed';
     case Related = 'related';
     case Unrelated = 'unrelated';

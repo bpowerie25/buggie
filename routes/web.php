@@ -366,6 +366,9 @@ Route::domain('{workspace}.'.$host)
         // rather than by a middleware, so the check sits beside the reason for it.
         Route::get('timeline', \App\Http\Controllers\TimelineController::class)
             ->name('timeline');
+        // Dragging on the timeline. Refused if the issue changed since it was loaded.
+        Route::patch('issues/{issue}/schedule', \App\Http\Controllers\IssueScheduleController::class)
+            ->name('issues.schedule');
         // --- end timeline -----------------------------------------------------
         Route::get('time', [\App\Http\Controllers\TimeReportController::class, 'index'])
             ->name('time.index');

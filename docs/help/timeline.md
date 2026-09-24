@@ -117,11 +117,29 @@ The dates are not part of the query, because they decide what is *drawn* rather 
 what matches. Two issues both due in June are both June issues however you are
 looking at them.
 
+## Dragging
+
+- **Move a bar** by dragging its middle: both dates move together, in whole days.
+- **Change one date** by dragging either end of a bar. An end stops at the other one,
+  so a bar is always at least a day.
+- **A diamond** (one date only) moves that one date and leaves the other empty.
+- **A bracket** (a parent spanning its subtasks) cannot be dragged: its dates are its
+  subtasks'. Drag those.
+- **An undated issue** can be dragged from the *No dates* list onto the chart: it gets
+  a one-day bar on the day it was dropped, ready to be stretched.
+- **From the keyboard**, focus a bar with Tab: ← and → move it a day, and with Shift
+  they move its due date.
+
+The dates being chosen are shown above the bar while it moves. Every change is recorded
+in the issue's activity, for staff.
+
+**Two people planning at once.** Each bar carries the version of the issue it was drawn
+from. If somebody else has changed that issue since you loaded the timeline, your drag is
+refused rather than quietly overwriting theirs; the timeline says who changed it and
+reloads to show it as it is now. Try again from there.
+
 ## Known rough edges
 
-- **Nothing can be dragged.** Dates are changed on the issue, not on the chart. A
-  Gantt you can drag needs a conflict story for two people dragging at once, and
-  Buggie does not have one yet.
 - **Five hundred rows, then it stops**, and says so. A chart with a thousand bars is a
   texture rather than a plan. The cut happens before subtasks are grouped, so a very
   large workspace may see a parent whose children were trimmed away.

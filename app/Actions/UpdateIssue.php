@@ -59,14 +59,18 @@ class UpdateIssue
                     'type' => $this->simple($issue, 'type', $value, IssueEventType::TypeChanged, $actor),
                     'visibility' => $this->simple($issue, 'visibility', $value, IssueEventType::VisibilityChanged, $actor),
                     'labels' => $this->labels($issue, $value, $actor),
-                    'start_on' => $issue->fill(['start_on' => $value]),
-                    'due_on' => $issue->fill(['due_on' => $value]),
+                    // Handled together after the loop: one entry for one change of plan.
+                    'start_on', 'due_on' => null,
                     'version_id' => $this->version($issue, $value === null ? null : (int) $value, $actor),
                     // Not an event: pinning is how the board is laid out, not news
                     // about the issue.
                     'board_pinned' => $issue->board_pinned_at = filter_var($value, FILTER_VALIDATE_BOOL) ? ($issue->board_pinned_at ?? now()) : null,
                     default => null,
                 };
+            }
+
+            if (array_key_exists('start_on', $attributes) || array_key_exists('due_on', $attributes)) {
+                $this->dates($issue, $attributes, $actor);
             }
 
             // After the loop, and as one change: the audience and the people named in
@@ -375,6 +379,26 @@ class UpdateIssue
             'to' => $to->value,
             'clients' => User::whereIn('id', $wanted)->orderBy('name')->pluck('name')->all(),
         ], $actor);
+    }
+
+    /**
+     * The plan moved. Recorded, internally, because somebody's dates being changed
+     * under them is worth being able to see — and the timeline names whoever did it
+     * when it refuses a drag made on top of theirs.
+     *
+     * @param  array<string, mixed>  $attributes
+     */
+    private function dates(Issue $issue, array $attributes, ?User $actor): void
+    {
+        $from = ['start_on' => $issue->start_on?->toDateString(), 'due_on' => $issue->due_on?->toDateString()];
+
+        $issue->fill(array_intersect_key($attributes, array_flip(['start_on', 'due_on'])));
+
+        $to = ['start_on' => $issue->start_on?->toDateString(), 'due_on' => $issue->due_on?->toDateString()];
+
+        if ($from !== $to) {
+            $issue->recordEvent(IssueEventType::DatesChanged, ['from' => $from, 'to' => $to], $actor);
+        }
     }
 
     /** @param array<int, int> $labelIds */
