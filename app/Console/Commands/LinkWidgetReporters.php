@@ -31,9 +31,16 @@ class LinkWidgetReporters extends Command
             ->get();
 
         if ($workspaces->isEmpty()) {
-            $this->error('No such workspace.');
+            if ($this->option('workspace')) {
+                $this->error('No such workspace.');
 
-            return self::FAILURE;
+                return self::FAILURE;
+            }
+
+            // Nothing to link on an install with no workspaces yet; that is not an error.
+            $this->line('No workspaces yet, so nothing to link.');
+
+            return self::SUCCESS;
         }
 
         $dry = (bool) $this->option('dry-run');
