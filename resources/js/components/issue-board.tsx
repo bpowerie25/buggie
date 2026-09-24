@@ -10,7 +10,8 @@ import type { IssueRow, IssueStatus } from '@/types';
 import {
     DndContext,
     DragOverlay,
-    PointerSensor,
+    MouseSensor,
+    TouchSensor,
     useDraggable,
     useDroppable,
     useSensor,
@@ -20,7 +21,7 @@ import {
 } from '@dnd-kit/core';
 import { Link } from '@inertiajs/react';
 import { Pin, Plus } from 'lucide-react';
-import { useState, type FormEvent } from 'react';
+import { useRef, useState, type FormEvent } from 'react';
 
 function Card({
     issue,
@@ -54,7 +55,10 @@ function Card({
                         aria-label={issue.pinned ? `Unpin ${issue.key}` : `Pin ${issue.key} to the board`}
                         title={issue.pinned ? 'Pinned: always on the board. Click to unpin.' : 'Pin: always show on the board'}
                         className={`rounded p-0.5 transition ${
-                            issue.pinned ? 'text-accent' : 'text-ink-subtle opacity-0 group-hover:opacity-100 focus:opacity-100'
+                            issue.pinned
+                                ? 'text-accent'
+                                : // No hover on a touch screen, so there it is always shown.
+                                  'text-ink-subtle opacity-0 group-hover:opacity-100 focus:opacity-100 [@media(hover:none)]:opacity-100'
                         }`}
                     >
                         <Pin className="size-3" />
@@ -201,7 +205,13 @@ function Column({
     return (
         <section
             ref={setNodeRef}
-            className={`flex w-72 shrink-0 flex-col rounded-xl border p-2 transition ${
+            data-column={name}
+            /*
+             * A phone shows one column at a time, nearly full width, and snaps to the
+             * next; a laptop a fixed width each; a wide screen shares the width out
+             * rather than leaving half of it empty to the right.
+             */
+            className={`flex w-[85vw] max-w-sm shrink-0 snap-center flex-col rounded-xl border p-2 transition sm:w-72 2xl:w-auto 2xl:min-w-72 2xl:flex-1 ${
                 isOver ? 'border-accent bg-accent-soft/30' : 'border-border bg-surface'
             }`}
         >
@@ -211,7 +221,9 @@ function Column({
                 <WipCount count={issues.length} limit={status?.wip_limit ?? null} />
             </header>
 
-            <div className="mt-1 flex flex-1 flex-col gap-1.5 overflow-y-auto">
+            {/* Each column scrolls on its own, so a long one does not push the board off
+                the bottom of the screen and take every other column with it. */}
+            <div className="mt-1 flex max-h-[calc(100dvh-15rem)] flex-1 flex-col gap-1.5 overflow-y-auto">
                 {issues.map((issue) => (
                     <DraggableCard
                         key={issue.id}
@@ -359,9 +371,19 @@ export function IssueBoard({
 }) {
     const [dragging, setDragging] = useState<IssueRow | null>(null);
     const sensors = useSensors(
-        // A few pixels of travel before dragging starts, so a click still clicks.
-        useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+        // A mouse: a few pixels of travel before dragging starts, so a click clicks.
+        useSensor(MouseSensor, { activationConstraint: { distance: 4 } }),
+        // A finger: press and hold. Otherwise every swipe across the board to reach
+        // the next column picks up whichever card it started on.
+        useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 8 } }),
     );
+    const scroller = useRef<HTMLDivElement>(null);
+
+    function jumpTo(name: string) {
+        scroller.current
+            ?.querySelector(`[data-column="${CSS.escape(name)}"]`)
+            ?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+    }
 
     function onDragStart(event: DragStartEvent) {
         setDragging((event.active.data.current?.issue as IssueRow) ?? null);
@@ -414,7 +436,24 @@ export function IssueBoard({
 
     return (
         <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd}>
-            <div className="flex gap-3 overflow-x-auto pb-4">
+            {/* On a phone only one column is in view, so say which exist and jump. */}
+            <nav aria-label="Columns" className="-mx-4 mb-3 flex gap-1.5 overflow-x-auto px-4 sm:hidden">
+                {columns.map(({ name, issues }) => (
+                    <button
+                        key={name}
+                        type="button"
+                        onClick={() => jumpTo(name)}
+                        className="shrink-0 rounded-full border border-border bg-surface px-2.5 py-1 text-xs text-ink-muted"
+                    >
+                        {name} <span className="text-ink-subtle">{issues.length}</span>
+                    </button>
+                ))}
+            </nav>
+
+            <div
+                ref={scroller}
+                className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-4 sm:mx-0 sm:snap-none sm:px-0"
+            >
                 {columns.map(({ name, status, issues }) => (
                     <Column
                         key={name}

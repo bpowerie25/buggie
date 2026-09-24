@@ -12,6 +12,10 @@ today you are running `main`, which is honest rather than ideal — see
 
 ### Added
 
+- **Buggie works on a phone.** Below desktop width the sidebar is a slide-out menu,
+  and the board shows one near-full-width column at a time with a strip of column
+  names to jump between. On a touch screen, swiping scrolls and press-and-hold picks a
+  card up, instead of every swipe dragging whichever card it started on.
 - **A board you can work on.** Every status is a column whether or not it has cards,
   so there is always somewhere to drop the first one; *Add card* at the foot of a
   column creates an issue straight into that status; cards finished in the last two

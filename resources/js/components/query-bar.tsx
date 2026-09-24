@@ -45,7 +45,7 @@ export const QueryBar = forwardRef<
                     e.preventDefault();
                     onChange(raw);
                 }}
-                className="relative"
+                className="relative w-full sm:w-auto"
             >
                 <Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-ink-subtle" />
                 <input
@@ -63,7 +63,7 @@ export const QueryBar = forwardRef<
                     placeholder="is:open assignee:@me …"
                     aria-label="Filter issues"
                     spellCheck={false}
-                    className="h-[30px] w-80 rounded-lg border border-border bg-raised pr-2 pl-8 font-mono text-xs text-ink placeholder:text-ink-subtle focus:border-accent focus:outline-none"
+                    className="h-[30px] w-full rounded-lg sm:w-80 border border-border bg-raised pr-2 pl-8 font-mono text-xs text-ink placeholder:text-ink-subtle focus:border-accent focus:outline-none"
                 />
 
                 {/*

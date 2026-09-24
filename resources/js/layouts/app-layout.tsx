@@ -19,6 +19,7 @@ import {
     LayoutGrid,
     LayoutDashboard,
     LogOut,
+    Menu,
     Server,
     Settings,
     ShieldCheck,
@@ -30,7 +31,7 @@ import {
     UserPlus,
     Users,
 } from 'lucide-react';
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 
 function NavLink({
     href,
@@ -93,6 +94,11 @@ export function AppLayout({
         ziggy,
     } = usePage<SharedProps & { ziggy: { location: string } }>().props;
     const [switcherOpen, setSwitcherOpen] = useState(false);
+    const [navOpen, setNavOpen] = useState(false);
+
+    // Following a link closes the menu on a phone, or it would sit over the page
+    // somebody just asked to see.
+    useEffect(() => router.on('navigate', () => setNavOpen(false)), []);
     const [paletteOpen, setPaletteOpen] = useState(false);
     const [shortcutsOpen, setShortcutsOpen] = useState(false);
 
@@ -118,7 +124,20 @@ export function AppLayout({
 
     return (
         <div className="flex min-h-screen">
-            <aside className="flex w-60 shrink-0 flex-col border-r border-border bg-surface">
+            {/* Below desktop width the sidebar slides in over the page instead of
+                taking a quarter of a phone's screen for good. */}
+            {navOpen && (
+                <div
+                    aria-hidden
+                    onClick={() => setNavOpen(false)}
+                    className="fixed inset-0 z-30 bg-black/40 lg:hidden"
+                />
+            )}
+            <aside
+                className={`fixed inset-y-0 left-0 z-40 flex w-64 shrink-0 flex-col overflow-y-auto border-r border-border bg-surface transition-transform lg:static lg:w-60 lg:translate-x-0 ${
+                    navOpen ? 'translate-x-0' : '-translate-x-full'
+                }`}
+            >
                 <div className="relative p-3">
                     <button
                         onClick={() => setSwitcherOpen((o) => !o)}
@@ -365,15 +384,25 @@ export function AppLayout({
             </aside>
 
             <main className="min-w-0 flex-1">
-                <header className="flex h-14 items-center justify-between gap-4 border-b border-border px-6">
-                    <h1 className="truncate text-sm font-semibold text-ink">{title}</h1>
+                <header className="flex h-14 items-center justify-between gap-3 border-b border-border px-4 sm:px-6">
+                    <div className="flex min-w-0 items-center gap-2">
+                        <button
+                            type="button"
+                            onClick={() => setNavOpen(true)}
+                            aria-label="Open menu"
+                            className="-ml-1.5 rounded-lg p-1.5 text-ink-muted hover:text-ink lg:hidden"
+                        >
+                            <Menu className="size-5" />
+                        </button>
+                        <h1 className="truncate text-sm font-semibold text-ink">{title}</h1>
+                    </div>
                     <div className="flex shrink-0 items-center gap-2">
                         {timer && <RunningTimer timer={timer} />}
                         {actions}
                     </div>
                 </header>
 
-                <div className="p-6">
+                <div className="p-4 sm:p-6">
                     <MailBanner mail={mail} path={path} />
                     <BackupBanner backups={backups} />
                     <UsageBanner billing={billing} />
