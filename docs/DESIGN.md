@@ -1607,3 +1607,33 @@ it means "the bug was not reintroduced".
   files, with an error that reads like a broken test rather than a broken toolchain. JDK
   17 works and JDK 27 does not; the cut-off between them was not established. `test.sh`
   picks a 17 when it can, and skips the Android tests loudly when it cannot.
+
+---
+
+## 27. Phases
+
+The stages an agency quotes a job in: Discovery, Design, Build, Launch. They are per
+project and ordered, and an issue belongs to at most one. The timeline groups issues
+under them. It was the next gap after dragging and the client timeline in a comparison
+with monday.com's Gantt.
+
+**Not a version and not a parent.** A version says which release the work shipped in.
+A phase says which stage of the job the work belongs to. A parent issue is work that
+somebody does and closes, and a phase is neither.
+
+**No dates of its own.** A phase runs from its first issue to its last. Dates typed onto
+the phase would be a second plan, and it would disagree with the first within a week.
+The header on the timeline is drawn from the rows under it.
+
+**Progress counts the whole phase, not the rows on screen.** The timeline shows open
+work by default, so counting only what is drawn would report every phase as nothing
+done. Cancelled work is left out of both numbers. A client's count covers only what the
+visibility scope lets them see.
+
+**Order on the chart.** Issues are grouped by project, then by the team's phase order,
+with unphased work last. A subtask stays with its parent's phase, because the indent is
+what says it is a subtask. A project with no phases draws exactly as before, with no
+"No phase" header.
+
+Not built yet: dragging an issue from one phase to another on the chart, phases in
+the CSV import, and bulk "move to phase".

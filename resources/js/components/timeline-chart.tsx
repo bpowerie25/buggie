@@ -28,7 +28,8 @@ export interface TimelineRow {
     end: string;
     start_on: string | null;
     due_on: string | null;
-    kind: 'bar' | 'milestone' | 'rollup';
+    /** `phase` is a header over the issues in one stage of the job, not an issue. */
+    kind: 'bar' | 'milestone' | 'rollup' | 'phase';
     anchor: 'start' | 'due';
     open: boolean;
     overdue: boolean;
@@ -37,7 +38,16 @@ export interface TimelineRow {
     blocked_by: string[];
     conflicts: string[];
     /** Sent back with a drag, so one made on top of somebody else's is refused. */
-    version: string;
+    version: string | null;
+    /** On a phase header: its issues done, out of all of them (cancelled aside). */
+    progress?: { done: number; total: number } | null;
+    /** On an issue under a phase header: that header's key. */
+    phase?: string | null;
+}
+
+/** The rows left to draw once the collapsed phases have folded their issues away. */
+export function unfolded<T extends Pick<TimelineRow, 'phase'>>(rows: T[], collapsed: Set<string>): T[] {
+    return rows.filter((row) => !row.phase || !collapsed.has(row.phase));
 }
 
 /** What a drag is changing: the whole bar, or one end of it. */
@@ -120,7 +130,7 @@ function tickLabel(iso: string, interval: string): string {
 }
 
 export function TimelineChart({
-    rows,
+    rows: allRows,
     axis,
     editable = false,
     onReschedule,
@@ -135,14 +145,26 @@ export function TimelineChart({
     onPlace?: (key: string, version: string, day: string) => void;
 }) {
     const [drag, setDrag] = useState<Drag | null>(null);
+    const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+    const rows = unfolded(allRows, collapsed);
+
+    function toggle(key: string) {
+        setCollapsed((current) => {
+            const next = new Set(current);
+            if (next.has(key)) next.delete(key);
+            else next.add(key);
+
+            return next;
+        });
+    }
     // Where a dragged bar was dropped, shown until the server's answer replaces it —
     // so a bar does not jump back for the length of a request and then forward again.
     const [pending, setPending] = useState<Record<string, { start: string; end: string }>>({});
     const scroller = useRef<HTMLDivElement>(null);
 
-    useEffect(() => setPending({}), [rows]);
+    useEffect(() => setPending({}), [allRows]);
 
-    if (rows.length === 0 && !onPlace) {
+    if (allRows.length === 0 && !onPlace) {
         return (
             <p className="rounded-xl border border-border px-4 py-8 text-center text-sm text-ink-subtle">
                 Nothing with dates in this range.
@@ -167,7 +189,7 @@ export function TimelineChart({
     }
 
     function begin(event: ReactPointerEvent, row: TimelineRow, mode: DragMode) {
-        if (!canDrag || row.kind === 'rollup' || event.button !== 0) return;
+        if (!canDrag || row.kind === 'rollup' || row.kind === 'phase' || event.button !== 0) return;
 
         event.preventDefault();
         event.stopPropagation();
@@ -211,7 +233,7 @@ export function TimelineChart({
 
     /** Arrow keys move a focused bar a day; with Shift they move its due date. */
     function onKey(event: KeyboardEvent, row: TimelineRow) {
-        if (!canDrag || row.kind === 'rollup') return;
+        if (!canDrag || row.kind === 'rollup' || row.kind === 'phase') return;
         if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
 
         event.preventDefault();
@@ -248,10 +270,18 @@ export function TimelineChart({
         <div className="flex overflow-hidden rounded-xl border border-border">
             <div className="w-56 shrink-0 border-r border-border sm:w-72">
                 <div style={{ height: HEADER }} className="border-b border-border" />
-                {rows.map((row) => (
+                {rows.map((row) =>
+                    row.kind === 'phase' ? (
+                        <PhaseLabel
+                            key={row.key}
+                            row={row}
+                            collapsed={collapsed.has(row.key)}
+                            onToggle={() => toggle(row.key)}
+                        />
+                    ) : (
                     <div
                         key={row.key}
-                        style={{ height: ROW, paddingLeft: 8 + row.depth * 14 }}
+                        style={{ height: ROW, paddingLeft: 8 + row.depth * 14 + (row.phase ? 10 : 0) }}
                         className="flex items-center gap-2 overflow-hidden pr-2"
                         title={`${row.title} — ${row.project} · ${row.status}`}
                     >
@@ -275,7 +305,8 @@ export function TimelineChart({
                             </span>
                         )}
                     </div>
-                ))}
+                    ),
+                )}
             </div>
 
             <div
@@ -306,6 +337,13 @@ export function TimelineChart({
                     onPointerUp={end}
                     onPointerCancel={() => setDrag(null)}
                 >
+                    {/* A tint across the header rows, so the stages read as sections. */}
+                    {rows.map((row, i) =>
+                        row.kind === 'phase' ? (
+                            <rect key={`band-${row.key}`} x={0} y={rowY(i)} width={width} height={ROW} className="fill-surface" />
+                        ) : null,
+                    )}
+
                     {axis.ticks.map((tick) => (
                         <g key={tick}>
                             <line
@@ -355,7 +393,7 @@ export function TimelineChart({
                             y={rowY(i)}
                             x={x}
                             xEnd={xEnd}
-                            draggable={canDrag && row.kind !== 'rollup'}
+                            draggable={canDrag && row.kind !== 'rollup' && row.kind !== 'phase'}
                             dragging={drag?.key === row.key}
                             onBegin={(event, mode) => begin(event, row, mode)}
                             onKey={(event) => onKey(event, row)}
@@ -454,6 +492,29 @@ function Bar({
     const left = x(row.start);
     const right = Math.max(xEnd(row.end), left + 3);
 
+    if (row.kind === 'phase') {
+        // The stage's span, with how much of it is done filled in from the left. Not
+        // a date anybody set: a phase runs from its first issue to its last.
+        const progress = row.progress && row.progress.total > 0 ? row.progress.done / row.progress.total : 0;
+
+        return (
+            <g>
+                <title>{`${row.title} · ${row.start} to ${row.end}${row.progress ? ` · ${row.progress.done} of ${row.progress.total} done` : ''}`}</title>
+                <rect x={left} y={y + ROW / 2 - 4} width={right - left} height={8} rx={4} className="fill-ink-muted/30" />
+                {progress > 0 && (
+                    <rect
+                        x={left}
+                        y={y + ROW / 2 - 4}
+                        width={(right - left) * progress}
+                        height={8}
+                        rx={4}
+                        className="fill-success"
+                    />
+                )}
+            </g>
+        );
+    }
+
     if (row.kind === 'rollup') {
         // A bracket, not a bar: this parent has no dates of its own and is standing
         // in for the work underneath it. Drawing it solid would read as a commitment
@@ -503,6 +564,36 @@ function Bar({
                     />
                 ))}
         </g>
+    );
+}
+
+/** A phase's name, how far along it is, and the control that folds it away. */
+function PhaseLabel({
+    row,
+    collapsed,
+    onToggle,
+}: {
+    row: TimelineRow;
+    collapsed: boolean;
+    onToggle: () => void;
+}) {
+    return (
+        <button
+            type="button"
+            onClick={onToggle}
+            aria-expanded={!collapsed}
+            style={{ height: ROW }}
+            className="flex w-full items-center gap-1.5 overflow-hidden bg-surface pr-2 pl-2 text-left"
+            title={`${row.title} — ${row.children} on the chart`}
+        >
+            <span className={`shrink-0 text-[10px] text-ink-subtle transition ${collapsed ? '' : 'rotate-90'}`}>▶</span>
+            <span className="truncate text-xs font-semibold text-ink">{row.title}</span>
+            {row.progress && row.progress.total > 0 && (
+                <span className="ml-auto shrink-0 text-[10px] text-ink-subtle">
+                    {row.progress.done}/{row.progress.total} done
+                </span>
+            )}
+        </button>
     );
 }
 

@@ -4,6 +4,7 @@ namespace App\Support\Templates;
 
 use App\Enums\CustomFieldType;
 use App\Enums\StatusCategory;
+use App\Models\Status;
 
 /**
  * One entry from config/templates.php, checked.
@@ -19,6 +20,7 @@ class ProjectTemplate
      * @param  array<int, array{name: string, category: StatusCategory, color: string, is_default: bool, is_triage: bool, wip_limit: int|null}>  $statuses
      * @param  array<int, array{name: string, color: string, description: string|null}>  $labels
      * @param  array<int, array{name: string, type: CustomFieldType, options: array<int, string>|null, required: bool}>  $fields
+     * @param  array<int, string>  $phases
      */
     private function __construct(
         public readonly string $key,
@@ -27,6 +29,7 @@ class ProjectTemplate
         public readonly array $statuses,
         public readonly array $labels,
         public readonly array $fields,
+        public readonly array $phases = [],
     ) {}
 
     /** @throws InvalidTemplate */
@@ -43,6 +46,7 @@ class ProjectTemplate
             statuses: self::statuses($key, $raw['statuses'] ?? null),
             labels: self::labels($key, $raw['labels'] ?? []),
             fields: self::fields($key, $raw['fields'] ?? []),
+            phases: self::phases($key, $raw['phases'] ?? []),
         );
     }
 
@@ -110,9 +114,9 @@ class ProjectTemplate
         // create form too — is exactly what it creates.
         if (! in_array(true, array_column($statuses, 'is_triage'), true)) {
             array_unshift($statuses, [
-                ...\App\Models\Status::TRIAGE,
-                'name' => in_array('new', $names, true) ? 'Untriaged' : \App\Models\Status::TRIAGE['name'],
-                'category' => StatusCategory::from(\App\Models\Status::TRIAGE['category']),
+                ...Status::TRIAGE,
+                'name' => in_array('new', $names, true) ? 'Untriaged' : Status::TRIAGE['name'],
+                'category' => StatusCategory::from(Status::TRIAGE['category']),
                 'wip_limit' => null,
             ]);
         }
@@ -211,6 +215,43 @@ class ProjectTemplate
         }
 
         return $labels;
+    }
+
+    /**
+     * The same rules as the settings screen: a name, at most 60 characters, and no
+     * two alike in one project.
+     *
+     * @return array<int, string>
+     *
+     * @throws InvalidTemplate
+     */
+    private static function phases(string $key, mixed $raw): array
+    {
+        if (! is_array($raw)) {
+            throw InvalidTemplate::for($key, 'its phases are not an array.');
+        }
+
+        $phases = [];
+
+        foreach ($raw as $index => $name) {
+            if (! is_string($name) || trim($name) === '') {
+                throw InvalidTemplate::for($key, "phase #{$index} is not a name.");
+            }
+
+            $name = trim($name);
+
+            if (mb_strlen($name) > 60) {
+                throw InvalidTemplate::for($key, "the phase name “{$name}” is longer than 60 characters.");
+            }
+
+            if (in_array(mb_strtolower($name), array_map('mb_strtolower', $phases), true)) {
+                throw InvalidTemplate::for($key, "two phases are named “{$name}”.");
+            }
+
+            $phases[] = $name;
+        }
+
+        return $phases;
     }
 
     /**

@@ -20,8 +20,8 @@ final class IssueQuery implements Stringable
 {
     /** Keys that accept a value, with the ones that may repeat. */
     public const KEYS = [
-        'is', 'project', 'assignee', 'reporter', 'label', 'type', 'priority', 'version', 'no', 'field',
-        'parent',
+        'is', 'project', 'assignee', 'reporter', 'label', 'type', 'priority', 'version', 'phase', 'no',
+        'field', 'parent',
     ];
 
     /**

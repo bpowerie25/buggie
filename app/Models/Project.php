@@ -124,6 +124,11 @@ class Project extends Model
         return $this->hasMany(Version::class);
     }
 
+    public function phases(): HasMany
+    {
+        return $this->hasMany(Phase::class)->inOrder();
+    }
+
     public function widgetKeys(): HasMany
     {
         return $this->hasMany(WidgetKey::class);

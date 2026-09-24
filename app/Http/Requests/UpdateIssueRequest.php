@@ -45,6 +45,11 @@ class UpdateIssueRequest extends FormRequest
                 'sometimes', 'nullable',
                 Rule::exists('versions', 'id')->where('workspace_id', $workspaceId),
             ],
+            // As version_id: the workspace here, the issue's project in the action.
+            'phase_id' => [
+                'sometimes', 'nullable',
+                Rule::exists('phases', 'id')->where('workspace_id', $workspaceId),
+            ],
             'status_id' => [
                 'sometimes', 'required',
                 Rule::exists('statuses', 'id')->where('workspace_id', $workspaceId),

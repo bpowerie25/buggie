@@ -338,6 +338,15 @@ Route::domain('{workspace}.'.$host)
             ->name('versions.update');
         Route::delete('projects/{project}/versions/{version}', [\App\Http\Controllers\VersionController::class, 'destroy'])
             ->name('versions.destroy');
+        Route::post('projects/{project}/phases', [\App\Http\Controllers\PhaseController::class, 'store'])
+            ->name('phases.store');
+        // Before {phase}, so "order" is not read as a phase id.
+        Route::put('projects/{project}/phases/order', [\App\Http\Controllers\PhaseController::class, 'reorder'])
+            ->name('phases.reorder');
+        Route::patch('projects/{project}/phases/{phase}', [\App\Http\Controllers\PhaseController::class, 'update'])
+            ->name('phases.update');
+        Route::delete('projects/{project}/phases/{phase}', [\App\Http\Controllers\PhaseController::class, 'destroy'])
+            ->name('phases.destroy');
 
         Route::patch('issues/{issue}/parent', \App\Http\Controllers\IssueParentController::class)
             ->name('issues.parent');

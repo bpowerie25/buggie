@@ -16,9 +16,13 @@ export interface ParsedQuery {
     exclude: Record<string, string[]>;
 }
 
-// Must match IssueQuery::KEYS — it determines the canonical ordering.
-const KEYS = ['is', 'project', 'assignee', 'reporter', 'label', 'type', 'priority', 'no'];
-const MULTI = ['label'];
+// Must match IssueQuery::KEYS — it determines the canonical ordering. A key missing
+// here is dropped from the query whenever a chip rebuilds it.
+export const KEYS = [
+    'is', 'project', 'assignee', 'reporter', 'label', 'type', 'priority', 'version', 'phase', 'no',
+    'field', 'parent',
+];
+const MULTI = ['label', 'field'];
 
 function quote(value: string) {
     return value.includes(' ') ? `"${value}"` : value;

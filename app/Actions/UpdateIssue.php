@@ -7,11 +7,19 @@ use App\Enums\IssueEventType;
 use App\Enums\NotificationReason;
 use App\Enums\StatusCategory;
 use App\Enums\WatchReason;
+use App\Enums\WebhookEvent;
+use App\Enums\WorkspaceRole;
 use App\Models\Issue;
+use App\Models\Phase;
 use App\Models\Status;
 use App\Models\User;
+use App\Models\Version;
+use App\Support\Chat\ChatNotifications;
+use App\Support\CustomFields\FieldValues;
+use App\Support\Issues\Assignable;
 use App\Support\Notifications\Notifier;
 use App\Support\RichText\TiptapDocument;
+use App\Support\Webhooks\Webhooks;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -24,7 +32,7 @@ class UpdateIssue
 {
     public function __construct(
         private Notifier $notifier,
-        private \App\Support\CustomFields\FieldValues $fields,
+        private FieldValues $fields,
     ) {}
 
     /** @param array<string, mixed> $attributes */
@@ -62,6 +70,7 @@ class UpdateIssue
                     // Handled together after the loop: one entry for one change of plan.
                     'start_on', 'due_on' => null,
                     'version_id' => $this->version($issue, $value === null ? null : (int) $value, $actor),
+                    'phase_id' => $this->phase($issue, $value === null ? null : (int) $value, $actor),
                     // Not an event: pinning is how the board is laid out, not news
                     // about the issue.
                     'board_pinned' => $issue->board_pinned_at = filter_var($value, FILTER_VALIDATE_BOOL) ? ($issue->board_pinned_at ?? now()) : null,
@@ -89,12 +98,12 @@ class UpdateIssue
 
             // Closed is its own event as well as an update: "tell me when something
             // ships" is a different subscription from "tell me when anything moves".
-            \App\Support\Webhooks\Webhooks::issue(\App\Enums\WebhookEvent::IssueUpdated, $fresh);
-            \App\Support\Chat\ChatNotifications::issue(\App\Enums\WebhookEvent::IssueUpdated, $fresh);
+            Webhooks::issue(WebhookEvent::IssueUpdated, $fresh);
+            ChatNotifications::issue(WebhookEvent::IssueUpdated, $fresh);
 
             if ($wasOpen && ! $fresh->isOpen()) {
-                \App\Support\Webhooks\Webhooks::issue(\App\Enums\WebhookEvent::IssueClosed, $fresh);
-                \App\Support\Chat\ChatNotifications::issue(\App\Enums\WebhookEvent::IssueClosed, $fresh);
+                Webhooks::issue(WebhookEvent::IssueClosed, $fresh);
+                ChatNotifications::issue(WebhookEvent::IssueClosed, $fresh);
             }
 
             return $fresh;
@@ -183,10 +192,10 @@ class UpdateIssue
         $issue->unsetRelation('status');
 
         $fresh = $issue->refresh()->load(['status', 'project', 'assignee']);
-        \App\Support\Webhooks\Webhooks::issue(\App\Enums\WebhookEvent::IssueUpdated, $fresh);
+        Webhooks::issue(WebhookEvent::IssueUpdated, $fresh);
 
         if ($from->category->isOpen() && ! $fresh->isOpen()) {
-            \App\Support\Webhooks\Webhooks::issue(\App\Enums\WebhookEvent::IssueClosed, $fresh);
+            Webhooks::issue(WebhookEvent::IssueClosed, $fresh);
         }
     }
 
@@ -242,7 +251,7 @@ class UpdateIssue
         $previous = $issue->assignee;
         $next = $userId ? User::find($userId) : null;
 
-        \App\Support\Issues\Assignable::ensure($next, $issue->workspace);
+        Assignable::ensure($next, $issue->workspace);
 
         $issue->recordEvent(
             $next ? IssueEventType::Assigned : IssueEventType::Unassigned,
@@ -271,7 +280,7 @@ class UpdateIssue
             return;
         }
 
-        $next = $versionId === null ? null : \App\Models\Version::find($versionId);
+        $next = $versionId === null ? null : Version::find($versionId);
 
         if ($versionId !== null && $next?->project_id !== $issue->project_id) {
             throw ValidationException::withMessages([
@@ -285,6 +294,29 @@ class UpdateIssue
         ], $actor);
 
         $issue->version_id = $next?->id;
+    }
+
+    /** Put an issue in a phase of its own project, or take it out of one. */
+    private function phase(Issue $issue, ?int $phaseId, ?User $actor): void
+    {
+        if ($issue->phase_id === $phaseId) {
+            return;
+        }
+
+        $next = $phaseId === null ? null : Phase::find($phaseId);
+
+        if ($phaseId !== null && $next?->project_id !== $issue->project_id) {
+            throw ValidationException::withMessages([
+                'phase_id' => 'That phase belongs to another project.',
+            ]);
+        }
+
+        $issue->recordEvent(IssueEventType::PhaseChanged, [
+            'from' => $issue->phase?->name,
+            'to' => $next?->name,
+        ], $actor);
+
+        $issue->phase_id = $next?->id;
     }
 
     private function priority(Issue $issue, int $priority, ?User $actor): void
@@ -351,7 +383,7 @@ class UpdateIssue
                 ->whereIn('users.id', $wanted)
                 ->whereHas('workspaces', fn ($w) => $w
                     ->where('workspaces.id', $issue->workspace_id)
-                    ->where('workspace_user.role', \App\Enums\WorkspaceRole::Client->value))
+                    ->where('workspace_user.role', WorkspaceRole::Client->value))
                 ->pluck('users.id')
                 ->all();
 

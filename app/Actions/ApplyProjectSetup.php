@@ -71,6 +71,10 @@ class ApplyProjectSetup
             ]);
         }
 
+        foreach ($template->phases as $position => $name) {
+            $project->phases()->create(['name' => $name, 'position' => $position]);
+        }
+
         $this->assertUsableWorkflow($project);
     }
 
@@ -80,7 +84,8 @@ class ApplyProjectSetup
      * Copied: the statuses, exactly — names, categories, colours, order, which one
      * is the default, and any WIP limit. The custom field definitions, keeping their
      * keys so a saved view or a CSV built around `field:client_ref` works on the new
-     * project too.
+     * project too. The phases, by name and in order: they are how the job is run, not
+     * the work in it.
      *
      * Not copied, and none of these are oversights:
      *
@@ -152,6 +157,10 @@ class ApplyProjectSetup
                 'visible_to_client' => $field->visible_to_client,
                 'position' => $position,
             ]);
+        }
+
+        foreach ($source->phases()->get() as $position => $phase) {
+            $target->phases()->create(['name' => $phase->name, 'position' => $position]);
         }
 
         $this->assertUsableWorkflow($target);

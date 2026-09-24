@@ -40,6 +40,9 @@ use App\Models\Status;
 | missing and leaves the ones that already exist exactly as they are, including
 | their colour — an existing label is somebody's decision.
 |
+| Phases are optional: a list of names, drawn in this order on the timeline as the
+| stages of the job. Only a template for fixed-scope work has any.
+|
 | Order is array order. A `position` key here would be a second source of truth,
 | free to disagree with the order the list is read in.
 |
@@ -92,6 +95,8 @@ return [
                 ['name' => 'Browser', 'type' => 'text'],
                 ['name' => 'Client reference', 'type' => 'text'],
             ],
+            // The stages the job is quoted in, and the ones the client reads the plan by.
+            'phases' => ['Discovery', 'Design', 'Build', 'Content', 'Launch'],
         ],
 
         /*

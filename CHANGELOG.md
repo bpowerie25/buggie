@@ -12,6 +12,15 @@ today you are running `main`, which is honest rather than ideal — see
 
 ### Added
 
+- **Phases.** A project can be split into stages, such as Discovery, Design, Build and
+  Launch, in project settings. Put an issue in one from its sidebar, or filter with
+  `phase:Design` and `no:phase`. The timeline groups issues under each phase in the
+  order the job runs. A phase header spans its work, shows how much of it is done, and
+  folds away. The *Client website build* template comes with five phases, and copying a
+  project's setup copies its phases.
+- **Filters kept when a chip is edited.** The browser's copy of the query language
+  didn't know `version:`, `field:` or `parent:`, so clicking a filter chip quietly dropped
+  them from the query. A test now keeps the two lists the same.
 - **A timeline for clients**, per project and off by default: *Show the timeline to
   clients* in project settings gives clients who hold the project a read-only view of it,
   with only the issues they can already open, no estimates, and no blockers they cannot

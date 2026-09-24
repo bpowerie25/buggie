@@ -16,6 +16,7 @@ interface UndatedRow {
     status: string;
     assignee: string | null;
     open: boolean;
+    phase: string | null;
 }
 
 export default function TimelinePage({
@@ -64,7 +65,7 @@ export default function TimelinePage({
     // with the refusal already shows their version.
     const conflict = (usePage().props.errors as Record<string, string>)?.schedule;
 
-    function schedule(key: string, dates: { start_on: string | null; due_on: string | null }, version: string) {
+    function schedule(key: string, dates: { start_on: string | null; due_on: string | null }, version: string | null) {
         router.patch(
             `/issues/${key}/schedule`,
             { ...dates, version },
@@ -201,6 +202,12 @@ export default function TimelinePage({
                         <span className="h-0.5 w-4 bg-ink-muted" />
                         A parent spanning its subtasks
                     </span>
+                    {rows.some((row) => row.kind === 'phase') && (
+                        <span className="flex items-center gap-1.5">
+                            <span className="h-1.5 w-4 rounded-full bg-gradient-to-r from-success from-50% to-ink-muted/30 to-50%" />
+                            A phase, filled in as its issues are done
+                        </span>
+                    )}
                     <span className="flex items-center gap-1.5">
                         <span className="h-0.5 w-4 bg-danger" />
                         A blocker that does not finish in time
@@ -245,6 +252,11 @@ export default function TimelinePage({
                                     <span className="min-w-0 flex-1 truncate text-sm text-ink">
                                         {issue.title}
                                     </span>
+                                    {issue.phase && (
+                                        <span className="shrink-0 rounded bg-surface px-1.5 py-0.5 text-[11px] text-ink-muted">
+                                            {issue.phase}
+                                        </span>
+                                    )}
                                     <span className="shrink-0 text-xs text-ink-subtle">
                                         {issue.project}
                                     </span>

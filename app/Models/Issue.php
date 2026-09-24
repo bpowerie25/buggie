@@ -21,6 +21,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 #[Fillable([
     'project_id', 'title', 'description', 'description_text', 'type', 'status_id',
     'priority', 'reporter_id', 'assignee_id', 'visibility', 'start_on', 'due_on', 'version_id',
+    'phase_id',
 ])]
 #[\Illuminate\Database\Eloquent\Attributes\ScopedBy([\App\Models\Scopes\LiveProjectScope::class])]
 class Issue extends Model
@@ -139,6 +140,12 @@ class Issue extends Model
     public function version(): BelongsTo
     {
         return $this->belongsTo(Version::class);
+    }
+
+    /** The stage of the project this belongs to: Discovery, Design, Build… */
+    public function phase(): BelongsTo
+    {
+        return $this->belongsTo(Phase::class);
     }
 
     public function comments(): HasMany

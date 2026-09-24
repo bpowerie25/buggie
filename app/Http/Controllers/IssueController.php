@@ -6,21 +6,31 @@ use App\Actions\CreateIssue;
 use App\Actions\UpdateIssue;
 use App\Enums\IssuePriority;
 use App\Enums\IssueType;
-use App\Enums\IssueVisibility;
+use App\Enums\RelationType;
 use App\Http\Requests\StoreIssueRequest;
 use App\Http\Requests\UpdateIssueRequest;
 use App\Models\Issue;
 use App\Models\Label;
+use App\Models\Phase;
 use App\Models\Project;
 use App\Models\Status;
+use App\Models\TimeEntry;
 use App\Models\User;
+use App\Models\Version;
+use App\Support\CustomFields\FieldValues;
+use App\Support\Issues\Assignable;
+use App\Support\Issues\AuthorLabel;
+use App\Support\Issues\ClientAudienceSummary;
+use App\Support\Issues\ClientConversation;
 use App\Support\Issues\IssueQuery;
 use App\Support\Issues\IssueQueryFilter;
-use App\Support\Issues\AuthorLabel;
+use App\Support\Reports\ReporterLink;
 use App\Support\Tenancy\Tenancy;
+use App\Support\Time\Duration;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -54,8 +64,8 @@ class IssueController extends Controller
         return $request->string('layout')->toString() === 'board' ? 'board' : 'list';
     }
 
-    /** @return \Illuminate\Support\Collection<int, array<string, mixed>> */
-    private function issues(Request $request, IssueQuery $query, string $layout = 'list'): \Illuminate\Support\Collection
+    /** @return Collection<int, array<string, mixed>> */
+    private function issues(Request $request, IssueQuery $query, string $layout = 'list'): Collection
     {
         // Who may see what, before any filter: every query below starts here.
         $base = fn () => Issue::query()->unless(
@@ -166,7 +176,7 @@ class IssueController extends Controller
             'statuses' => $this->statusesFor($project),
             // A client filing an issue is only offered the fields they can see; the
             // internal ones are not rendered blank-and-disabled, they are absent.
-            'customFields' => app(\App\Support\CustomFields\FieldValues::class)
+            'customFields' => app(FieldValues::class)
                 ->definitions($project, clientOnly: ! $this->isStaff($request->user()))
                 ->map(fn ($field) => [
                     'key' => $field->key,
@@ -203,7 +213,7 @@ class IssueController extends Controller
         $this->authorize('view', $issue);
 
         $issue->load([
-            'status', 'project', 'assignee', 'reporter', 'labels', 'version', 'duplicateOf:id,key,title',
+            'status', 'project', 'assignee', 'reporter', 'labels', 'version', 'phase', 'duplicateOf:id,key,title',
             'parent:id,key,title',
             'children:id,parent_id,key,title,status_id',
             'children.status:id,name,color,category',
@@ -219,7 +229,7 @@ class IssueController extends Controller
 
         // Somebody on the team has looked, so "client replied" comes down.
         if ($staff) {
-            app(\App\Support\Issues\ClientConversation::class)->seenByStaff($issue);
+            app(ClientConversation::class)->seenByStaff($issue);
         }
 
         // What a client may know about other issues: only those they could open. A
@@ -242,21 +252,21 @@ class IssueController extends Controller
             'role' => AuthorLabel::role($user, $workspace),
         ];
 
-        $audience = app(\App\Support\Issues\ClientAudienceSummary::class);
+        $audience = app(ClientAudienceSummary::class);
         $audienceLabel = $staff ? $audience->label($issue) : null;
 
         return Inertia::render('issues/show', [
             // Filtered in the query, not in the template: a field marked internal
             // must not reach a client's browser at all. Rendering conditionally
             // would still put "Internal estimate: 3 days" in the page source.
-            'customFields' => app(\App\Support\CustomFields\FieldValues::class)
+            'customFields' => app(FieldValues::class)
                 ->forIssue($issue, clientOnly: ! $staff),
 
             // One level, so this is a parent or a list of children, never both.
             'parent' => $canSee($issue->parent?->id) ? $issue->parent->only(['key', 'title']) : null,
             'children' => $issue->children
-                ->filter(fn (\App\Models\Issue $child) => $canSee($child->id))
-                ->map(fn (\App\Models\Issue $child) => [
+                ->filter(fn (Issue $child) => $canSee($child->id))
+                ->map(fn (Issue $child) => [
                     'key' => $child->key,
                     'title' => $child->title,
                     'status' => $child->status?->name,
@@ -273,7 +283,7 @@ class IssueController extends Controller
             'time' => $staff ? [
                 'entries' => $issue->timeEntries()->with('user:id,name')->orderByDesc('spent_on')
                     ->orderByDesc('id')->get()
-                    ->map(fn (\App\Models\TimeEntry $entry) => [
+                    ->map(fn (TimeEntry $entry) => [
                         'id' => $entry->id,
                         'duration' => $entry->formatted(),
                         'minutes' => $entry->minutes,
@@ -283,18 +293,18 @@ class IssueController extends Controller
                         'user' => $entry->user?->name ?? 'Someone who has left',
                         'can_delete' => request()->user()->can('delete', $entry),
                     ]),
-                'total' => \App\Support\Time\Duration::format(
+                'total' => Duration::format(
                     $total = (int) $issue->timeEntries()->sum('minutes'),
                 ),
                 'total_minutes' => $total,
-                'estimate' => \App\Support\Time\Duration::format($issue->estimate_minutes),
+                'estimate' => Duration::format($issue->estimate_minutes),
                 'estimate_minutes' => $issue->estimate_minutes,
                 // Only meaningful with both numbers, and only interesting when it is
                 // over: "you are under your estimate" is not news.
                 'over_by' => $issue->estimate_minutes !== null && $total > $issue->estimate_minutes
-                    ? \App\Support\Time\Duration::format($total - $issue->estimate_minutes)
+                    ? Duration::format($total - $issue->estimate_minutes)
                     : null,
-                'can_log' => request()->user()->can('create', \App\Models\TimeEntry::class),
+                'can_log' => request()->user()->can('create', TimeEntry::class),
             ] : null,
             'issue' => [
                 ...$this->summary($issue),
@@ -315,7 +325,7 @@ class IssueController extends Controller
                     'page_url' => is_string($issue->environment['url'] ?? null) ? $issue->environment['url'] : null,
                     'linked' => $issue->reporter !== null && AuthorLabel::role($issue->reporter, $workspace) === 'client',
                     // Who "Link to client" can choose from, the address match first.
-                    'candidates' => \App\Support\Reports\ReporterLink::eligible($issue)
+                    'candidates' => ReporterLink::eligible($issue)
                         ->orderBy('users.name')->get(['users.id', 'users.name', 'users.email'])
                         ->sortByDesc(fn ($u) => strcasecmp((string) $u->email, (string) $issue->reporter_email) === 0)
                         ->values()
@@ -331,11 +341,12 @@ class IssueController extends Controller
                 // else the agency works with. A client is told only that it is theirs.
                 'client_share_ids' => $staff ? $issue->clientShares()->pluck('users.id') : [],
                 'audience_label' => $staff
-                    ? app(\App\Support\Issues\ClientAudienceSummary::class)->label($issue)
+                    ? app(ClientAudienceSummary::class)->label($issue)
                     : null,
                 'start_on' => $issue->start_on?->toDateString(),
                 'due_on' => $issue->due_on?->toDateString(),
                 'version' => $issue->version?->only(['id', 'name']),
+                'phase' => $issue->phase?->only(['id', 'name']),
                 'created_at' => $issue->created_at->toIso8601String(),
                 // A client is shown only whether they themselves watch it: the list
                 // can name other clients, and the team speaks as the workspace.
@@ -358,20 +369,27 @@ class IssueController extends Controller
             // happened to log, and a client should not be reading that about their
             // own users. Clients never see the triage inbox either.
             'diagnostics' => $staff ? $this->diagnostics($issue) : null,
-            'relationTypes' => \App\Enums\RelationType::options(),
+            'relationTypes' => RelationType::options(),
 
             // Who can be named in a "specific clients" audience. Staff only.
             'projectClients' => $staff
-                ? app(\App\Support\Issues\ClientAudienceSummary::class)->candidates($issue)
+                ? app(ClientAudienceSummary::class)->candidates($issue)
                     ->map(fn ($client) => ['id' => $client->id, 'name' => $client->name])
+                : [],
+
+            // The phases it could be moved to, in the order the job runs. Staff only:
+            // only staff can move it.
+            'phases' => $staff
+                ? Phase::where('project_id', $issue->project_id)->inOrder()->get(['id', 'name'])
+                    ->map->only(['id', 'name'])
                 : [],
 
             // The releases this issue could belong to: its own project's, and the
             // unreleased ones first, because that is what anybody is choosing between.
-            'versions' => \App\Models\Version::where('project_id', $issue->project_id)
+            'versions' => Version::where('project_id', $issue->project_id)
                 ->inWorkingOrder()
                 ->get()
-                ->map(fn (\App\Models\Version $v) => [
+                ->map(fn (Version $v) => [
                     'id' => $v->id,
                     'name' => $v->name,
                     'released' => $v->isReleased(),
@@ -433,7 +451,7 @@ class IssueController extends Controller
             'composer' => $staff ? [
                 'internal' => 'Internal — staff only',
                 'public' => $audienceLabel,
-                'can_await' => app(\App\Support\Issues\ClientConversation::class)->canAwait($issue),
+                'can_await' => app(ClientConversation::class)->canAwait($issue),
                 'awaiting_status' => $issue->project->awaitingClientStatus()?->name,
             ] : null,
             'can' => [
@@ -455,7 +473,7 @@ class IssueController extends Controller
         // getting it wrong shows a client something, and nothing else on the page
         // would say so.
         if ($request->hasAny(['visibility', 'client_audience', 'client_share_ids'])) {
-            return back()->with('success', app(\App\Support\Issues\ClientAudienceSummary::class)->label($updated).'.');
+            return back()->with('success', app(ClientAudienceSummary::class)->label($updated).'.');
         }
 
         // Inertia turns this into a partial reload of the page the edit came from,
@@ -538,7 +556,7 @@ class IssueController extends Controller
             // holds clients so that filter chips can name a reporter.
             'assignees' => $staff
                 ? $this->tenancy->currentOrFail()->members()
-                    ->wherePivotIn('role', \App\Support\Issues\Assignable::roles())
+                    ->wherePivotIn('role', Assignable::roles())
                     ->orderBy('name')->get(['users.id', 'users.name'])
                     ->map(fn (User $u) => ['id' => $u->id, 'name' => $u->name])
                 : collect(),

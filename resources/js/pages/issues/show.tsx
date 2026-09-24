@@ -87,6 +87,7 @@ interface Issue extends IssueRow {
     start_on: string | null;
     due_on: string | null;
     version: { id: number; name: string } | null;
+    phase: { id: number; name: string } | null;
     created_at: string;
     watchers: Person[];
     watching: boolean;
@@ -417,6 +418,10 @@ function eventSentence(event: Event): string {
             return d.to === 'client'
                 ? `${actor} made this visible to the client`
                 : `${actor} made this internal only`;
+        case 'phase_changed':
+            return d.to
+                ? `${actor} moved this to the ${d.to} phase`
+                : `${actor} took this out of the ${d.from} phase`;
         case 'version_changed':
             return d.to
                 ? `${actor} put this in ${d.to}`
@@ -675,6 +680,7 @@ export default function ShowIssue({
     projectClients = [],
     composer = null,
     versions = [],
+    phases = [],
     customFields = [],
     time = null,
     parent = null,
@@ -699,6 +705,7 @@ export default function ShowIssue({
         awaiting_status: string | null;
     } | null;
     versions?: { id: number; name: string; released: boolean }[];
+    phases?: { id: number; name: string }[];
     customFields?: CustomFieldWithValue[];
     parent?: { key: string; title: string } | null;
     children?: { key: string; title: string; status: string | null; open: boolean }[];
@@ -1347,6 +1354,35 @@ export default function ShowIssue({
                                 clients={projectClients}
                                 onChange={patch}
                             />
+                        </SidebarRow>
+                    )}
+
+                    {/* Only once the project has phases; until then the row is noise. */}
+                    {(phases.length > 0 || issue.phase) && (
+                        <SidebarRow label="Phase">
+                            {can.update ? (
+                                <select
+                                    value={issue.phase?.id ?? ''}
+                                    aria-label="Phase"
+                                    onChange={(e) =>
+                                        router.patch(
+                                            `/issues/${issue.key}`,
+                                            { phase_id: e.target.value ? Number(e.target.value) : null },
+                                            { preserveScroll: true },
+                                        )
+                                    }
+                                    className="w-full rounded-md border border-transparent bg-transparent px-1.5 py-1 text-sm text-ink transition hover:border-border"
+                                >
+                                    <option value="">No phase</option>
+                                    {phases.map((phase) => (
+                                        <option key={phase.id} value={phase.id}>
+                                            {phase.name}
+                                        </option>
+                                    ))}
+                                </select>
+                            ) : (
+                                <span className="text-sm text-ink">{issue.phase?.name}</span>
+                            )}
                         </SidebarRow>
                     )}
 

@@ -3,10 +3,14 @@
 namespace App\Support\Timeline;
 
 use App\Enums\RelationType;
+use App\Enums\StatusCategory;
 use App\Models\Issue;
+use App\Models\Phase;
 use App\Models\User;
+use App\Support\Issues\AuthorLabel;
 use App\Support\Issues\IssueQuery;
 use App\Support\Issues\IssueQueryFilter;
+use App\Support\Tenancy\Tenancy;
 use App\Support\Time\Duration;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
@@ -216,16 +220,16 @@ class Timeline
             }
 
             if ($group !== []) {
-                $groups[] = $group;
+                $groups[] = ['phase' => $issue->phase, 'rows' => $group];
             }
         }
 
         usort(
             $groups,
-            fn (array $a, array $b) => [$a[0]['start'], $a[0]['key']] <=> [$b[0]['start'], $b[0]['key']],
+            fn (array $a, array $b) => [$a['rows'][0]['start'], $a['rows'][0]['key']] <=> [$b['rows'][0]['start'], $b['rows'][0]['key']],
         );
 
-        $rows = array_merge(...($groups ?: [[]]));
+        $rows = $this->inPhases($groups);
 
         // Everything the filter matched with no date at either end, parents and
         // children alike. A parent standing in for its children still has an extent,
@@ -262,6 +266,7 @@ class Timeline
                 'status:id,name,category,color',
                 'project:id,key,slug,name',
                 'assignee:id,name',
+                'phase:id,project_id,name,position',
                 // Whole models rather than a column list: strict mode throws on
                 // reading an attribute that was not selected, and a related issue is
                 // read for its key, its title and both of its dates.
@@ -272,6 +277,118 @@ class Timeline
             ->orderBy('issues.id')
             ->limit(self::LIMIT)
             ->get();
+    }
+
+    /**
+     * The groups, laid out under their phases when any of them has one.
+     *
+     * A phase is a header row spanning the work under it, in the order the job runs,
+     * with anything not yet placed in a phase after the last one. A group goes with
+     * its parent's phase: a subtask filed under another stage still draws beneath
+     * the issue it belongs to, because the indent is what says it is a subtask.
+     *
+     * With no phases at all nothing changes, so a project that never uses them does
+     * not get a header reading "No phase" above every row.
+     *
+     * @param  array<int, array{phase: Phase|null, rows: array<int, array<string, mixed>>}>  $groups
+     * @return array<int, array<string, mixed>>
+     */
+    private function inPhases(array $groups): array
+    {
+        $flatten = fn (iterable $groups) => array_merge([], ...array_map(fn (array $g) => $g['rows'], [...$groups]));
+
+        if (! collect($groups)->contains(fn (array $g) => $g['phase'] !== null)) {
+            return $flatten($groups);
+        }
+
+        $sections = collect($groups)->groupBy(fn (array $g) => $g['phase']?->id ?? 0);
+        $phases = collect($groups)->pluck('phase')->filter()->unique('id')->keyBy('id');
+        $projects = collect($groups)->flatMap(fn (array $g) => array_column($g['rows'], 'project'))->unique();
+        $progress = $this->progress($phases->keys()->all());
+
+        // By project, then the order the team gave the phases; unphased work last.
+        $order = $sections->keys()->sortBy(fn (int $id) => $id === 0
+            ? [1, '', 0, 0]
+            : [0, $phases[$id]->project_id, $phases[$id]->position, $id]);
+
+        $rows = [];
+
+        foreach ($order as $id) {
+            $members = $flatten($sections[$id]);
+            $phase = $phases[$id] ?? null;
+            $key = $phase ? "phase-{$phase->id}" : 'phase-none';
+            $project = $members[0]['project'];
+
+            $rows[] = [
+                'key' => $key,
+                'title' => ($projects->count() > 1 ? "{$project} · " : '').($phase?->name ?? 'No phase'),
+                'project' => $project,
+                'status' => '',
+                'assignee' => null,
+                'version' => null,
+                'depth' => 0,
+                'start' => min(array_column($members, 'start')),
+                'end' => max(array_column($members, 'end')),
+                'start_on' => null,
+                'due_on' => null,
+                'kind' => 'phase',
+                'anchor' => 'start',
+                'open' => collect($members)->contains('open', true),
+                'overdue' => false,
+                'children' => count($members),
+                'estimate' => null,
+                'blocked_by' => [],
+                'conflicts' => [],
+                'progress' => $phase ? ($progress[$phase->id] ?? ['done' => 0, 'total' => 0]) : null,
+                'phase' => null,
+            ];
+
+            foreach ($members as $member) {
+                $rows[] = [...$member, 'phase' => $key];
+            }
+        }
+
+        return $rows;
+    }
+
+    /**
+     * How far along each phase is: its issues done, out of all of them.
+     *
+     * Counted across the whole phase rather than the rows on screen. The timeline
+     * shows open work by default, so counting only what is drawn would report every
+     * phase as nought done. Cancelled work is left out of both numbers — it was never
+     * going to be done, and counting it would leave a finished phase looking short.
+     * A client's count is of what they can see, like everything else they are shown.
+     *
+     * @param  array<int, int>  $ids
+     * @return array<int, array{done: int, total: int}>
+     */
+    private function progress(array $ids): array
+    {
+        if ($ids === []) {
+            return [];
+        }
+
+        $count = fn (array $categories) => Issue::query()
+            ->when($this->forClient, fn (Builder $q) => $q->visibleToClient($this->viewer))
+            ->whereIn('phase_id', $ids)
+            ->whereHas('status', fn (Builder $q) => $q->whereIn('category', $categories))
+            ->groupBy('phase_id')
+            ->selectRaw('phase_id, count(*) as n')
+            ->pluck('n', 'phase_id');
+
+        $counted = array_map(fn ($c) => $c->value, array_filter(
+            StatusCategory::cases(),
+            fn ($c) => $c !== StatusCategory::Canceled,
+        ));
+
+        $total = $count(array_values($counted));
+        $done = $count([StatusCategory::Done->value]);
+
+        return collect($ids)->mapWithKeys(fn (int $id) => [$id => [
+            'done' => (int) ($done[$id] ?? 0),
+            'total' => (int) ($total[$id] ?? 0),
+        ]])->all();
     }
 
     private function countMatching(): int
@@ -436,8 +553,8 @@ class Timeline
         $row['version'] = null;
 
         if ($row['assignee'] !== null) {
-            $workspace = app(\App\Support\Tenancy\Tenancy::class)->currentOrFail();
-            $row['assignee'] = \App\Support\Issues\AuthorLabel::showsStaffNames($workspace) ? $row['assignee'] : $workspace->name;
+            $workspace = app(Tenancy::class)->currentOrFail();
+            $row['assignee'] = AuthorLabel::showsStaffNames($workspace) ? $row['assignee'] : $workspace->name;
         }
 
         return $row;
@@ -488,6 +605,7 @@ class Timeline
             'status' => $issue->status->name,
             'assignee' => $issue->assignee?->name,
             'open' => $issue->status->category->isOpen(),
+            'phase' => $issue->phase?->name,
         ];
     }
 }

@@ -4,7 +4,7 @@ import { WorkflowEditor } from '@/components/workflow-editor';
 import { AppLayout } from '@/layouts/app-layout';
 import type { ProjectSummary } from '@/types';
 import { Head, Link, router, useForm } from '@inertiajs/react';
-import { Check, Copy, Download, Plus, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, Check, Copy, Download, Plus, Trash2 } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 
 interface WidgetKeyRow {
@@ -18,6 +18,12 @@ interface WidgetKeyRow {
     last_used_at: string | null;
     snippet: string;
     secret_rotated_at: string | null;
+}
+
+interface PhaseRow {
+    id: number;
+    name: string;
+    issues_count: number;
 }
 
 interface CustomFieldRow {
@@ -57,6 +63,7 @@ export default function EditProject({
     inboundAddress,
     inboundReason = null,
     versions = [],
+    phases = [],
     customFields = [],
     fieldTypes = [],
     branding,
@@ -72,6 +79,7 @@ export default function EditProject({
     inboundAddress: string;
     inboundReason?: string | null;
     versions?: VersionRow[];
+    phases?: PhaseRow[];
     customFields?: CustomFieldRow[];
     fieldTypes?: { value: string; label: string; has_options: boolean }[];
     branding: { name: string | null; color: string | null; logo: string | null; placeholder: string };
@@ -242,6 +250,8 @@ export default function EditProject({
                     </div>
                 )}
             </section>
+
+            <Phases phases={phases} project={project} />
 
             <Versions versions={versions} project={project} />
 
@@ -589,6 +599,120 @@ const userHash = crypto
                 <CopyRow value={node} label="Copy Node example" />
             </div>
         </div>
+    );
+}
+
+/**
+ * The stages of the job, in the order it runs. The timeline groups issues under them;
+ * an issue is put in one from its own page.
+ */
+function Phases({ phases, project }: { phases: PhaseRow[]; project: ProjectSummary }) {
+    const { data, setData, post, processing, errors, reset } = useForm({ name: '' });
+
+    function submit(e: FormEvent) {
+        e.preventDefault();
+        post(`/projects/${project.slug}/phases`, {
+            preserveScroll: true,
+            onSuccess: () => reset(),
+        });
+    }
+
+    function move(index: number, by: -1 | 1) {
+        const ids = phases.map((phase) => phase.id);
+        [ids[index], ids[index + by]] = [ids[index + by], ids[index]];
+
+        router.put(`/projects/${project.slug}/phases/order`, { ids }, { preserveScroll: true });
+    }
+
+    function rename(phase: PhaseRow, input: HTMLInputElement) {
+        const name = input.value.trim();
+        // Put the old name back rather than leave one on screen that was not saved.
+        const restore = () => (input.value = phase.name);
+
+        if (name === phase.name) return;
+        if (name === '') return restore();
+
+        router.patch(`/projects/${project.slug}/phases/${phase.id}`, { name }, { preserveScroll: true, onError: restore });
+    }
+
+    return (
+        <section className="mt-12 max-w-2xl">
+            <h2 className="text-sm font-semibold text-ink">Phases</h2>
+            <p className="mt-1 text-sm text-ink-muted">
+                The stages the job runs in, such as Discovery, Design, Build and Launch. The
+                timeline groups issues under them in this order, and shows how much of each
+                is done. Put an issue in a phase from its own page, or filter with{' '}
+                <code className="font-mono text-xs">phase:Design</code>.
+            </p>
+
+            {phases.length > 0 && (
+                <ul className="mt-4 divide-y divide-border rounded-xl border border-border bg-raised">
+                    {phases.map((phase, index) => (
+                        <li key={`${phase.id}-${phase.name}`} className="flex items-center gap-2 px-4 py-2">
+                            <input
+                                defaultValue={phase.name}
+                                aria-label={`Rename ${phase.name}`}
+                                maxLength={60}
+                                onBlur={(e) => rename(phase, e.currentTarget)}
+                                onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+                                className="min-w-0 flex-1 rounded-md border border-transparent bg-transparent px-1.5 py-1 text-sm text-ink transition hover:border-border focus:border-border"
+                            />
+                            <span className="shrink-0 text-xs text-ink-subtle">
+                                {phase.issues_count} issue{phase.issues_count === 1 ? '' : 's'}
+                            </span>
+                            <button
+                                type="button"
+                                aria-label={`Move ${phase.name} earlier`}
+                                disabled={index === 0}
+                                onClick={() => move(index, -1)}
+                                className="shrink-0 rounded p-1 text-ink-subtle transition hover:text-ink disabled:opacity-30"
+                            >
+                                <ArrowUp className="size-3.5" />
+                            </button>
+                            <button
+                                type="button"
+                                aria-label={`Move ${phase.name} later`}
+                                disabled={index === phases.length - 1}
+                                onClick={() => move(index, 1)}
+                                className="shrink-0 rounded p-1 text-ink-subtle transition hover:text-ink disabled:opacity-30"
+                            >
+                                <ArrowDown className="size-3.5" />
+                            </button>
+                            <button
+                                type="button"
+                                aria-label={`Delete ${phase.name}`}
+                                title="Delete the phase. Its issues are kept."
+                                onClick={() =>
+                                    router.delete(`/projects/${project.slug}/phases/${phase.id}`, {
+                                        preserveScroll: true,
+                                    })
+                                }
+                                className="shrink-0 rounded p-1 text-ink-subtle transition hover:text-danger"
+                            >
+                                <Trash2 className="size-3.5" />
+                            </button>
+                        </li>
+                    ))}
+                </ul>
+            )}
+
+            <form onSubmit={submit} className="mt-4 flex flex-wrap items-end gap-3">
+                <div className="flex-1">
+                    <Field label="New phase" error={errors.name}>
+                        <Input
+                            value={data.name}
+                            placeholder={phases.length === 0 ? 'Discovery' : 'Launch'}
+                            onChange={(e) => setData('name', e.target.value)}
+                        />
+                    </Field>
+                </div>
+
+                <Button type="submit" size="sm" disabled={processing || data.name === ''}>
+                    <Plus className="size-4" />
+                    Add
+                </Button>
+            </form>
+        </section>
     );
 }
 

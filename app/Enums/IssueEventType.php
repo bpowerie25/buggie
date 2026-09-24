@@ -31,6 +31,8 @@ enum IssueEventType: string
     /** Its start or due date moved — on the issue, or by dragging on the timeline. Internal. */
     case DatesChanged = 'dates_changed';
     case VersionChanged = 'version_changed';
+    /** Moved into or out of a phase. Internal. */
+    case PhaseChanged = 'phase_changed';
     case Related = 'related';
     case Unrelated = 'unrelated';
     case Reopened = 'reopened';

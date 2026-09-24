@@ -3,8 +3,10 @@
 namespace App\Support\Issues;
 
 use App\Enums\IssuePriority;
+use App\Models\CustomField;
 use App\Models\Issue;
 use App\Models\User;
+use App\Support\Tenancy\Tenancy;
 use Illuminate\Database\Eloquent\Builder;
 
 /**
@@ -38,6 +40,7 @@ class IssueQueryFilter
         $this->type($query, $parsed);
         $this->priority($query, $parsed);
         $this->version($query, $parsed);
+        $this->phase($query, $parsed);
         $this->customFields($query, $parsed, $viewer);
         $this->parent($query, $parsed);
         $this->absence($query, $parsed);
@@ -178,12 +181,12 @@ class IssueQueryFilter
     }
 
     /**
-     * @param  Builder<\App\Models\CustomField>  $query
-     * @return Builder<\App\Models\CustomField>
+     * @param  Builder<CustomField>  $query
+     * @return Builder<CustomField>
      */
     private function fieldsVisibleTo(Builder $query, User $viewer): Builder
     {
-        $workspace = app(\App\Support\Tenancy\Tenancy::class)->current();
+        $workspace = app(Tenancy::class)->current();
 
         $staff = $workspace !== null
             && ($viewer->membershipIn($workspace)?->isStaff() ?? false);
@@ -264,6 +267,21 @@ class IssueQueryFilter
         }
     }
 
+    /**
+     * phase:Design — by name, like version:, and for the same reason: every project
+     * may have its own "Design", and `project:` is how to mean one of them.
+     */
+    private function phase(Builder $query, IssueQuery $parsed): void
+    {
+        foreach ($parsed->all('phase') as $name) {
+            $query->whereHas('phase', fn (Builder $q) => $q->where('name', $name));
+        }
+
+        foreach ($parsed->all('phase', negated: true) as $name) {
+            $query->whereDoesntHave('phase', fn (Builder $q) => $q->where('name', $name));
+        }
+    }
+
     /** no:assignee, no:label, no:description — the "needs attention" filters. */
     private function absence(Builder $query, IssueQuery $parsed): void
     {
@@ -278,6 +296,8 @@ class IssueQueryFilter
                 // Everything not yet assigned to a release: the list you work from
                 // when deciding what goes in the next one.
                 'version' => $query->whereNull('version_id'),
+                // Work not yet placed in a stage of the job.
+                'phase' => $query->whereNull('phase_id'),
                 // Work that is not part of anything. The useful half of the parent
                 // filter: a backlog of orphans is what a planning board looks like
                 // before somebody groups it.

@@ -3,11 +3,20 @@
 namespace App\Http\Controllers;
 
 use App\Actions\CreateProject;
+use App\Enums\CustomFieldType;
 use App\Enums\StatusCategory;
+use App\Enums\WidgetMode;
 use App\Http\Requests\StoreProjectRequest;
 use App\Http\Requests\UpdateProjectRequest;
+use App\Models\CustomField;
+use App\Models\Phase;
 use App\Models\Project;
 use App\Models\Status;
+use App\Models\User;
+use App\Models\Version;
+use App\Support\Mail\InboundMail;
+use App\Support\Templates\ProjectTemplates;
+use App\Support\Tenancy\Tenancy;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -44,7 +53,7 @@ class ProjectController extends Controller
             // Resolved rather than injected: controller arguments here are spliced in
             // positionally after the workspace binding is dropped, and this method
             // takes none.
-            'templates' => app(\App\Support\Templates\ProjectTemplates::class)->summaries(),
+            'templates' => app(ProjectTemplates::class)->summaries(),
 
             // "Make it like Acme's" is the case an agency actually has. Archived
             // projects are left out: copying the workflow of something nobody works
@@ -106,7 +115,7 @@ class ProjectController extends Controller
             // Unreleased first: what people are working towards matters more than
             // what already shipped.
             'versions' => $project->versions()->inWorkingOrder()->withCount('issues')->get()
-                ->map(fn (\App\Models\Version $version) => [
+                ->map(fn (Version $version) => [
                     'id' => $version->id,
                     'name' => $version->name,
                     'description' => $version->description,
@@ -146,16 +155,22 @@ class ProjectController extends Controller
             // Unreleased first: what people are working towards matters more than
             // what already shipped.
             'versions' => $project->versions()->inWorkingOrder()->withCount('issues')->get()
-                ->map(fn (\App\Models\Version $version) => [
+                ->map(fn (Version $version) => [
                     'id' => $version->id,
                     'name' => $version->name,
                     'description' => $version->description,
                     'released_at' => $version->released_at?->toDateString(),
                     'issues_count' => $version->issues_count,
                 ]),
-            'customFields' => \App\Models\CustomField::where('project_id', $project->id)
+            'phases' => $project->phases()->withCount('issues')->get()
+                ->map(fn (Phase $phase) => [
+                    'id' => $phase->id,
+                    'name' => $phase->name,
+                    'issues_count' => $phase->issues_count,
+                ]),
+            'customFields' => CustomField::where('project_id', $project->id)
                 ->inOrder()->get()
-                ->map(fn (\App\Models\CustomField $field) => [
+                ->map(fn (CustomField $field) => [
                     'id' => $field->id,
                     'name' => $field->name,
                     'key' => $field->key,
@@ -165,19 +180,19 @@ class ProjectController extends Controller
                     'visible_to_client' => $field->visible_to_client,
                 ]),
             'fieldTypes' => array_map(
-                fn (\App\Enums\CustomFieldType $type) => [
+                fn (CustomFieldType $type) => [
                     'value' => $type->value,
                     'label' => $type->label(),
                     'has_options' => $type->hasOptions(),
                 ],
-                \App\Enums\CustomFieldType::cases(),
+                CustomFieldType::cases(),
             ),
             // Generated since M5 and never once displayed, which made filing by email
             // impossible without database access.
             'inboundAddress' => $project->inboundAddress(),
             // Whether that address is a destination or a placeholder. Offering one to
             // copy without saying which is how somebody emails into silence.
-            'inboundReason' => app(\App\Support\Mail\InboundMail::class)->reason(),
+            'inboundReason' => app(InboundMail::class)->reason(),
             'branding' => [
                 'name' => $project->brand_name,
                 'color' => $project->brand_color,
@@ -199,8 +214,8 @@ class ProjectController extends Controller
                 'secret_rotated_at' => $key->secret_rotated_at?->toIso8601String(),
             ]),
             'widgetModes' => array_map(
-                fn (\App\Enums\WidgetMode $mode) => ['value' => $mode->value, 'label' => $mode->label()],
-                \App\Enums\WidgetMode::cases(),
+                fn (WidgetMode $mode) => ['value' => $mode->value, 'label' => $mode->label()],
+                WidgetMode::cases(),
             ),
             // Only on the page load straight after creating or rotating, for the person
             // who did it. See WidgetKeyController::reveal().
@@ -254,8 +269,8 @@ class ProjectController extends Controller
         ];
     }
 
-    private function isStaff(\App\Models\User $user): bool
+    private function isStaff(User $user): bool
     {
-        return $user->membershipIn(app(\App\Support\Tenancy\Tenancy::class)->currentOrFail())?->isStaff() ?? false;
+        return $user->membershipIn(app(Tenancy::class)->currentOrFail())?->isStaff() ?? false;
     }
 }
