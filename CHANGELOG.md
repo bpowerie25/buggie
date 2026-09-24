@@ -122,6 +122,10 @@ today you are running `main`, which is honest rather than ideal — see
 
 ### Fixed
 
+- **Marking up a screenshot on a scrolled page drew the box far from the pointer** —
+  above it by exactly as far as the page was scrolled, so on a long page often off the
+  image altogether. html2canvas leaves a translation by the scroll position set on the
+  canvas it returns; the widget now works on a clean copy of the image.
 - **The screenshot is of what the reporter is looking at.** On a scrolled page it could
   be of a different part of the page altogether — further off the further down — and
   text in it looked wrong. The capture copied the widget's own stylesheet into its copy

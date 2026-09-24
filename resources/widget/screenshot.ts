@@ -95,15 +95,22 @@ export async function capture(hide: HTMLElement): Promise<HTMLCanvasElement | nu
             ignoreElements: (element: Element) => element === hide,
         });
 
-        // html2canvas sizes the canvas inline to the page's CSS pixels, which beats
-        // any stylesheet: the panel then showed a zoomed-in crop of the top-left
-        // corner, and the editor clamped width and height separately and squashed
-        // the image. Without it the canvas takes its size from our CSS and keeps its
-        // shape everywhere.
-        canvas.style.removeProperty('width');
-        canvas.style.removeProperty('height');
+        /*
+         * Handed on as a copy, on a canvas nobody else has drawn with.
+         *
+         * html2canvas leaves its own state behind on the canvas it returns: a
+         * translate by the scroll position it cropped at, so on a page scrolled
+         * 2,500 pixels down every box drawn afterwards landed 2,500 pixels above the
+         * pointer, and an inline width and height in the page's CSS pixels, which
+         * beat our styles and cropped the preview. A fresh canvas has neither, and
+         * whatever else it might leave set — a clip, a blend mode — goes with them.
+         */
+        const clean = document.createElement('canvas');
+        clean.width = canvas.width;
+        clean.height = canvas.height;
+        clean.getContext('2d')?.drawImage(canvas, 0, 0);
 
-        return canvas;
+        return clean;
     } catch {
         return null;
     } finally {
@@ -135,6 +142,11 @@ export type Tool = 'box' | 'blur';
 export function attachAnnotator(canvas: HTMLCanvasElement, getTool: () => Tool) {
     const context = canvas.getContext('2d');
     if (!context) return;
+
+    // Drawing happens in the image's own pixels, whatever made the canvas. getImageData
+    // and putImageData ignore the transform and strokeRect does not, so a transform
+    // left over would put the marks somewhere the snapshot is not.
+    context.setTransform(1, 0, 0, 1, 0, 0);
 
     let start: { x: number; y: number } | null = null;
     let snapshot: ImageData | null = null;
