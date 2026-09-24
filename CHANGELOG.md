@@ -12,6 +12,11 @@ today you are running `main`, which is honest rather than ideal — see
 
 ### Added
 
+- **Swimlanes and colours on the timeline.** Group rows by phase, project, person or
+  status (or not at all), each group with a header you can fold away. Colour bars by
+  status or by person instead of open/closed/late; late work keeps a red outline.
+  Each row shows the initials of whoever has it. Clients can group by phase or not at
+  all, and never see colours or initials, which would name the team to them.
 - **Dependencies on the timeline.** Every "blocks" link between two issues on the chart
   is drawn as a line, with late ones still in red; a checkbox limits it to the late ones.
   Staff drag the dot after a bar onto another issue to make it block that one, and click

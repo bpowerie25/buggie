@@ -67,7 +67,19 @@ class Timeline
          * team named as the workspace, and no blocker they cannot see.
          */
         private bool $forClient = false,
+        /*
+         * What the rows are grouped under: one of GROUPINGS. A way of laying the
+         * chart out rather than a statement about which issues match, so it is not
+         * part of the query string, any more than the dates are.
+         */
+        private string $groupBy = 'phase',
     ) {}
+
+    /**
+     * The ways the chart can be grouped. Phase is the default, and only changes the
+     * chart when the work has phases. `none` is the flat list, sorted by start date.
+     */
+    public const GROUPINGS = ['phase', 'project', 'assignee', 'status', 'none'];
 
     /**
      * How wide each axis label is spaced.
@@ -220,7 +232,7 @@ class Timeline
             }
 
             if ($group !== []) {
-                $groups[] = ['phase' => $issue->phase, 'rows' => $group];
+                $groups[] = ['issue' => $issue, 'rows' => $group];
             }
         }
 
@@ -229,7 +241,7 @@ class Timeline
             fn (array $a, array $b) => [$a['rows'][0]['start'], $a['rows'][0]['key']] <=> [$b['rows'][0]['start'], $b['rows'][0]['key']],
         );
 
-        $rows = $this->inPhases($groups);
+        $rows = $this->inSections($groups);
 
         // Everything the filter matched with no date at either end, parents and
         // children alike. A parent standing in for its children still has an extent,
@@ -280,49 +292,47 @@ class Timeline
     }
 
     /**
-     * The groups, laid out under their phases when any of them has one.
+     * The groups, laid out in sections under a header row each: by phase, project,
+     * assignee or status.
      *
-     * A phase is a header row spanning the work under it, in the order the job runs,
-     * with anything not yet placed in a phase after the last one. A group goes with
-     * its parent's phase: a subtask filed under another stage still draws beneath
-     * the issue it belongs to, because the indent is what says it is a subtask.
+     * A header spans the work under it and folds away on the chart. A group — an
+     * issue and its subtasks — goes where its parent goes: a subtask assigned to
+     * somebody else still draws beneath the issue it belongs to, because the indent
+     * is what says it is a subtask. Within a section the order is by start date, as
+     * it is with no sections at all.
      *
-     * With no phases at all nothing changes, so a project that never uses them does
-     * not get a header reading "No phase" above every row.
+     * Grouping by phase changes nothing until the work has phases, so a project that
+     * never uses them does not get a header reading "No phase" above every row.
      *
-     * @param  array<int, array{phase: Phase|null, rows: array<int, array<string, mixed>>}>  $groups
+     * @param  array<int, array{issue: Issue, rows: array<int, array<string, mixed>>}>  $groups
      * @return array<int, array<string, mixed>>
      */
-    private function inPhases(array $groups): array
+    private function inSections(array $groups): array
     {
         $flatten = fn (iterable $groups) => array_merge([], ...array_map(fn (array $g) => $g['rows'], [...$groups]));
 
-        if (! collect($groups)->contains(fn (array $g) => $g['phase'] !== null)) {
+        if ($this->groupBy === 'none'
+            || ($this->groupBy === 'phase' && ! collect($groups)->contains(fn (array $g) => $g['issue']->phase !== null))) {
             return $flatten($groups);
         }
 
-        $sections = collect($groups)->groupBy(fn (array $g) => $g['phase']?->id ?? 0);
-        $phases = collect($groups)->pluck('phase')->filter()->unique('id')->keyBy('id');
-        $projects = collect($groups)->flatMap(fn (array $g) => array_column($g['rows'], 'project'))->unique();
-        $progress = $this->progress($phases->keys()->all());
-
-        // By project, then the order the team gave the phases; unphased work last.
-        $order = $sections->keys()->sortBy(fn (int $id) => $id === 0
-            ? [1, '', 0, 0]
-            : [0, $phases[$id]->project_id, $phases[$id]->position, $id]);
+        $projects = collect($groups)->map(fn (array $g) => $g['issue']->project_id)->unique();
+        $sections = collect($groups)->groupBy(fn (array $g) => $this->section($g['issue'], $projects->count() > 1)['id']);
+        $progress = $this->groupBy === 'phase'
+            ? $this->progress(collect($groups)->map(fn (array $g) => $g['issue']->phase_id)->filter()->unique()->values()->all())
+            : [];
 
         $rows = [];
 
-        foreach ($order as $id) {
-            $members = $flatten($sections[$id]);
-            $phase = $phases[$id] ?? null;
-            $key = $phase ? "phase-{$phase->id}" : 'phase-none';
-            $project = $members[0]['project'];
+        foreach ($sections->sortBy(fn ($section) => $this->section($section[0]['issue'], $projects->count() > 1)['sort']) as $id => $section) {
+            $members = $flatten($section);
+            $head = $this->section($section[0]['issue'], $projects->count() > 1);
+            $phaseId = $this->groupBy === 'phase' ? $section[0]['issue']->phase_id : null;
 
             $rows[] = [
-                'key' => $key,
-                'title' => ($projects->count() > 1 ? "{$project} · " : '').($phase?->name ?? 'No phase'),
-                'project' => $project,
+                'key' => "group-{$id}",
+                'title' => $head['title'],
+                'project' => $members[0]['project'],
                 'status' => '',
                 'assignee' => null,
                 'version' => null,
@@ -331,7 +341,7 @@ class Timeline
                 'end' => max(array_column($members, 'end')),
                 'start_on' => null,
                 'due_on' => null,
-                'kind' => 'phase',
+                'kind' => 'group',
                 'anchor' => 'start',
                 'open' => collect($members)->contains('open', true),
                 'overdue' => false,
@@ -339,16 +349,60 @@ class Timeline
                 'estimate' => null,
                 'blocked_by' => [],
                 'conflicts' => [],
-                'progress' => $phase ? ($progress[$phase->id] ?? ['done' => 0, 'total' => 0]) : null,
-                'phase' => null,
+                // Only a phase is a piece of the job with a finish line to measure
+                // against. "Dana: 3 of 7 done" is a scorecard, not a plan.
+                'progress' => $phaseId ? ($progress[$phaseId] ?? ['done' => 0, 'total' => 0]) : null,
+                'group' => null,
+                'status_color' => null,
+                'assignee_id' => null,
             ];
 
             foreach ($members as $member) {
-                $rows[] = [...$member, 'phase' => $key];
+                $rows[] = [...$member, 'group' => "group-{$id}"];
             }
         }
 
         return $rows;
+    }
+
+    /**
+     * Which section an issue's group falls in, what its header says, and where it
+     * sorts. The ones without a value — no phase, nobody assigned — sort last.
+     *
+     * Statuses are grouped by name, as the issue list groups them across projects:
+     * two projects' "In review" are one column of work to whoever is looking at both.
+     * They sort by category, so the sections read left to right the way work moves.
+     *
+     * @return array{id: string, title: string, sort: array<int, mixed>}
+     */
+    private function section(Issue $issue, bool $manyProjects): array
+    {
+        return match ($this->groupBy) {
+            'phase' => $issue->phase
+                ? [
+                    'id' => "phase-{$issue->phase->id}",
+                    'title' => ($manyProjects ? "{$issue->project->name} · " : '').$issue->phase->name,
+                    'sort' => [0, $issue->project->name, $issue->phase->position, $issue->phase->id],
+                ]
+                : ['id' => 'phase-none', 'title' => 'No phase', 'sort' => [1, '', 0, 0]],
+            'project' => [
+                'id' => "project-{$issue->project_id}",
+                'title' => $issue->project->name,
+                'sort' => [0, mb_strtolower($issue->project->name), $issue->project_id, 0],
+            ],
+            'assignee' => $issue->assignee
+                ? [
+                    'id' => "assignee-{$issue->assignee->id}",
+                    'title' => $issue->assignee->name,
+                    'sort' => [0, mb_strtolower($issue->assignee->name), $issue->assignee->id, 0],
+                ]
+                : ['id' => 'assignee-none', 'title' => 'Unassigned', 'sort' => [1, '', 0, 0]],
+            'status' => [
+                'id' => 'status-'.md5(mb_strtolower($issue->status->name)),
+                'title' => $issue->status->name,
+                'sort' => [0, array_search($issue->status->category, StatusCategory::cases(), true), mb_strtolower($issue->status->name), 0],
+            ],
+        };
     }
 
     /**
@@ -480,6 +534,9 @@ class Timeline
             'project' => $issue->project->name,
             'status' => $issue->status->name,
             'assignee' => $issue->assignee?->name,
+            // For colouring bars by status or by person. Staff only; see forClientRow.
+            'status_color' => $issue->status->color,
+            'assignee_id' => $issue->assignee_id,
             // Sent back with a drag, so one made on top of somebody else's is refused.
             'version' => $issue->scheduleVersion(),
             'depth' => $depth,
@@ -551,6 +608,8 @@ class Timeline
         $row['blocked_by'] = array_values(array_intersect($row['blocked_by'], $visible));
         $row['estimate'] = null;
         $row['version'] = null;
+        $row['status_color'] = null;
+        $row['assignee_id'] = null;
 
         if ($row['assignee'] !== null) {
             $workspace = app(Tenancy::class)->currentOrFail();

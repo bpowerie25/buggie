@@ -170,12 +170,12 @@ class PhaseTest extends TestCase
         );
 
         $header = $rows[0];
-        $this->assertSame('phase', $header['kind']);
+        $this->assertSame('group', $header['kind']);
         $this->assertSame(now()->addDays(3)->toDateString(), $header['start']);
         $this->assertSame(now()->addDays(10)->toDateString(), $header['end']);
         // The finished moodboard is off the chart (open issues by default) but counts.
         $this->assertSame(['done' => 1, 'total' => 3], $header['progress']);
-        $this->assertSame("phase-{$design->id}", $rows[1]['phase']);
+        $this->assertSame("group-phase-{$design->id}", $rows[1]['group']);
     }
 
     #[Test]
@@ -187,7 +187,7 @@ class PhaseTest extends TestCase
             ->viewData('page')['props']['rows'];
 
         $this->assertSame(['Homepage'], array_column($rows, 'title'));
-        $this->assertArrayNotHasKey('phase', $rows[0]);
+        $this->assertArrayNotHasKey('group', $rows[0]);
     }
 
     #[Test]

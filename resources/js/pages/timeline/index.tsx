@@ -1,5 +1,6 @@
 import {
     TimelineChart,
+    type ColourBy,
     type TimelineAxis,
     type TimelineRow,
 } from '@/components/timeline-chart';
@@ -27,6 +28,8 @@ export default function TimelinePage({
     query,
     projects,
     editable = false,
+    group = 'phase',
+    groupings = ['phase', 'none'],
 }: {
     rows: TimelineRow[];
     undated: UndatedRow[];
@@ -36,6 +39,9 @@ export default function TimelinePage({
     projects: { id: number; name: string; slug: string }[];
     /** Staff drag; a client reads, one project at a time. */
     editable?: boolean;
+    group?: string;
+    /** The groupings this viewer may choose: fewer for a client. */
+    groupings?: string[];
 }) {
     const [raw, setRaw] = useState(query.query);
 
@@ -47,11 +53,13 @@ export default function TimelinePage({
         if (!editing) setRaw(query.query);
     }, [query.query, editing]);
 
-    function apply(changes: { q?: string; from?: string; to?: string }) {
+    function apply(changes: { q?: string; from?: string; to?: string; group?: string }) {
         const next: Record<string, string> = {
             q: changes.q ?? query.query,
             from: changes.from ?? axis.from,
             to: changes.to ?? axis.to,
+            // The default is left out of the URL, so a plain link stays plain.
+            group: (changes.group ?? group) === 'phase' ? '' : (changes.group ?? group),
         };
 
         Object.keys(next).forEach((key) => next[key] === '' && delete next[key]);
@@ -70,6 +78,25 @@ export default function TimelinePage({
     // Per-person display choices, remembered in this browser only.
     const [allLinks, setAllLinks] = useRemembered('timeline.allLinks', true);
     const [shiftDependents, setShiftDependents] = useRemembered('timeline.shiftDependents', false);
+    const [colourBy, setColourBy] = useState<ColourBy>(() => {
+        try {
+            const stored = window.localStorage.getItem('timeline.colourBy');
+
+            return stored === 'status' || stored === 'assignee' ? stored : 'state';
+        } catch {
+            return 'state';
+        }
+    });
+
+    function chooseColour(next: ColourBy) {
+        setColourBy(next);
+
+        try {
+            window.localStorage.setItem('timeline.colourBy', next);
+        } catch {
+            // Not kept; it lasts for this page.
+        }
+    }
 
     const reload = { preserveScroll: true, preserveState: true, only: ['rows', 'undated', 'errors', 'flash'] };
 
@@ -157,6 +184,35 @@ export default function TimelinePage({
                         className={control}
                     />
 
+                    {groupings.length > 1 && (
+                        <select
+                            value={group}
+                            aria-label="Group by"
+                            onChange={(e) => apply({ group: e.target.value })}
+                            className={control}
+                        >
+                            {groupings.map((g) => (
+                                <option key={g} value={g}>
+                                    {GROUP_LABELS[g] ?? g}
+                                </option>
+                            ))}
+                        </select>
+                    )}
+
+                    {/* A client's rows carry no status colour or person to colour by. */}
+                    {editable && (
+                        <select
+                            value={colourBy}
+                            aria-label="Colour by"
+                            onChange={(e) => chooseColour(e.target.value as ColourBy)}
+                            className={control}
+                        >
+                            <option value="state">Colour: open, closed, late</option>
+                            <option value="status">Colour: by status</option>
+                            <option value="assignee">Colour: by person</option>
+                        </select>
+                    )}
+
                     {/* A plan is mostly ahead of you, so the presets are too. */}
                     {[
                         { label: 'A month', back: 7, forward: 30 },
@@ -200,6 +256,8 @@ export default function TimelinePage({
                     onLink={editable ? link : undefined}
                     onUnlink={editable ? unlink : undefined}
                     allLinks={allLinks}
+                    colourBy={editable ? colourBy : 'state'}
+                    owners={editable}
                 />
 
                 <div className="flex flex-wrap gap-x-5 gap-y-1 text-xs text-ink-muted">
@@ -229,9 +287,18 @@ export default function TimelinePage({
                 )}
 
                 <div className="flex flex-wrap gap-4 text-xs text-ink-muted">
-                    <Key className="bg-accent" label="Open" />
-                    <Key className="bg-success" label="Closed" />
-                    <Key className="bg-danger" label="Overdue" />
+                    {editable && colourBy !== 'state' ? (
+                        <span>
+                            Bars are coloured {colourBy === 'status' ? 'by status' : 'by person'}; closed
+                            work is faded and late work is outlined in red.
+                        </span>
+                    ) : (
+                        <>
+                            <Key className="bg-accent" label="Open" />
+                            <Key className="bg-success" label="Closed" />
+                            <Key className="bg-danger" label="Overdue" />
+                        </>
+                    )}
                     <span className="flex items-center gap-1.5">
                         <span className="size-2 rotate-45 bg-ink-muted" />
                         One date only — a marker, not a span
@@ -240,7 +307,7 @@ export default function TimelinePage({
                         <span className="h-0.5 w-4 bg-ink-muted" />
                         A parent spanning its subtasks
                     </span>
-                    {rows.some((row) => row.kind === 'phase') && (
+                    {rows.some((row) => row.progress) && (
                         <span className="flex items-center gap-1.5">
                             <span className="h-1.5 w-4 rounded-full bg-gradient-to-r from-success from-50% to-ink-muted/30 to-50%" />
                             A phase, filled in as its issues are done
@@ -314,6 +381,14 @@ export default function TimelinePage({
         </AppLayout>
     );
 }
+
+const GROUP_LABELS: Record<string, string> = {
+    phase: 'Group: by phase',
+    project: 'Group: by project',
+    assignee: 'Group: by person',
+    status: 'Group: by status',
+    none: 'No grouping',
+};
 
 /** A setting kept in this browser. Storage can be missing or refuse; then it is not kept. */
 function useRemembered(key: string, fallback: boolean): [boolean, (value: boolean) => void] {

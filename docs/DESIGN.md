@@ -1664,3 +1664,31 @@ exist in data from before they were refused.
 Not handled: working days (weekends count), and other people's timelines don't update
 live. A colleague still has to reload, and a drag on top of their own stale view is
 refused as usual.
+
+---
+
+## 29. Swimlanes and colours on the timeline
+
+**Grouping is a display setting, not a filter.** It is `?group=` in the URL, beside
+`from` and `to`, and is not part of the query string, which only says which issues
+match. The phase headers from §27 became the general case: a `group` row spanning its
+members, with the members tagged by header key so the chart can fold them. Only a phase
+header shows progress. "Dana: 3 of 7 done" is a scorecard, not a plan.
+
+**Where things go.**
+- A subtask goes with its parent's section, as it does for phases.
+- Grouping by status merges statuses with the same name across projects, as the issue
+  list does, and orders them by category so the sections follow the way work moves.
+- The empty sections (no phase, nobody assigned) come last.
+
+**Colour is chosen in the browser**, remembered per person, because it changes nothing
+about what is shown.
+- Colouring by person hashes the user id into a fixed palette, so a person keeps the
+  same colour from one day to the next.
+- When bars are coloured, late work gets a red outline in place of a red fill, and
+  closed work is faded.
+
+**A client can group by phase or not at all.** Grouping by person would name the team
+to someone who is shown the workspace name instead. Grouping by status would reveal the
+workflow the rest of the app keeps from clients. For the same reason, a client's rows
+carry no status colour or assignee id.

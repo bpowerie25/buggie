@@ -28,8 +28,8 @@ export interface TimelineRow {
     end: string;
     start_on: string | null;
     due_on: string | null;
-    /** `phase` is a header over the issues in one stage of the job, not an issue. */
-    kind: 'bar' | 'milestone' | 'rollup' | 'phase';
+    /** `group` is a section header — a phase, project, person or status — not an issue. */
+    kind: 'bar' | 'milestone' | 'rollup' | 'group';
     anchor: 'start' | 'due';
     open: boolean;
     overdue: boolean;
@@ -41,13 +41,40 @@ export interface TimelineRow {
     version: string | null;
     /** On a phase header: its issues done, out of all of them (cancelled aside). */
     progress?: { done: number; total: number } | null;
-    /** On an issue under a phase header: that header's key. */
-    phase?: string | null;
+    /** On an issue under a section header: that header's key. */
+    group?: string | null;
+    /** For colouring by status or person. Staff only; null for a client. */
+    status_color?: string | null;
+    assignee_id?: number | null;
 }
 
-/** The rows left to draw once the collapsed phases have folded their issues away. */
-export function unfolded<T extends Pick<TimelineRow, 'phase'>>(rows: T[], collapsed: Set<string>): T[] {
-    return rows.filter((row) => !row.phase || !collapsed.has(row.phase));
+/** How bars are coloured: open, closed and late; the status's own colour; or by person. */
+export type ColourBy = 'state' | 'status' | 'assignee';
+
+const PEOPLE = ['#6366f1', '#0ea5e9', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6', '#14b8a6', '#f97316'];
+
+/** A fill for a bar, or undefined to use the open/closed/late classes. */
+export function barColour(
+    row: Pick<TimelineRow, 'status_color' | 'assignee_id'>,
+    by: ColourBy,
+): string | undefined {
+    if (by === 'status') return row.status_color ?? undefined;
+    // The same person is the same colour on every load; nobody is a colour at all.
+    if (by === 'assignee') return row.assignee_id == null ? '#94a3b8' : PEOPLE[row.assignee_id % PEOPLE.length];
+
+    return undefined;
+}
+
+/** "Dana Scully" → "DS", for the owner beside each row. */
+export function initials(name: string): string {
+    const parts = name.trim().split(/\s+/).filter(Boolean);
+
+    return ((parts[0]?.[0] ?? '') + (parts.length > 1 ? parts[parts.length - 1][0] : '')).toUpperCase();
+}
+
+/** The rows left to draw once the collapsed sections have folded their issues away. */
+export function unfolded<T extends Pick<TimelineRow, 'group'>>(rows: T[], collapsed: Set<string>): T[] {
+    return rows.filter((row) => !row.group || !collapsed.has(row.group));
 }
 
 /** What a drag is changing: the whole bar, or one end of it. */
@@ -138,6 +165,8 @@ export function TimelineChart({
     onLink,
     onUnlink,
     allLinks = true,
+    colourBy = 'state',
+    owners = false,
 }: {
     rows: TimelineRow[];
     axis: TimelineAxis;
@@ -151,6 +180,9 @@ export function TimelineChart({
     onUnlink?: (blocker: string, blocked: string) => void;
     /** Every dependency, rather than only the ones running late. */
     allLinks?: boolean;
+    colourBy?: ColourBy;
+    /** Initials of whoever has each issue, beside its title. */
+    owners?: boolean;
 }) {
     const [drag, setDrag] = useState<Drag | null>(null);
     const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
@@ -204,7 +236,7 @@ export function TimelineChart({
     }
 
     function begin(event: ReactPointerEvent, row: TimelineRow, mode: DragMode) {
-        if (!canDrag || row.kind === 'rollup' || row.kind === 'phase' || event.button !== 0) return;
+        if (!canDrag || row.kind === 'rollup' || row.kind === 'group' || event.button !== 0) return;
 
         event.preventDefault();
         event.stopPropagation();
@@ -244,11 +276,11 @@ export function TimelineChart({
 
     function end() {
         if (linking) {
-            // Whichever issue row the pointer let go over. A phase header is not work.
+            // Whichever issue row the pointer let go over. A section header is not work.
             const target = rows[Math.floor((linking.y - HEADER) / ROW)];
             setLinking(null);
 
-            if (target && target.kind !== 'phase' && target.key !== linking.from) {
+            if (target && target.kind !== 'group' && target.key !== linking.from) {
                 onLink?.(linking.from, target.key);
             }
 
@@ -281,7 +313,7 @@ export function TimelineChart({
 
     /** Arrow keys move a focused bar a day; with Shift they move its due date. */
     function onKey(event: KeyboardEvent, row: TimelineRow) {
-        if (!canDrag || row.kind === 'rollup' || row.kind === 'phase') return;
+        if (!canDrag || row.kind === 'rollup' || row.kind === 'group') return;
         if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
 
         event.preventDefault();
@@ -345,8 +377,8 @@ export function TimelineChart({
             <div className="w-56 shrink-0 border-r border-border sm:w-72">
                 <div style={{ height: HEADER }} className="border-b border-border" />
                 {rows.map((row) =>
-                    row.kind === 'phase' ? (
-                        <PhaseLabel
+                    row.kind === 'group' ? (
+                        <GroupLabel
                             key={row.key}
                             row={row}
                             collapsed={collapsed.has(row.key)}
@@ -355,7 +387,7 @@ export function TimelineChart({
                     ) : (
                     <div
                         key={row.key}
-                        style={{ height: ROW, paddingLeft: 8 + row.depth * 14 + (row.phase ? 10 : 0) }}
+                        style={{ height: ROW, paddingLeft: 8 + row.depth * 14 + (row.group ? 10 : 0) }}
                         className="flex items-center gap-2 overflow-hidden pr-2"
                         title={`${row.title} — ${row.project} · ${row.status}`}
                     >
@@ -376,6 +408,14 @@ export function TimelineChart({
                                 className="shrink-0 text-[10px] text-ink-subtle"
                             >
                                 ⛔{row.blocked_by.length}
+                            </span>
+                        )}
+                        {owners && row.assignee && (
+                            <span
+                                title={row.assignee}
+                                className="ml-auto flex size-5 shrink-0 items-center justify-center rounded-full bg-surface text-[9px] font-medium text-ink-muted"
+                            >
+                                {initials(row.assignee)}
                             </span>
                         )}
                     </div>
@@ -417,7 +457,7 @@ export function TimelineChart({
                 >
                     {/* A tint across the header rows, so the stages read as sections. */}
                     {rows.map((row, i) =>
-                        row.kind === 'phase' ? (
+                        row.kind === 'group' ? (
                             <rect key={`band-${row.key}`} x={0} y={rowY(i)} width={width} height={ROW} className="fill-surface" />
                         ) : null,
                     )}
@@ -471,7 +511,8 @@ export function TimelineChart({
                             y={rowY(i)}
                             x={x}
                             xEnd={xEnd}
-                            draggable={canDrag && row.kind !== 'rollup' && row.kind !== 'phase'}
+                            draggable={canDrag && row.kind !== 'rollup' && row.kind !== 'group'}
+                            fill={barColour(row, colourBy)}
                             dragging={drag?.key === row.key}
                             onBegin={(event, mode) => begin(event, row, mode)}
                             onKey={(event) => onKey(event, row)}
@@ -509,7 +550,7 @@ export function TimelineChart({
                     {/* The handles links are drawn from, just past the end of each bar. */}
                     {onLink &&
                         rows.map((row, i) =>
-                            row.kind === 'phase' || row.kind === 'rollup' ? null : (
+                            row.kind === 'group' || row.kind === 'rollup' ? null : (
                                 <circle
                                     key={`link-${row.key}`}
                                     cx={xEnd(shown(row).end) + 9}
@@ -552,7 +593,9 @@ function Bar({
     dragging = false,
     onBegin,
     onKey,
+    fill,
 }: {
+    fill?: string;
     row: TimelineRow;
     y: number;
     x: (iso: string) => number;
@@ -562,7 +605,17 @@ function Bar({
     onBegin?: (event: ReactPointerEvent, mode: DragMode) => void;
     onKey?: (event: KeyboardEvent) => void;
 }) {
-    const tone = row.overdue ? 'fill-danger' : row.open ? 'fill-accent' : 'fill-success';
+    // A chosen colour replaces the open/closed fill; late work keeps a red outline.
+    const tone = fill
+        ? row.overdue
+            ? 'stroke-danger stroke-2'
+            : ''
+        : row.overdue
+          ? 'fill-danger'
+          : row.open
+            ? 'fill-accent'
+            : 'fill-success';
+    const painted = fill ? { fill, opacity: row.open ? 1 : 0.5 } : undefined;
     const label = `${row.key} ${row.start}${row.start === row.end ? '' : ` to ${row.end}`}`;
     const grab = draggable ? { onPointerDown: (e: ReactPointerEvent) => onBegin?.(e, 'move') } : {};
     const focus = draggable
@@ -597,7 +650,7 @@ function Bar({
                 <polygon
                     points={`${centre},${mid - r} ${centre + r},${mid} ${centre},${mid + r} ${centre - r},${mid}`}
                     className={`${tone} ${draggable ? 'cursor-grab' : ''}`}
-                    style={draggable ? { touchAction: 'none' } : undefined}
+                    style={{ ...painted, ...(draggable ? { touchAction: 'none' } : {}) }}
                     {...grab}
                 />
             </g>
@@ -607,7 +660,7 @@ function Bar({
     const left = x(row.start);
     const right = Math.max(xEnd(row.end), left + 3);
 
-    if (row.kind === 'phase') {
+    if (row.kind === 'group') {
         // The stage's span, with how much of it is done filled in from the left. Not
         // a date anybody set: a phase runs from its first issue to its last.
         const progress = row.progress && row.progress.total > 0 ? row.progress.done / row.progress.total : 0;
@@ -660,7 +713,7 @@ function Bar({
                 height={12}
                 rx={3}
                 className={`${tone} ${draggable ? 'cursor-grab' : ''} ${dragging ? 'opacity-80' : ''}`}
-                style={draggable ? { touchAction: 'none' } : undefined}
+                style={{ ...painted, ...(draggable ? { touchAction: 'none' } : {}) }}
                 {...grab}
             />
             {/* The ends, a little wider than they look, so they can be caught. */}
@@ -682,8 +735,8 @@ function Bar({
     );
 }
 
-/** A phase's name, how far along it is, and the control that folds it away. */
-function PhaseLabel({
+/** A section's name, how far along it is (phases only), and the control that folds it away. */
+function GroupLabel({
     row,
     collapsed,
     onToggle,

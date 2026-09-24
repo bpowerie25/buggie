@@ -67,7 +67,15 @@ class TimelineController extends Controller
             );
         }
 
-        $timeline = new Timeline($from, $to, $query, $request->user(), $this->filter, forClient: ! $staff);
+        /*
+         * A client groups by phase or not at all. By assignee would name the team to
+         * somebody shown them as the workspace, and by status would hand over the
+         * workflow the rest of the app keeps from them.
+         */
+        $groupings = $staff ? Timeline::GROUPINGS : ['phase', 'none'];
+        $group = in_array($request->query('group'), $groupings, true) ? $request->query('group') : 'phase';
+
+        $timeline = new Timeline($from, $to, $query, $request->user(), $this->filter, forClient: ! $staff, groupBy: $group);
 
         return Inertia::render('timeline/index', [
             'rows' => $timeline->rows(),
@@ -98,6 +106,8 @@ class TimelineController extends Controller
             'projects' => $projects->map->only(['id', 'name', 'slug'])->values(),
             // Staff drag; a client reads.
             'editable' => $staff,
+            'group' => $group,
+            'groupings' => $groupings,
         ]);
     }
 
