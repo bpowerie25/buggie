@@ -70,6 +70,10 @@ interface Issue extends IssueRow {
 }
 
 /** Renders one activity event as a sentence. */
+function typeLabel(value: string): string {
+    return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
 function eventSentence(event: Event): string {
     const d = event.data as Record<string, { name?: string } | string | number | null>;
     const actor = event.actor?.name ?? 'Someone';
@@ -86,7 +90,10 @@ function eventSentence(event: Event): string {
         case 'priority_changed':
             return `${actor} changed the priority`;
         case 'type_changed':
-            return `${actor} changed the type to ${d.to as string}`;
+            // Stored as the enum value ('bug'), shown as its label ('Bug').
+            return d.from
+                ? `${actor} changed the type from ${typeLabel(d.from as string)} to ${typeLabel(d.to as string)}`
+                : `${actor} changed the type to ${typeLabel(d.to as string)}`;
         case 'title_changed':
             return `${actor} renamed this issue`;
         case 'label_added':
@@ -808,10 +815,39 @@ export default function ShowIssue({
                     </SidebarRow>
 
                     <SidebarRow label="Type">
-                        <span className="flex items-center gap-2 text-sm text-ink capitalize">
-                            <TypeIcon type={issue.type} />
-                            {issue.type}
-                        </span>
+                        {can.update ? (
+                            <Popover
+                                align="right"
+                                label="Change type"
+                                trigger={() => (
+                                    <span className="flex items-center gap-2 px-1.5 py-1 text-sm text-ink capitalize">
+                                        <TypeIcon type={issue.type} />
+                                        {issue.type}
+                                    </span>
+                                )}
+                            >
+                                {(close) =>
+                                    facets.types.map((option) => (
+                                        <PopoverItem
+                                            key={option.value}
+                                            selected={option.value === issue.type}
+                                            onSelect={() => {
+                                                close();
+                                                patch({ type: option.value });
+                                            }}
+                                        >
+                                            <TypeIcon type={option.value} />
+                                            {option.label}
+                                        </PopoverItem>
+                                    ))
+                                }
+                            </Popover>
+                        ) : (
+                            <span className="flex items-center gap-2 text-sm text-ink capitalize">
+                                <TypeIcon type={issue.type} />
+                                {issue.type}
+                            </span>
+                        )}
                     </SidebarRow>
 
                     <SidebarRow label="Labels">

@@ -12,6 +12,8 @@ today you are running `main`, which is honest rather than ideal — see
 
 ### Added
 
+- **An issue's type can be changed from its sidebar**, like status and priority, and
+  the activity feed says what it changed from and to. Staff only; a client sees it.
 - **A registration mode**: open, by invitation, or by invitation and on request, set
   under Settings → Instance or with `BUGGIE_REGISTRATION`. In `request` mode a
   workspace's sign-in page offers *Request access*; its owners and admins are emailed

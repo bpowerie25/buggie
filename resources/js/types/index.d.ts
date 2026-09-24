@@ -143,7 +143,7 @@ export interface Facets {
     labels: LabelChip[];
     members: Person[];
     priorities: { value: number; label: string; color: string }[];
-    types: { value: string; label: string }[];
+    types: { value: IssueTypeValue; label: string }[];
     statuses_by_project: Record<number, IssueStatus[]>;
 }
 
