@@ -24,6 +24,7 @@ class WorkspaceSettingsController extends Controller
                 'name' => $workspace->name,
                 'slug' => $workspace->slug,
                 'show_staff_names' => \App\Support\Issues\AuthorLabel::showsStaffNames($workspace),
+                'trust_unverified_emails' => \App\Support\Reports\ReporterLink::trustsUnverified($workspace),
                 'created_at' => $workspace->created_at->toDateString(),
             ],
             'domain' => config('buggie.domain'),
@@ -113,17 +114,22 @@ class WorkspaceSettingsController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:120'],
             'show_staff_names' => ['sometimes', 'boolean'],
+            'trust_unverified_emails' => ['sometimes', 'boolean'],
         ]);
 
         // The slug is deliberately not editable: it is in every widget snippet, every
         // invitation link and every bookmark our customers' customers hold.
         $workspace->update(['name' => $validated['name']]);
 
-        if (array_key_exists('show_staff_names', $validated)) {
-            $workspace->forceFill(['settings' => [
-                ...($workspace->settings ?? []),
-                \App\Support\Issues\AuthorLabel::SHOW_STAFF_NAMES => (bool) $validated['show_staff_names'],
-            ]])->save();
+        $settings = collect([
+            \App\Support\Issues\AuthorLabel::SHOW_STAFF_NAMES => 'show_staff_names',
+            \App\Support\Reports\ReporterLink::TRUST_UNVERIFIED => 'trust_unverified_emails',
+        ])->filter(fn ($field) => array_key_exists($field, $validated))
+            ->map(fn ($field) => (bool) $validated[$field])
+            ->all();
+
+        if ($settings !== []) {
+            $workspace->forceFill(['settings' => [...($workspace->settings ?? []), ...$settings]])->save();
         }
 
         return back()->with('success', 'Workspace updated.');

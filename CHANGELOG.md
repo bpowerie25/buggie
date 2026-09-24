@@ -12,6 +12,12 @@ today you are running `main`, which is honest rather than ideal — see
 
 ### Added
 
+- **Reporter identity on widget reports**: anonymous, unverified email, identified (via
+  `identify()`), or verified, where your server signs `id:email` with the key's secret.
+  A verified report from a client on the project is linked to them on acceptance, so
+  they can see it; unverified addresses grant nothing unless the workspace trusts them,
+  and staff can link by hand. Keys can require a verified identity. The key's `mode`,
+  which existed and did nothing, is now this setting.
 - **Reply & await client.** Whose turn it is lives in the status, not the assignee.
   The reply goes out in public, the clients who can see the issue are told, and the
   issue moves to the project's awaiting-client status. The client's answer — in the
@@ -97,6 +103,9 @@ today you are running `main`, which is honest rather than ideal — see
 
 ### Fixed
 
+- The widget key settings card called its routes with the numeric id while the routes
+  bind by public key, so every toggle, the allowed origins and the revoke button failed
+  with a 404 while looking saved. A failed save now says so on the card.
 - A client's copy of an issue included the full watcher list, which could name other
   clients, and the titles of related, parent and child issues they could not open.
 - A client filing an issue could set its starting status by adding `status_id` to the

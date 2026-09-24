@@ -80,8 +80,9 @@ window.buggie.q.push(['identify', { id: 4821, email: 'ann@acme.com' }]);
 window.buggie.q.push(['setRelease', '2026.09.18-a1c3']);
 ```
 
-`identify()` sends exactly what you pass it and nothing else — `id`, `email`, `name`
-and any extra keys of your own. Nothing is scraped from the page.
+`identify()` sends exactly what you pass it and nothing else — `id`, `email`, `name`,
+`user_hash` and any extra keys of your own. Nothing is scraped from the page. See
+[Who sent it](#who-sent-it) for what `user_hash` is and what verifying buys you.
 
 ## What it captures
 
@@ -215,19 +216,66 @@ In project settings, each key has:
 - **Allowed origins**, as above.
 - **Offer a screenshot** — when off, the server issues no upload URL, so no image is
   stored.
-- **Require an email address** — see the note below.
+- **Require an email address** — the widget asks for one, and the server refuses a
+  report without it.
 - **Accepting reports** — turning this off makes the key behave as though it does not
   exist. **Revoke** deletes it outright.
+- **Reporter identity** — see [Who sent it](#who-sent-it).
+- **Signing secret** — shown once when the key is created or the secret rotated.
 
+Each setting saves as you change it, and says so; if a save fails, the card says why.
 The screen also shows when the key was last used.
 
-> **Worth knowing:** the widget reads "require an email address" and "offer a
-> screenshot" from the `data-` attributes on the script tag, not from these
-> checkboxes. Turning *Require an email address* on in settings does not currently
-> change what the reporter sees; use `data-require-email="true"` in the snippet.
-> Turning *Offer a screenshot* off does stop the image being stored, but the reporter
-> is still shown a screenshot to annotate first. The `mode` field (anonymous or
-> identified) recorded against a key has no effect anywhere.
+The widget fetches these settings when the reporter opens it, so they apply without
+editing the snippet. The `data-` attributes on the script tag can switch a screenshot
+off for one page, but never on.
+
+## Who sent it
+
+Every report records how sure Buggie is about who sent it, shown as a badge beside
+the reporter on the issue:
+
+| | |
+|---|---|
+| **Anonymous** | No email. |
+| **Unverified email** | Typed into the widget by the reporter. |
+| **Identified** | Given by your page through `identify()`. The email field is then filled in and hidden. |
+| **Verified** | `identify()` also passed a `user_hash` your server computed, and it checked out. |
+
+To verify, compute `user_hash` **on your server** as HMAC-SHA256 of `"{id}:{email}"`
+— exactly the id and email you pass to `identify()` — with the key's signing secret,
+and pass it along:
+
+```js
+window.buggie.identify({ id: '4821', email: 'ann@acme.com', name: 'Ann', user_hash: '…' });
+```
+
+```php
+$userHash = hash_hmac('sha256', $user->id . ':' . $user->email, $secret);
+```
+
+```js
+const userHash = crypto.createHmac('sha256', secret).update(`${user.id}:${user.email}`).digest('hex');
+```
+
+The email is signed as well as the id because a report is linked to a client by its
+email: a hash over the id alone would let anybody signed in to your site pair their own
+valid hash with somebody else's address. A hash that does not match is not refused — the
+report is recorded as *identified* and the mismatch logged — and the hash itself is
+never stored. Never compute it in the browser: the secret would then be public.
+
+The key's **Reporter identity** setting decides what it accepts: *Anonymous* ignores
+`identify()` entirely; *Identified* (the default) takes it and verifies a hash when there
+is one; *Require verified identity* refuses any report without a valid hash, with a
+message telling the reporter to sign in.
+
+**What identity is allowed to grant.** When a report is accepted in Triage and its
+identity is *verified*, and its email belongs to a client who can see the project, that
+client becomes the issue's reporter — so they can see it and hear about it, by the
+ordinary rule that clients see what they reported. An unverified or identified email
+grants nothing unless **Settings → Workspace → Trust unverified emails** is on; the name
+and address are kept on the issue, and staff can choose **Link to client** in the
+sidebar. Reports always go to Triage first, never straight to the backlog.
 
 ## The npm package
 

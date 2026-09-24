@@ -241,6 +241,26 @@ class IssueController extends Controller
                 ...$this->summary($issue),
                 'description' => $issue->description,
                 'reporter' => $issue->reporter === null ? null : $author($issue->reporter),
+                // Who sent a widget report and how sure we are. Staff only: it is an
+                // address and an assessment, and neither is a client's business.
+                'widget_reporter' => $staff && $issue->reporter_identity !== null ? [
+                    'identity' => $issue->reporter_identity->value,
+                    'label' => $issue->reporter_identity->label(),
+                    'name' => $issue->reporter_name,
+                    'email' => $issue->reporter_email,
+                    'page_url' => is_string($issue->environment['url'] ?? null) ? $issue->environment['url'] : null,
+                    'linked' => $issue->reporter !== null && AuthorLabel::role($issue->reporter, $workspace) === 'client',
+                    // Who "Link to client" can choose from, the address match first.
+                    'candidates' => \App\Support\Reports\ReporterLink::eligible($issue)
+                        ->orderBy('users.name')->get(['users.id', 'users.name', 'users.email'])
+                        ->sortByDesc(fn ($u) => strcasecmp((string) $u->email, (string) $issue->reporter_email) === 0)
+                        ->values()
+                        ->map(fn ($u) => [
+                            'id' => $u->id,
+                            'name' => $u->name,
+                            'matches' => strcasecmp((string) $u->email, (string) $issue->reporter_email) === 0,
+                        ]),
+                ] : null,
                 'visibility' => $issue->visibility->value,
                 'client_audience' => $issue->client_audience->value,
                 // Staff only: both name clients, and a client must not learn who

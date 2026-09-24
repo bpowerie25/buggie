@@ -40,13 +40,21 @@ class TriageReport
                     : IssueVisibility::Internal->value,
             ], $actor);
 
-            // Carry the captured context onto the issue, where it is actually useful.
+            // Carry the captured context onto the issue, where it is actually useful —
+            // including who sent it and how sure we are, which grants nothing by itself.
             $issue->forceFill([
                 'fingerprint' => $report->fingerprint,
                 'environment' => $report->environment,
                 'first_seen_at' => $report->created_at,
                 'last_seen_at' => $report->created_at,
+                'reporter_identity' => $report->reporter_identity ?? ($report->reporter_email ? 'email_unverified' : 'anonymous'),
+                'reporter_name' => $report->reporter_name,
+                'reporter_email' => $report->reporter_email,
             ])->save();
+
+            // A verified reporter who is a client on this project becomes the issue's
+            // reporter, so they can see it and hear about it by the existing rules.
+            \App\Support\Reports\ReporterLink::linkIfTrusted($issue);
 
             $this->attachScreenshot($report, $issue, $actor);
 

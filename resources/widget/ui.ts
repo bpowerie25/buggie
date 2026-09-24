@@ -21,6 +21,11 @@ export interface Identity {
     id?: string | number;
     email?: string;
     name?: string;
+    /**
+     * HMAC-SHA256 of `${id}:${email}` with the widget key's secret, computed on your
+     * server. Proves this is the signed-in person you say it is. Never stored.
+     */
+    user_hash?: string;
     [key: string]: unknown;
 }
 
@@ -123,6 +128,8 @@ export class Widget {
     private annotatorAttached = false;
 
     identity: Identity = {};
+    /** Set when the key is anonymous: later identify() calls are ignored too. */
+    ignoreIdentity = false;
     release: string | null = null;
 
     constructor(private config: WidgetConfig) {
@@ -189,7 +196,15 @@ export class Widget {
             const settings = (await response.json()) as {
                 require_email?: boolean;
                 capture_screenshot?: boolean;
+                mode?: string;
             };
+
+            // A key set to anonymous takes no identity from the page: the reporter
+            // types an email or stays anonymous. The server discards it anyway.
+            if (settings.mode === 'anonymous') {
+                this.identity = {};
+                this.ignoreIdentity = true;
+            }
 
             if (typeof settings.require_email === 'boolean') {
                 this.config.requireEmail = settings.require_email;
@@ -381,7 +396,9 @@ export class Widget {
             <label for="buggie-body">Anything else?</label>
             <textarea id="buggie-body" maxlength="4000" placeholder="What you expected instead, and how to reproduce it."></textarea>
             ${
-                this.config.requireEmail || !this.identity.email
+                // An email from identify() is the page vouching for who this is, so
+                // the reporter is not asked to type it again.
+                !this.identity.email
                     ? `<label for="buggie-email">Your email${this.config.requireEmail ? '' : ' (optional)'}</label>
                        <input id="buggie-email" type="email" value="${escapeAttribute(this.identity.email ?? '')}" placeholder="you@example.com" />`
                     : ''
@@ -438,8 +455,12 @@ export class Widget {
                     body: body || null,
                     reporter: {
                         name: this.identity.name ?? null,
-                        email: email || this.identity.email || null,
+                        email: this.identity.email || email || null,
                         ref: this.identity.id != null ? String(this.identity.id) : null,
+                        // Where the email came from, which the server cannot otherwise
+                        // tell: the page, via identify(), or the reporter's own typing.
+                        source: this.identity.email ? 'identify' : email ? 'typed' : null,
+                        user_hash: typeof this.identity.user_hash === 'string' ? this.identity.user_hash : null,
                     },
                     environment: { ...environment(this.release), identity: scrubIdentity(this.identity) },
                     console: getConsole(),
@@ -503,7 +524,9 @@ export class Widget {
 
 /** Only ever send the identity fields the host app chose to give us. */
 function scrubIdentity(identity: Identity): Record<string, unknown> {
-    const { id, email, name, ...rest } = identity;
+    // The hash is a credential, not context: it is checked once and never stored.
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { id, email, name, user_hash, ...rest } = identity;
 
     return { id: id ?? null, email: email ?? null, name: name ?? null, ...rest };
 }

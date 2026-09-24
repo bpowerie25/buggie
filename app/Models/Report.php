@@ -12,7 +12,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 #[Fillable([
     'project_id', 'widget_key_id', 'title', 'body', 'reporter_name', 'reporter_email',
-    'reporter_ref', 'environment', 'console', 'network', 'error', 'screenshot_path',
+    'reporter_ref', 'reporter_identity', 'environment', 'console', 'network', 'error', 'screenshot_path',
     'fingerprint', 'state', 'issue_id', 'ip_hash',
 ])]
 class Report extends Model

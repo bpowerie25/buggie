@@ -219,6 +219,8 @@ Route::domain('{workspace}.'.$host)
             ->name('comments.store');
         Route::post('issues/{issue}/await-client', [CommentController::class, 'await'])
             ->name('comments.await');
+        Route::post('issues/{issue}/reporter', \App\Http\Controllers\IssueReporterController::class)
+            ->name('issues.reporter');
         Route::patch('comments/{comment}', [CommentController::class, 'update'])
             ->name('comments.update');
         Route::delete('comments/{comment}', [CommentController::class, 'destroy'])
@@ -259,6 +261,8 @@ Route::domain('{workspace}.'.$host)
             ->name('widget-keys.store');
         Route::patch('widget-keys/{widgetKey}', [WidgetKeyController::class, 'update'])
             ->name('widget-keys.update');
+        Route::post('widget-keys/{widgetKey}/secret', [WidgetKeyController::class, 'rotate'])
+            ->name('widget-keys.rotate');
         Route::delete('widget-keys/{widgetKey}', [WidgetKeyController::class, 'destroy'])
             ->name('widget-keys.destroy');
 

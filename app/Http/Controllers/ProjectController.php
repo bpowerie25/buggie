@@ -177,7 +177,17 @@ class ProjectController extends Controller
                 'is_active' => $key->is_active,
                 'last_used_at' => $key->last_used_at?->toIso8601String(),
                 'snippet' => '<script src="'.central_url('w/'.$key->public_key.'.js').'" async></script>',
+                // When, never what: the secret itself is shown once, on creation or
+                // rotation, and is otherwise never sent to a browser.
+                'secret_rotated_at' => $key->secret_rotated_at?->toIso8601String(),
             ]),
+            'widgetModes' => array_map(
+                fn (\App\Enums\WidgetMode $mode) => ['value' => $mode->value, 'label' => $mode->label()],
+                \App\Enums\WidgetMode::cases(),
+            ),
+            // Only on the page load straight after creating or rotating, for the person
+            // who did it. See WidgetKeyController::reveal().
+            'revealedSecret' => session('widget_secret'),
         ]);
     }
 

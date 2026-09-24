@@ -14,6 +14,9 @@ use Illuminate\Support\Str;
     'project_id', 'allowed_origins', 'mode', 'require_email',
     'capture_screenshot', 'is_active',
 ])]
+// The secret signs reporter identities. Hidden as well as unfillable: it must never
+// reach a browser — not the embed script, not page props, not a JSON response.
+#[\Illuminate\Database\Eloquent\Attributes\Hidden(['secret'])]
 class WidgetKey extends Model
 {
     use BelongsToWorkspace, HasFactory;
@@ -26,6 +29,10 @@ class WidgetKey extends Model
             'capture_screenshot' => 'boolean',
             'is_active' => 'boolean',
             'last_used_at' => 'datetime',
+            // Encrypted at rest with APP_KEY: a database dump is not a way to forge a
+            // verified report.
+            'secret' => 'encrypted',
+            'secret_rotated_at' => 'datetime',
         ];
     }
 
@@ -38,6 +45,8 @@ class WidgetKey extends Model
     {
         static::creating(function (self $key) {
             $key->public_key ??= self::generateKey();
+            $key->secret ??= self::generateSecret();
+            $key->secret_rotated_at ??= now();
         });
     }
 
@@ -54,6 +63,41 @@ class WidgetKey extends Model
     public function reports(): HasMany
     {
         return $this->hasMany(Report::class);
+    }
+
+    public static function generateSecret(): string
+    {
+        return 'whs_'.Str::random(40);
+    }
+
+    /** A new secret, returned so it can be shown once. The old one stops working. */
+    public function rotateSecret(): string
+    {
+        $secret = self::generateSecret();
+
+        $this->forceFill(['secret' => $secret, 'secret_rotated_at' => now()])->save();
+
+        return $secret;
+    }
+
+    /**
+     * Whether a user_hash proves this id and email: HMAC-SHA256 of "id:email" with
+     * the secret, compared in constant time. Both parts are signed because a report
+     * is linked to a client by its email, and a hash over the id alone would let a
+     * signed-in user pair their own valid hash with somebody else's address.
+     */
+    public function verifiesIdentity(?string $id, ?string $email, ?string $hash): bool
+    {
+        if ($this->secret === null || $id === null || $id === '' || $email === null || $email === '' || $hash === null || $hash === '') {
+            return false;
+        }
+
+        return hash_equals(hash_hmac('sha256', $id.':'.$email, $this->secret), strtolower($hash));
+    }
+
+    public function mode(): \App\Enums\WidgetMode
+    {
+        return \App\Enums\WidgetMode::tryFrom((string) $this->mode) ?? \App\Enums\WidgetMode::Identified;
     }
 
     public static function generateKey(): string

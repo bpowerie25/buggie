@@ -16,6 +16,11 @@ export interface Identity {
     id?: string | number;
     email?: string;
     name?: string;
+    /**
+     * HMAC-SHA256 of `${id}:${email}` with the widget key's secret, computed on your
+     * server — never in the browser. Makes the report "verified".
+     */
+    user_hash?: string;
     [key: string]: unknown;
 }
 

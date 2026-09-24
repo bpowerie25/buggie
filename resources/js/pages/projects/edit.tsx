@@ -17,6 +17,7 @@ interface WidgetKeyRow {
     is_active: boolean;
     last_used_at: string | null;
     snippet: string;
+    secret_rotated_at: string | null;
 }
 
 interface CustomFieldRow {
@@ -60,6 +61,8 @@ export default function EditProject({
     fieldTypes = [],
     branding,
     clientWait,
+    widgetModes = [],
+    revealedSecret = null,
 }: {
     project: ProjectSummary;
     widgetKeys: WidgetKeyRow[];
@@ -72,6 +75,9 @@ export default function EditProject({
     fieldTypes?: { value: string; label: string; has_options: boolean }[];
     branding: { name: string | null; color: string | null; logo: string | null; placeholder: string };
     clientWait: { reminder_days: number | null; close_days: number | null; has_status: boolean };
+    widgetModes?: { value: string; label: string }[];
+    /** Present only on the page load straight after creating or rotating a secret. */
+    revealedSecret?: { key: string; secret: string } | null;
 }) {
     const { data, setData, put, processing, errors } = useForm({
         name: project.name,
@@ -205,7 +211,12 @@ export default function EditProject({
                 ) : (
                     <div className="mt-4 space-y-4">
                         {widgetKeys.map((key) => (
-                            <WidgetKeyCard key={key.id} widgetKey={key} />
+                            <WidgetKeyCard
+                                key={key.id}
+                                widgetKey={key}
+                                modes={widgetModes}
+                                secret={revealedSecret?.key === key.public_key ? revealedSecret.secret : null}
+                            />
                         ))}
                     </div>
                 )}
@@ -308,7 +319,16 @@ function CopyRow({ value, label }: { value: string; label: string }) {
     );
 }
 
-function WidgetKeyCard({ widgetKey }: { widgetKey: WidgetKeyRow }) {
+function WidgetKeyCard({
+    widgetKey,
+    modes,
+    secret,
+}: {
+    widgetKey: WidgetKeyRow;
+    modes: { value: string; label: string }[];
+    /** Only straight after creating or rotating it, and never again. */
+    secret: string | null;
+}) {
     const [origins, setOrigins] = useState(widgetKey.allowed_origins.join('\n'));
     // Said beside the key rather than only in a toast: a setting that did not save
     // and looks as if it did is how a widget ends up open to every origin.
@@ -440,11 +460,113 @@ function WidgetKeyCard({ widgetKey }: { widgetKey: WidgetKeyRow }) {
                 </div>
             </div>
 
+            <IdentitySettings
+                widgetKey={widgetKey}
+                modes={modes}
+                secret={secret}
+                onModeChange={(mode) => save({ mode })}
+            />
+
             <p className="mt-3 text-[11px] text-ink-subtle">
                 Passwords and any element marked <code>data-buggie-redact</code> are never
                 captured, credential-shaped query parameters are stripped from URLs, and the
                 reporter sees the image before it is sent.
             </p>
+        </div>
+    );
+}
+
+/**
+ * Who reported something, and how sure we are: the key's identity mode, its signing
+ * secret, and how to call identify() — with the server-side half, because a hash
+ * computed in the browser would be a hash anybody could compute.
+ */
+function IdentitySettings({
+    widgetKey,
+    modes,
+    secret,
+    onModeChange,
+}: {
+    widgetKey: WidgetKeyRow;
+    modes: { value: string; label: string }[];
+    secret: string | null;
+    onModeChange: (mode: string) => void;
+}) {
+    const identify = `window.buggie = window.buggie || { q: [] };
+window.buggie.q.push(['identify', {
+  id: '4821',
+  email: 'ann@acme.com',
+  name: 'Ann',
+  user_hash: '<computed on your server>',
+}]);`;
+
+    const php = `// user_hash = HMAC-SHA256 of "id:email", with this key's secret.
+$userHash = hash_hmac('sha256', $user->id . ':' . $user->email, getenv('BUGGIE_WIDGET_SECRET'));`;
+
+    const node = `// user_hash = HMAC-SHA256 of "id:email", with this key's secret.
+const crypto = require('node:crypto');
+const userHash = crypto
+  .createHmac('sha256', process.env.BUGGIE_WIDGET_SECRET)
+  .update(\`\${user.id}:\${user.email}\`)
+  .digest('hex');`;
+
+    return (
+        <div className="mt-5 space-y-3 border-t border-border pt-4">
+            <Field
+                label="Reporter identity"
+                hint="Verified means your server signed who the reporter is. Only then — unless the workspace trusts unverified emails — is a report linked to a client, who can then see it."
+            >
+                <select
+                    value={widgetKey.mode}
+                    onChange={(e) => onModeChange(e.target.value)}
+                    className="w-full rounded-lg border border-border bg-raised px-3 py-2 text-sm text-ink"
+                >
+                    {modes.map((mode) => (
+                        <option key={mode.value} value={mode.value}>
+                            {mode.label}
+                        </option>
+                    ))}
+                </select>
+            </Field>
+
+            <div>
+                <p className="text-sm font-medium text-ink">Signing secret</p>
+                {secret ? (
+                    <>
+                        <p className="mt-1 text-xs text-amber-600 dark:text-amber-500">
+                            Copy this now and keep it on your server. It is not shown again.
+                        </p>
+                        <CopyRow value={secret} label="Copy secret" />
+                    </>
+                ) : (
+                    <p className="mt-1 text-xs text-ink-subtle">
+                        Hidden. {widgetKey.secret_rotated_at && `Last set ${new Date(widgetKey.secret_rotated_at).toLocaleDateString()}. `}
+                        Rotating makes a new one and stops the old one verifying at once.
+                    </p>
+                )}
+                <Button
+                    size="sm"
+                    variant="secondary"
+                    className="mt-2"
+                    onClick={() => router.post(`/widget-keys/${widgetKey.public_key}/secret`, {}, { preserveScroll: true })}
+                >
+                    Rotate secret
+                </Button>
+            </div>
+
+            <div>
+                <p className="text-sm font-medium text-ink">Identify the reporter</p>
+                <p className="mt-1 text-xs text-ink-subtle">
+                    On pages where someone is signed in. The email field is then filled in and hidden.
+                    Without <code>user_hash</code> the report is <em>identified</em>; with a valid one it is{' '}
+                    <em>verified</em>. A wrong hash is recorded as identified and logged.
+                </p>
+                <CopyRow value={identify} label="Copy identify snippet" />
+                <p className="mt-3 text-xs text-ink-subtle">Computing user_hash on your server — PHP:</p>
+                <CopyRow value={php} label="Copy PHP example" />
+                <p className="mt-3 text-xs text-ink-subtle">Node:</p>
+                <CopyRow value={node} label="Copy Node example" />
+            </div>
         </div>
     );
 }

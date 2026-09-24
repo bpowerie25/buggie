@@ -125,7 +125,7 @@ replace; an unresolvable name matches nothing rather than everything.
 `resources/widget/` builds separately (`npm run build:widget`) to a stable, unhashed
 path, because customers embed the URL. It is vanilla TypeScript with no runtime
 dependencies — html2canvas is fetched from a CDN only when someone opens the reporter,
-which keeps the bundle every visitor downloads at ~6KB gzipped. Keep it that way.
+which keeps the bundle every visitor downloads at ~7KB gzipped. Keep it that way.
 
 Two things that are load-bearing:
 
@@ -140,7 +140,10 @@ Two things that are load-bearing:
 
 The ingest endpoint is unauthenticated by necessity and treated as hostile: origin
 allowlist, rate limits, hard size caps, URL secret-stripping, and the IP stored only as
-an HMAC. `/widget-demo` (local only) is a deliberately broken checkout page for
+an HMAC. Reporter identity is decided there too (`ReporterIdentityCheck`), after the
+origin check: a `user_hash` is HMAC-SHA256 of `id:email` with the key's secret, which is
+encrypted, `#[Hidden]`, and leaves the server only in the one flash after creating or
+rotating it. Identity grants access only through `ReporterLink` setting `reporter_id`. `/widget-demo` (local only) is a deliberately broken checkout page for
 developing against.
 
 Reports are **not** issues. They land in `reports` and are promoted, merged or

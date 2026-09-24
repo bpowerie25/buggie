@@ -53,6 +53,9 @@ class Issue extends Model
             'client_reminded_at' => 'datetime',
             'auto_closed_at' => 'datetime',
             'client_replied_at' => 'datetime',
+            // Who sent a widget report and how sure we are. Informational; access
+            // comes only from reporter_id. See ReporterLink.
+            'reporter_identity' => \App\Enums\ReporterIdentity::class,
         ];
     }
 

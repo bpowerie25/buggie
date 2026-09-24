@@ -66,7 +66,9 @@ function boot() {
     });
 
     const api: BuggieApi = {
-        identify: (identity) => Object.assign(widget.identity, identity ?? {}),
+        identify: (identity) => {
+            if (!widget.ignoreIdentity) Object.assign(widget.identity, identity ?? {});
+        },
         setRelease: (release) => (widget.release = release),
         open: () => void widget.show(),
         close: () => widget.dismiss(),

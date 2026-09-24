@@ -24,6 +24,8 @@ enum IssueEventType: string
     case ClientReminded = 'client_reminded';
     /** Closed after waiting too long for a reply. Client-visible, with a comment. */
     case AutoClosed = 'auto_closed';
+    /** A widget report's reporter was matched to a client member. Internal. */
+    case ReporterLinked = 'reporter_linked';
     case VersionChanged = 'version_changed';
     case Related = 'related';
     case Unrelated = 'unrelated';

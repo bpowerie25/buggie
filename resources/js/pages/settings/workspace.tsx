@@ -70,7 +70,13 @@ export default function WorkspaceSettings({
     chatProviders = [],
     projects = [],
 }: {
-    workspace: { name: string; slug: string; created_at: string; show_staff_names: boolean };
+    workspace: {
+        name: string;
+        slug: string;
+        created_at: string;
+        show_staff_names: boolean;
+        trust_unverified_emails: boolean;
+    };
     domain: string;
     can_delete: boolean;
     tokens?: TokenRow[];
@@ -84,6 +90,7 @@ export default function WorkspaceSettings({
     const { data, setData, patch, processing, errors } = useForm({
         name: workspace.name,
         show_staff_names: workspace.show_staff_names,
+        trust_unverified_emails: workspace.trust_unverified_emails,
     });
     const [confirm, setConfirm] = useState('');
 
@@ -128,6 +135,23 @@ export default function WorkspaceSettings({
                         <span className="block text-xs text-ink-subtle">
                             Off, clients see replies and changes from “{workspace.name}”. On, they
                             see who on the team wrote each one.
+                        </span>
+                    </span>
+                </label>
+
+                <label className="flex items-start gap-2 text-sm text-ink-muted">
+                    <input
+                        type="checkbox"
+                        checked={data.trust_unverified_emails}
+                        onChange={(e) => setData('trust_unverified_emails', e.target.checked)}
+                        className="mt-0.5 rounded border-border-strong"
+                    />
+                    <span>
+                        Trust unverified emails from the widget
+                        <span className="block text-xs text-ink-subtle">
+                            Off, only a verified identity links a widget report to a client, who can
+                            then see it. On, a typed or identified email matching a client does too —
+                            and anybody could type that client's address.
                         </span>
                     </span>
                 </label>

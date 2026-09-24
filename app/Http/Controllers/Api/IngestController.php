@@ -12,6 +12,9 @@ use App\Models\WidgetKey;
 use App\Support\Tenancy\Tenancy;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use App\Enums\ReporterIdentity;
+use App\Enums\WidgetMode;
+use App\Support\Reports\ReporterIdentityCheck;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
@@ -76,9 +79,21 @@ class IngestController extends Controller
             ], 402);
         }
 
+        // Who sent it, decided here rather than believed from the page. After the
+        // origin check and the rate limits: identity is only considered for a report
+        // that is allowed to arrive at all.
+        $identity = ReporterIdentityCheck::resolve($request, $key);
+
+        if ($key->mode() === WidgetMode::Verified && $identity['level'] !== ReporterIdentity::Verified) {
+            return response()->json([
+                'message' => 'This site only accepts reports from signed-in users. Please sign in and try again, or contact the team directly.',
+                'errors' => ['reporter' => ['A verified identity is required.']],
+            ], 422);
+        }
+
         // Enforced here as well as asked for in the form. A rule the browser keeps
         // is a rule anybody can decline to keep.
-        if ($key->require_email && ! filter_var((string) $request->input('reporter.email'), FILTER_VALIDATE_EMAIL)) {
+        if ($key->require_email && ! filter_var((string) $identity['email'], FILTER_VALIDATE_EMAIL)) {
             return response()->json([
                 'message' => 'This site asks for an email address with every report.',
                 'errors' => ['reporter.email' => ['An email address is required.']],
@@ -92,9 +107,10 @@ class IngestController extends Controller
             'widget_key_id' => $key->id,
             'title' => Str::limit($request->string('title')->trim()->toString(), 250, ''),
             'body' => $request->string('body')->trim()->toString() ?: null,
-            'reporter_name' => $request->input('reporter.name'),
-            'reporter_email' => $request->input('reporter.email'),
-            'reporter_ref' => $request->input('reporter.ref'),
+            'reporter_name' => $identity['name'],
+            'reporter_email' => $identity['email'],
+            'reporter_ref' => $identity['ref'],
+            'reporter_identity' => $identity['level']->value,
             'environment' => $this->environment($request),
 
             // An unmetered duplicate keeps what makes it an occurrence — the error,
@@ -250,6 +266,12 @@ class IngestController extends Controller
 
         if (isset($environment['referrer'])) {
             $environment['referrer'] = self::stripSecrets((string) $environment['referrer']);
+        }
+
+        // The identity hash is a credential, checked once and never kept — wherever
+        // in the payload an older or hand-rolled client put it.
+        if (is_array($environment['identity'] ?? null)) {
+            unset($environment['identity']['user_hash']);
         }
 
         return $environment;

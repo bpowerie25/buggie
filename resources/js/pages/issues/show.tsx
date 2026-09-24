@@ -65,7 +65,17 @@ type ClientAudience = 'default' | 'project' | 'specific';
 
 interface Issue extends IssueRow {
     description: JSONContent | null;
-    reporter: Person | null;
+    reporter: Actor | null;
+    /** Who sent a widget report and how sure we are. Staff only. */
+    widget_reporter: {
+        identity: 'anonymous' | 'email_unverified' | 'identified' | 'verified';
+        label: string;
+        name: string | null;
+        email: string | null;
+        page_url: string | null;
+        linked: boolean;
+        candidates: { id: number; name: string; matches: boolean }[];
+    } | null;
     visibility: VisibilityValue;
     client_audience: ClientAudience;
     /** Staff only; empty for a client. */
@@ -206,6 +216,92 @@ function commentBorder(comment: Comment): string {
     if (comment.is_internal) return '#F59E0B';
 
     return comment.author.role === 'client' ? '#10B981' : '#3B82F6';
+}
+
+const IDENTITY_STYLES: Record<string, string> = {
+    verified: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
+    identified: 'bg-sky-500/10 text-sky-600 dark:text-sky-400',
+    email_unverified: 'bg-amber-500/10 text-amber-600 dark:text-amber-500',
+    anonymous: 'bg-surface text-ink-muted',
+};
+
+/**
+ * Who sent a widget report, how sure we are, and — if they are not linked to a
+ * client yet — the way to link them. Linking is what lets them see the issue.
+ */
+function WidgetReporter({
+    reporter,
+    linkedTo,
+    issueKey,
+    canLink,
+}: {
+    reporter: NonNullable<Issue['widget_reporter']>;
+    linkedTo: string | null;
+    issueKey: string;
+    canLink: boolean;
+}) {
+    const error = (usePage().props.errors as Record<string, string>)?.user_id;
+
+    return (
+        <div className="min-w-0 space-y-1 text-sm">
+            <p className="flex flex-wrap items-center gap-1.5 text-ink">
+                <span className="truncate">{reporter.name ?? reporter.email ?? 'Anonymous'}</span>
+                <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${IDENTITY_STYLES[reporter.identity]}`}>
+                    {reporter.label}
+                </span>
+            </p>
+            {reporter.name && reporter.email && (
+                <p className="truncate text-xs text-ink-subtle">{reporter.email}</p>
+            )}
+            <p className="truncate text-xs text-ink-subtle">
+                via widget
+                {reporter.page_url && (
+                    <>
+                        {' · '}
+                        <a href={reporter.page_url} target="_blank" rel="noreferrer noopener" className="hover:text-accent">
+                            {reporter.page_url}
+                        </a>
+                    </>
+                )}
+            </p>
+
+            {linkedTo ? (
+                <p className="text-xs text-ink-muted">Linked to {linkedTo}, who can see this issue.</p>
+            ) : (
+                canLink &&
+                reporter.candidates.length > 0 && (
+                    <Popover
+                        align="right"
+                        label="Link to client"
+                        trigger={() => (
+                            <span className="rounded border border-dashed border-border-strong px-1.5 py-0.5 text-[11px] text-ink-subtle">
+                                Link to client
+                            </span>
+                        )}
+                    >
+                        {(close) =>
+                            reporter.candidates.map((client) => (
+                                <PopoverItem
+                                    key={client.id}
+                                    onSelect={() => {
+                                        close();
+                                        router.post(`/issues/${issueKey}/reporter`, { user_id: client.id }, { preserveScroll: true });
+                                    }}
+                                >
+                                    {client.name}
+                                    {client.matches && (
+                                        <span className="ml-auto text-[10px] text-ink-subtle">same email</span>
+                                    )}
+                                </PopoverItem>
+                            ))
+                        }
+                    </Popover>
+                )
+            )}
+
+            {error && <p className="text-xs text-danger">{error}</p>}
+        </div>
+    );
 }
 
 /** Renders one activity event as a sentence. */
@@ -1393,9 +1489,18 @@ export default function ShowIssue({
                     </SidebarRow>
 
                     <SidebarRow label="Reporter">
-                        <span className="text-sm text-ink">
-                            {issue.reporter?.name ?? 'Unknown'}
-                        </span>
+                        {issue.widget_reporter ? (
+                            <WidgetReporter
+                                reporter={issue.widget_reporter}
+                                linkedTo={issue.widget_reporter.linked ? issue.reporter?.name ?? null : null}
+                                issueKey={issue.key}
+                                canLink={can.update}
+                            />
+                        ) : (
+                            <span className="text-sm text-ink">
+                                {issue.reporter?.name ?? 'Unknown'}
+                            </span>
+                        )}
                     </SidebarRow>
 
                     {diagnostics && <Diagnostics data={diagnostics} heading="Diagnostics" />}
