@@ -67,8 +67,15 @@ canvas { width: 100%; border: 1px solid #e2e8f0; border-radius: 8px; cursor: cro
 .hint { font-size: 11px; color: #64748b; margin: 6px 0 0; }
 .shot { cursor: zoom-in; }
 .shot canvas { pointer-events: none; }
+/* A zero-height strip over the top of the screenshot that sticks to the visible part
+   of the panel, so the button stays in reach however the form is scrolled. */
+.expand-dock {
+  position: sticky; top: 8px; bottom: 40px; z-index: 1; height: 0;
+  display: flex; justify-content: flex-end; align-items: flex-start; pointer-events: none;
+}
 .expand {
-  position: absolute; right: 8px; top: 8px;
+  margin: 8px 8px 0 0; pointer-events: auto;
+  box-shadow: 0 2px 8px rgba(0,0,0,.25);
   display: flex; align-items: center; gap: 4px;
   padding: 4px 8px; border: 0; border-radius: 6px;
   background: rgba(15,23,42,.82); color: #fff; font-size: 11px; cursor: pointer;
@@ -259,15 +266,19 @@ export class Widget {
 
         this.canvas = canvas;
         slot.innerHTML = '';
-        slot.appendChild(canvas);
 
         // The preview is a button into the editor; the drawing happens there, where
-        // the image is big enough to aim at.
+        // the image is big enough to aim at. The button sits in a sticky strip ahead
+        // of the image, so it floats over it and never scrolls out of reach.
+        const dock = document.createElement('div');
+        dock.className = 'expand-dock';
         const expand = document.createElement('button');
         expand.type = 'button';
         expand.className = 'expand';
         expand.textContent = '✎ Mark up';
-        slot.appendChild(expand);
+        dock.appendChild(expand);
+        slot.appendChild(dock);
+        slot.appendChild(canvas);
 
         const hint = document.createElement('p');
         hint.className = 'hint';
@@ -340,7 +351,8 @@ export class Widget {
         const close = () => {
             // Put the image back in the panel so the reporter still sees what they
             // are about to send.
-            slot.insertBefore(canvas, slot.firstChild);
+            // Back under the sticky strip that carries the Mark up button.
+            slot.insertBefore(canvas, slot.querySelector('.expand-dock')?.nextSibling ?? slot.firstChild);
             editor.remove();
             document.removeEventListener('keydown', onKey);
         };

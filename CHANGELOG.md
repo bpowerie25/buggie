@@ -118,6 +118,12 @@ today you are running `main`, which is honest rather than ideal — see
 
 ### Fixed
 
+- **The screenshot is of what the reporter is looking at.** On a scrolled page it could
+  be of a different part of the page altogether — further off the further down — and
+  text in it looked wrong. The capture copied the widget's own stylesheet into its copy
+  of the page, which resized every padded or bordered element on it. The widget is now
+  left out of the copy entirely. *Mark up* also floats over the screenshot and stays in
+  view however the report form is scrolled.
 - A client on "own issues only" did not see issues they had reported through the widget
   with their own address, because the link to their account was only made when a
   report was accepted, and only for a trusted identity. Turning on *Trust unverified

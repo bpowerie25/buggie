@@ -84,6 +84,15 @@ export async function capture(hide: HTMLElement): Promise<HTMLCanvasElement | nu
             scrollY: 0,
             windowWidth: window.innerWidth,
             windowHeight: window.innerHeight,
+            /*
+             * Left out of the copy entirely, not merely hidden. html2canvas copies a
+             * shadow root's children — our stylesheet included — into the light DOM of
+             * the page it clones, where `* { box-sizing: border-box }` and our fonts
+             * then restyled the whole customer page: every padded or bordered element
+             * changed size, everything below moved, and the picture was of a different
+             * part of the page from the one on screen, further off the further down.
+             */
+            ignoreElements: (element: Element) => element === hide,
         });
 
         // html2canvas sizes the canvas inline to the page's CSS pixels, which beats
