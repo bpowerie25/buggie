@@ -9,4 +9,6 @@ enum WatchReason: string
     case Commented = 'commented';
     case Reported = 'reported';
     case Manual = 'manual';
+    /** Followed the original because their own issue was closed as its duplicate. */
+    case Duplicate = 'duplicate';
 }

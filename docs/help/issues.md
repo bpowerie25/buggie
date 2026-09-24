@@ -198,6 +198,14 @@ Issues can be linked as *blocks*, *blocked by*, *relates to* or *duplicates*, an
 inverse link is written on the other issue automatically. Existing links appear under
 **Linked** in the right-hand column.
 
+**Mark as duplicate…** under *Linked* in the sidebar does more than link: type the key
+of the original and this issue closes as not done (the project's first *canceled*
+status), a comment in its thread says why, and its reporter and watchers start
+following the original — so a client who raised it hears when the real one moves.
+Marking something as a duplicate of an issue that is itself a duplicate points at the
+original. A client is only told the original's key when it is visible to clients in the
+same project; otherwise they read that it duplicates an issue the team is already on.
+
 There is currently no control in the interface for adding or removing a link; the
 endpoints exist (`POST` and `DELETE` on `/issues/{key}/relations`, taking a `key` and
 a `type`) but nothing on the issue page calls them. Links created another way display

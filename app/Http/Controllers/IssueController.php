@@ -203,7 +203,7 @@ class IssueController extends Controller
         $this->authorize('view', $issue);
 
         $issue->load([
-            'status', 'project', 'assignee', 'reporter', 'labels', 'version',
+            'status', 'project', 'assignee', 'reporter', 'labels', 'version', 'duplicateOf:id,key,title',
             'parent:id,key,title',
             'children:id,parent_id,key,title,status_id',
             'children.status:id,name,color,category',
@@ -225,7 +225,7 @@ class IssueController extends Controller
         // What a client may know about other issues: only those they could open. A
         // related or child issue's title is otherwise internal work in the payload.
         $visibleKeys = $staff ? null : Issue::query()
-            ->whereIn('id', collect([$issue->parent?->id])
+            ->whereIn('id', collect([$issue->parent?->id, $issue->duplicate_of_id])
                 ->merge($issue->children->pluck('id'))
                 ->merge($issue->relations->pluck('relatedIssue.id'))
                 ->filter()->all())
@@ -300,6 +300,11 @@ class IssueController extends Controller
                 ...$this->summary($issue),
                 'description' => $issue->description,
                 'reporter' => $issue->reporter === null ? null : $author($issue->reporter),
+                // Only if the reader could open it; a key is not something a client
+                // should learn about work they cannot see.
+                'duplicate_of' => $canSee($issue->duplicate_of_id)
+                    ? $issue->duplicateOf?->only(['key', 'title'])
+                    : null,
                 // Who sent a widget report and how sure we are. Staff only: it is an
                 // address and an assessment, and neither is a client's business.
                 'widget_reporter' => $staff && $issue->reporter_identity !== null ? [

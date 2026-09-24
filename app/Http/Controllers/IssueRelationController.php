@@ -47,4 +47,26 @@ class IssueRelationController extends Controller
 
         return back();
     }
+
+    /**
+     * Close this issue as a duplicate of another. Staff only: it closes the issue and
+     * moves its followers, which is changing state.
+     */
+    public function duplicate(Request $request, Issue $issue, \App\Actions\MarkDuplicate $action): RedirectResponse
+    {
+        $this->authorize('update', $issue);
+
+        $validated = $request->validate(['key' => ['required', 'string', 'max:40']]);
+
+        // Scoped, so a key from another workspace simply does not exist.
+        $original = Issue::where('key', strtoupper(trim($validated['key'])))->first();
+
+        if ($original === null) {
+            return back()->withErrors(['key' => 'No issue with that key in this workspace.']);
+        }
+
+        $action->handle($issue, $original, $request->user());
+
+        return back()->with('success', "{$issue->key} closed as a duplicate of {$original->key}. Its followers now follow {$original->key}.");
+    }
 }

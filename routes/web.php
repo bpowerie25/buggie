@@ -237,6 +237,8 @@ Route::domain('{workspace}.'.$host)
             ->name('relations.store');
         Route::delete('issues/{issue}/relations', [IssueRelationController::class, 'destroy'])
             ->name('relations.destroy');
+        Route::post('issues/{issue}/duplicate', [IssueRelationController::class, 'duplicate'])
+            ->name('issues.duplicate');
 
         Route::resource('labels', LabelController::class)
             ->only(['index', 'store', 'update', 'destroy']);

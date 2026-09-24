@@ -30,7 +30,7 @@ import type {
 import type { RequestPayload } from '@inertiajs/core';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import type { JSONContent } from '@tiptap/react';
-import { Eye, EyeOff, Lock, Plus, Tag, Timer, Trash2, X } from 'lucide-react';
+import { Copy, Eye, EyeOff, Lock, Plus, Tag, Timer, Trash2, X } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 
 /** Whoever wrote or did something, as the reader is allowed to see them. */
@@ -66,6 +66,8 @@ type ClientAudience = 'default' | 'project' | 'specific';
 interface Issue extends IssueRow {
     description: JSONContent | null;
     reporter: Actor | null;
+    /** The issue this one was closed as a duplicate of, if the reader could open it. */
+    duplicate_of: { key: string; title: string } | null;
     /** Who sent a widget report and how sure we are. Staff only. */
     widget_reporter: {
         identity: 'anonymous' | 'email_unverified' | 'identified' | 'verified';
@@ -304,6 +306,57 @@ function WidgetReporter({
     );
 }
 
+/**
+ * Close this issue as a duplicate of another: type its key, and the issue closes,
+ * says so in its thread, and its reporter and watchers follow the original instead.
+ */
+function MarkDuplicate({ issueKey }: { issueKey: string }) {
+    const [open, setOpen] = useState(false);
+    const { data, setData, post, processing, errors } = useForm({ key: '' });
+
+    if (!open) {
+        return (
+            <button
+                type="button"
+                onClick={() => setOpen(true)}
+                className="mt-1.5 flex items-center gap-1 rounded border border-dashed border-border-strong px-1.5 py-0.5 text-[11px] text-ink-subtle hover:text-ink"
+            >
+                <Copy className="size-3" />
+                Mark as duplicate…
+            </button>
+        );
+    }
+
+    return (
+        <form
+            onSubmit={(e) => {
+                e.preventDefault();
+                post(`/issues/${issueKey}/duplicate`, { preserveScroll: true, onSuccess: () => setOpen(false) });
+            }}
+            className="mt-1.5 space-y-1.5"
+        >
+            <p className="text-[11px] text-ink-subtle">
+                Duplicate of which issue? This one closes, and its reporter and watchers follow that one.
+            </p>
+            <div className="flex gap-1.5">
+                <input
+                    value={data.key}
+                    autoFocus
+                    placeholder="KD-12"
+                    aria-label="Key of the original issue"
+                    onChange={(e) => setData('key', e.target.value)}
+                    onKeyDown={(e) => e.key === 'Escape' && setOpen(false)}
+                    className="h-7 w-24 rounded-md border border-border-strong bg-raised px-2 font-mono text-xs text-ink uppercase focus:border-accent focus:outline-none"
+                />
+                <Button type="submit" size="sm" disabled={processing || data.key.trim() === ''}>
+                    Close as duplicate
+                </Button>
+            </div>
+            {errors.key && <p className="text-[11px] text-danger">{errors.key}</p>}
+        </form>
+    );
+}
+
 /** Renders one activity event as a sentence. */
 function typeLabel(value: string): string {
     return value.charAt(0).toUpperCase() + value.slice(1);
@@ -343,6 +396,8 @@ function eventSentence(event: Event): string {
             return 'The client was reminded that a reply is waiting';
         case 'auto_closed':
             return `Closed after ${d.days as number} days without a reply`;
+        case 'marked_duplicate':
+            return d.of ? `${actor} closed this as a duplicate of ${d.of as string}` : `${actor} closed this as a duplicate`;
         case 'audience_changed': {
             const clients = (d.clients as string[] | undefined) ?? [];
             const to =
@@ -740,6 +795,17 @@ export default function ShowIssue({
                             </span>
                         )}
                     </div>
+
+                    {issue.duplicate_of && (
+                        <p className="mt-2 flex items-center gap-1.5 text-sm text-ink-muted">
+                            <Copy className="size-3.5" />
+                            Duplicate of{' '}
+                            <Link href={`/issues/${issue.duplicate_of.key}`} className="font-medium text-accent hover:underline">
+                                {issue.duplicate_of.key}
+                            </Link>
+                            <span className="truncate text-ink-subtle">{issue.duplicate_of.title}</span>
+                        </p>
+                    )}
 
                     {editingTitle && can.update ? (
                         <input
@@ -1486,6 +1552,7 @@ export default function ShowIssue({
                             types={relationTypes}
                             editable={can.update}
                         />
+                        {can.update && !issue.duplicate_of && <MarkDuplicate issueKey={issue.key} />}
                     </SidebarRow>
 
                     <SidebarRow label="Reporter">

@@ -26,6 +26,8 @@ enum IssueEventType: string
     case AutoClosed = 'auto_closed';
     /** A widget report's reporter was matched to a client member. Internal. */
     case ReporterLinked = 'reporter_linked';
+    /** Closed as a duplicate of another issue. Client-visible: it is why their issue closed. */
+    case MarkedDuplicate = 'marked_duplicate';
     case VersionChanged = 'version_changed';
     case Related = 'related';
     case Unrelated = 'unrelated';
@@ -44,7 +46,7 @@ enum IssueEventType: string
     {
         return in_array($this, [
             self::Created, self::StatusChanged, self::Closed, self::Reopened,
-            self::AwaitingClient, self::ClientReplied, self::AutoClosed,
+            self::AwaitingClient, self::ClientReplied, self::AutoClosed, self::MarkedDuplicate,
         ], true);
     }
 }

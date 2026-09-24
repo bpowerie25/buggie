@@ -12,6 +12,10 @@ today you are running `main`, which is honest rather than ideal — see
 
 ### Added
 
+- **Mark as duplicate.** Closes an issue as not done, says why in its thread, and moves
+  its reporter and watchers onto the original, so whoever raised it keeps hearing about
+  the fix. A "duplicates" link existed before, but left the duplicate open and its
+  reporter waiting on an issue nobody would work.
 - **Buggie works on a phone.** Below desktop width the sidebar is a slide-out menu,
   and the board shows one near-full-width column at a time with a strip of column
   names to jump between. On a touch screen, swiping scrolls and press-and-hold picks a
