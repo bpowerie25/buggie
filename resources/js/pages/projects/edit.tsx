@@ -275,10 +275,30 @@ function CopyRow({ value, label }: { value: string; label: string }) {
 
 function WidgetKeyCard({ widgetKey }: { widgetKey: WidgetKeyRow }) {
     const [origins, setOrigins] = useState(widgetKey.allowed_origins.join('\n'));
+    // Said beside the key rather than only in a toast: a setting that did not save
+    // and looks as if it did is how a widget ends up open to every origin.
+    const [error, setError] = useState<string | null>(null);
 
+    // Anything other than a validation error — refused, not found, the server or the
+    // network — is shown here too, instead of Inertia's full-page error dialog.
+    function failures(what: string) {
+        return {
+            onHttpException: (response: { status: number }) => {
+                setError(`${what} (the server answered ${response.status}).`);
+                return false;
+            },
+            onNetworkError: () => {
+                setError(`${what}: the server could not be reached.`);
+                return false;
+            },
+        };
+    }
+
+    // By public key, which is how the routes bind a widget key. The numeric id 404'd,
+    // and every toggle on this card failed while looking as if it had worked.
     function save(changes: Record<string, unknown>) {
         router.patch(
-            `/widget-keys/${widgetKey.id}`,
+            `/widget-keys/${widgetKey.public_key}`,
             {
                 allowed_origins: origins.split('\n').map((o) => o.trim()).filter(Boolean),
                 mode: widgetKey.mode,
@@ -287,7 +307,13 @@ function WidgetKeyCard({ widgetKey }: { widgetKey: WidgetKeyRow }) {
                 is_active: widgetKey.is_active,
                 ...changes,
             },
-            { preserveScroll: true },
+            {
+                preserveScroll: true,
+                onSuccess: () => setError(null),
+                onError: (errors) =>
+                    setError(Object.values(errors)[0] ?? 'Could not save the widget settings.'),
+                ...failures('Could not save the widget settings'),
+            },
         );
     }
 
@@ -303,7 +329,12 @@ function WidgetKeyCard({ widgetKey }: { widgetKey: WidgetKeyRow }) {
                 <button
                     type="button"
                     onClick={() =>
-                        router.delete(`/widget-keys/${widgetKey.id}`, { preserveScroll: true })
+                        router.delete(`/widget-keys/${widgetKey.public_key}`, {
+                            preserveScroll: true,
+                            onError: (errors) =>
+                                setError(Object.values(errors)[0] ?? 'Could not revoke the key.'),
+                            ...failures('Could not revoke the key'),
+                        })
                     }
                     aria-label="Revoke key"
                     className="ml-auto rounded p-1 text-ink-subtle transition hover:text-danger"
@@ -313,6 +344,12 @@ function WidgetKeyCard({ widgetKey }: { widgetKey: WidgetKeyRow }) {
             </div>
 
             <CopyRow value={widgetKey.snippet} label="Copy snippet" />
+
+            {error && (
+                <p role="alert" className="mt-3 rounded-lg border border-danger/30 bg-danger-soft px-3 py-2 text-xs text-danger">
+                    {error}
+                </p>
+            )}
 
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
                 <Field
