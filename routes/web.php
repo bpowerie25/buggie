@@ -62,6 +62,12 @@ Route::domain($host)->group(function () {
         ->where('key', '[A-Za-z0-9_]+')
         ->name('widget.script');
 
+    // Asking for a workspace that does not exist yet. Only in `request` mode.
+    Route::get('request-access', [\App\Http\Controllers\AccessRequestController::class, 'create'])
+        ->name('access-requests.create');
+    Route::post('request-access', [\App\Http\Controllers\AccessRequestController::class, 'store'])
+        ->name('access-requests.store');
+
     Route::middleware('guest')->group(function () {
         Route::get('login', [AuthenticatedSessionController::class, 'create'])->name('login');
         Route::post('login', [AuthenticatedSessionController::class, 'store']);
@@ -161,6 +167,18 @@ Route::domain('{workspace}.'.$host)->group(function () {
     Route::post('invitations/{token}', [InvitationController::class, 'accept'])
         ->middleware('auth')
         ->name('invitations.accept');
+
+    // Signing in happens on the central domain, but people type the address they
+    // know. Sent on with the workspace attached, so the page can offer to ask it.
+    Route::get('login', fn () => redirect_across_domains(
+        central_url('login?workspace='.app(\App\Support\Tenancy\Tenancy::class)->currentOrFail()->slug),
+    ))->name('workspace.login');
+
+    // Asking this workspace to be let in. Only in `request` mode.
+    Route::get('request-access', [\App\Http\Controllers\AccessRequestController::class, 'create'])
+        ->name('workspace.access-requests.create');
+    Route::post('request-access', [\App\Http\Controllers\AccessRequestController::class, 'store'])
+        ->name('workspace.access-requests.store');
 });
 
 Route::domain('{workspace}.'.$host)
@@ -358,6 +376,22 @@ Route::domain('{workspace}.'.$host)
             ->name('instance.test-mail');
         Route::patch('settings/instance/registration', [\App\Http\Controllers\InstanceSettingsController::class, 'registration'])
             ->name('instance.registration');
+        // By id rather than bound: the tenant scope would hide every request that is
+        // not for the workspace the operator happens to be standing in.
+        Route::post('settings/instance/access-requests/{id}/approve', [\App\Http\Controllers\InstanceAccessRequestController::class, 'approve'])
+            ->whereNumber('id')
+            ->name('instance.access-requests.approve');
+        Route::post('settings/instance/access-requests/{id}/decline', [\App\Http\Controllers\InstanceAccessRequestController::class, 'decline'])
+            ->whereNumber('id')
+            ->name('instance.access-requests.decline');
+
+        // This workspace's own requests, for the people who can invite to it.
+        Route::get('settings/access-requests', [\App\Http\Controllers\WorkspaceAccessRequestController::class, 'index'])
+            ->name('access-requests.index');
+        Route::post('settings/access-requests/{accessRequest}/approve', [\App\Http\Controllers\WorkspaceAccessRequestController::class, 'approve'])
+            ->name('access-requests.approve');
+        Route::post('settings/access-requests/{accessRequest}/decline', [\App\Http\Controllers\WorkspaceAccessRequestController::class, 'decline'])
+            ->name('access-requests.decline');
 
         // API tokens. Created and revoked here; the API itself lives in routes/api.php.
         Route::post('settings/tokens', [\App\Http\Controllers\ApiTokenController::class, 'store'])

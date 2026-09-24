@@ -87,6 +87,15 @@ class HandleInertiaRequests extends Middleware
                 ? Report::awaitingTriage()->count()
                 : 0,
 
+            // Only for the people who can decide them, and only this workspace's.
+            'accessRequests' => fn () => $user && $workspace
+                && ($user->membershipIn($workspace)?->canManageWorkspace() ?? false)
+                ? [
+                    'enabled' => app(\App\Support\Registration\Registration::class)->mode()->acceptsAccessRequests(),
+                    'pending' => \App\Models\AccessRequest::pending()->count(),
+                ]
+                : null,
+
             /*
              * Unread notifications, for the sidebar badge.
              *

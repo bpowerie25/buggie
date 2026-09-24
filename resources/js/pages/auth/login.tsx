@@ -7,9 +7,12 @@ import type { FormEvent } from 'react';
 export default function Login({
     status,
     canRegister,
+    requestAccessUrl,
 }: {
     status?: string;
     canRegister: boolean;
+    /** Set when this install takes requests; points at the workspace they came from. */
+    requestAccessUrl: string | null;
 }) {
     const { data, setData, post, processing, errors, reset } = useForm({
         email: '',
@@ -83,6 +86,15 @@ export default function Login({
                     <Link href="/register" className="text-accent hover:underline">
                         Create one
                     </Link>
+                </p>
+            )}
+
+            {!canRegister && requestAccessUrl && (
+                <p className="mt-6 text-center text-sm text-ink-muted">
+                    No account?{' '}
+                    <a href={requestAccessUrl} className="text-accent hover:underline">
+                        Request access
+                    </a>
                 </p>
             )}
         </AuthLayout>

@@ -29,6 +29,15 @@ return Application::configure(basePath: dirname(__DIR__))
         // anyone might reload out of habit.
         $middleware->redirectUsersTo('/');
 
+        // A guest turned away from a workspace keeps the workspace, so the sign-in
+        // page can offer to ask it for access. The tenant is already resolved: see
+        // the priority list below.
+        $middleware->redirectGuestsTo(function () {
+            $workspace = app(\App\Support\Tenancy\Tenancy::class)->current();
+
+            return central_url($workspace ? 'login?workspace='.$workspace->slug : 'login');
+        });
+
         // Behind a reverse proxy, which is how this is deployed and how most
         // self-hosters will run it. Without this Laravel never sees
         // X-Forwarded-Proto, generates every asset URL as http:// on an https://

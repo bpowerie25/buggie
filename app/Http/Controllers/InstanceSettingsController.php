@@ -3,6 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Enums\RegistrationMode;
+use App\Enums\WorkspaceRole;
+use App\Models\AccessRequest;
+use App\Models\Workspace;
+use App\Support\Registration\AccessRequestList;
 use App\Support\Registration\Registration;
 use App\Support\Settings\Settings;
 use Illuminate\Http\RedirectResponse;
@@ -48,7 +52,32 @@ class InstanceSettingsController extends Controller
             ],
             'configured_by_env' => $this->settings->get('mail.mailer') === null,
             'registration' => $this->registrationProps(),
+            'accessRequests' => $this->accessRequestProps(),
         ]);
+    }
+
+    /**
+     * Every request on the install. Pending first, because those are the ones an
+     * operator can do something about; the rest is the record.
+     *
+     * @return array<string, mixed>
+     */
+    private function accessRequestProps(): array
+    {
+        $requests = AccessRequest::query()->acrossAllWorkspaces()
+            ->with(['workspace:id,name,slug', 'decidedBy:id,name'])
+            ->orderByRaw('case when status = ? then 0 else 1 end', ['pending'])
+            ->latest()
+            ->limit(200)
+            ->get();
+
+        return [
+            'enabled' => $this->registration->mode()->acceptsAccessRequests(),
+            'requests' => AccessRequestList::present($requests, withWorkspace: true),
+            'workspaces' => Workspace::orderBy('name')->get(['name', 'slug'])
+                ->map(fn (Workspace $w) => ['name' => $w->name, 'slug' => $w->slug]),
+            'roles' => AccessRequestList::roles([WorkspaceRole::Admin, WorkspaceRole::Member]),
+        ];
     }
 
     /**

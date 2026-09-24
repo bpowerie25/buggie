@@ -1,6 +1,7 @@
 import { Button } from '@/components/button';
 import { Field, Input } from '@/components/field';
 import { AppLayout } from '@/layouts/app-layout';
+import { AccessRequestList, type AccessRequestRow } from '@/components/access-request-list';
 import { Head, router, useForm, usePage } from '@inertiajs/react';
 import { Send } from 'lucide-react';
 import type { FormEvent } from 'react';
@@ -12,6 +13,13 @@ interface RegistrationSettings {
     env_invalid: boolean;
     env_value: string | null;
     modes: { value: string; label: string; description: string }[];
+}
+
+interface AccessRequestSettings {
+    enabled: boolean;
+    requests: AccessRequestRow[];
+    workspaces: { name: string; slug: string }[];
+    roles: { value: string; label: string }[];
 }
 
 interface MailSettings {
@@ -29,10 +37,12 @@ export default function InstanceSettings({
     mail,
     configured_by_env,
     registration,
+    accessRequests,
 }: {
     mail: MailSettings;
     configured_by_env: boolean;
     registration: RegistrationSettings;
+    accessRequests: AccessRequestSettings;
 }) {
     // The test-mail failure arrives as a shared error rather than a form one: it is
     // a different request, and the provider's own message is the useful part.
@@ -205,6 +215,25 @@ export default function InstanceSettings({
             </form>
 
             <RegistrationSection registration={registration} />
+
+            {(accessRequests.enabled || accessRequests.requests.length > 0) && (
+                <section id="access-requests" className="mt-12 max-w-2xl">
+                    <h2 className="text-xl font-semibold tracking-tight text-ink">
+                        Access requests
+                    </h2>
+                    <p className="mt-1 mb-6 text-sm text-ink-muted">
+                        Every request on this server. Each workspace's owners and admins are
+                        told about their own and decide them first; requests for a new
+                        workspace come only here. You can decide any of them.
+                    </p>
+                    <AccessRequestList
+                        requests={accessRequests.requests}
+                        roles={accessRequests.roles}
+                        workspaces={accessRequests.workspaces}
+                        actionBase="/settings/instance/access-requests"
+                    />
+                </section>
+            )}
         </AppLayout>
     );
 }

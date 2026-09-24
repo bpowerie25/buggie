@@ -26,6 +26,7 @@ import {
     Clock,
     Tag,
     Trash2,
+    UserPlus,
     Users,
 } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
@@ -82,6 +83,7 @@ export function AppLayout({
         views,
         inboxCount,
         notificationCount,
+        accessRequests,
         billing,
         mail,
         backups,
@@ -238,6 +240,16 @@ export function AppLayout({
                             >
                                 Members
                             </NavLink>
+                            {accessRequests && (accessRequests.enabled || accessRequests.pending > 0) && (
+                                <NavLink
+                                    href="/settings/access-requests"
+                                    icon={UserPlus}
+                                    active={path.startsWith('/settings/access-requests')}
+                                    badge={accessRequests.pending}
+                                >
+                                    Access requests
+                                </NavLink>
+                            )}
                             <NavLink
                                 href="/settings/workspace"
                                 icon={Settings}

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Auth\Concerns\SendsUsersOnwards;
 use App\Http\Controllers\Controller;
+use App\Models\Workspace;
 use App\Support\Registration\Registration;
 use App\Support\TwoFactor\PendingLogin;
 use Illuminate\Http\Request;
@@ -23,7 +24,25 @@ class AuthenticatedSessionController extends Controller
             'status' => session('status'),
             // A link to a page that refuses is worse than no link.
             'canRegister' => $registration->admits($request) !== null,
+            'requestAccessUrl' => $this->requestAccessUrl($request, $registration),
         ]);
+    }
+
+    /**
+     * Where "Request access" goes: the workspace they came from, when they came from
+     * one that exists, and otherwise the operators.
+     */
+    private function requestAccessUrl(Request $request, Registration $registration): ?string
+    {
+        if (! $registration->mode()->acceptsAccessRequests()) {
+            return null;
+        }
+
+        $slug = $request->query('workspace');
+
+        return is_string($slug) && Workspace::where('slug', $slug)->exists()
+            ? workspace_url($slug, 'request-access')
+            : central_url('request-access');
     }
 
     public function store(Request $request): SymfonyResponse

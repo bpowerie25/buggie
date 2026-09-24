@@ -63,6 +63,8 @@ export interface SharedProps {
     inboxCount: number;
     /** Unread in-app notifications for this person, in this workspace. */
     notificationCount: number;
+    /** For those who can invite: whether requests are taken, and how many wait. */
+    accessRequests: { enabled: boolean; pending: number } | null;
     billing: {
         plan: string;
         usage: Record<string, { used: number; limit: number | null; over: boolean; near: boolean }>;
