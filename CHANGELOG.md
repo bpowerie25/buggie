@@ -12,6 +12,14 @@ today you are running `main`, which is honest rather than ideal — see
 
 ### Added
 
+- **A registration mode**: open, by invitation, or by invitation and on request, set
+  under Settings → Instance or with `BUGGIE_REGISTRATION`. In `request` mode a
+  workspace's sign-in page offers *Request access*; its owners and admins are emailed
+  and decide, approving sends the ordinary invitation, and operators see every request
+  as the fallback. See the security entry below for why this exists.
+- **`buggie:operator`**, to promote, create, revoke or list operators from the command
+  line, and **`buggie:audit-signups`**, which lists accounts in no workspace and
+  workspaces no operator owns. The audit reports and never deletes.
 - **An in-app notification list.** Notifications existed only as email, and mail is
   unconfigured on a great many installs, so in practice they existed nowhere: the
   activity was recorded, the digest was assembled, and it went to a mail server that
@@ -78,6 +86,24 @@ today you are running `main`, which is honest rather than ideal — see
 
 ### Security
 
+- **Self-hosted installs no longer let strangers sign up.** Until now anybody could
+  register on a self-hosted install and create workspaces of their own — storage,
+  outbound mail and a subdomain of somebody else's domain to put content on. It was
+  not a leak between workspaces, which are membership-gated, but it was an open door
+  on a server whose owner never meant to run a public service. A self-hosted install
+  is now invitation-only by default, and one upgraded without having chosen a mode
+  becomes invitation-only too. Only operators create workspaces, enforced on the
+  route, the form and the action rather than by hiding a button. Nobody already in a
+  workspace loses anything, invitations already sent still work, and the hosted
+  service stays open. After upgrading, run `buggie:audit-signups` to see what was set
+  up while the door was open; to reopen it deliberately, choose *Open* on
+  Settings → Instance or set `BUGGIE_REGISTRATION=open`.
+- **Operators are stored, not inferred.** With nobody named in `BUGGIE_OPERATORS`, a
+  self-hosted install treated the lowest user id as its operator on every check, so
+  deleting that account silently handed the install to whoever came next. The upgrade
+  marks the same person the old rule chose, and from then on it is a recorded fact.
+- **The first registration on an empty install is race-safe.** Exactly one wins, and
+  the exception is never offered again, even after every account is deleted.
 - Webhook and chat URLs are checked against private address ranges when saved **and
   again at send time**, because a name that resolved somewhere public yesterday can
   resolve somewhere else today.

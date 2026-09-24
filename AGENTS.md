@@ -198,6 +198,32 @@ unread badge, which runs on every page load. Do not reach for it to prefilter th
 list: a prefilter that agrees with the policy hides a broken policy call, and one that
 disagrees is the leak.
 
+## Who can join
+
+`Registration` (in `app/Support/Registration`) is the one place that decides who may
+register and who may create a workspace. The mode is `BUGGIE_REGISTRATION` if set,
+else the stored setting, else `open` hosted and `invite` self-hosted. Do not test
+`config('buggie.hosted')` to decide either question; ask `Registration`.
+
+- Creating a workspace is checked by `WorkspacePolicy::create` on the route, in
+  `StoreWorkspaceRequest`, **and** in `CreateWorkspace`, so a new entry point cannot
+  skip it. `RegistrationModeTest` asserts no other route reaches either store action.
+- In invite mode a newcomer still registers, carrying their invitation token in the
+  session. Anything that changes `PendingInvitation` must keep that working.
+- The first-run exception is claimed by a primary-key insert inside the registration
+  transaction. Keep the claim inside the transaction, or a failed registration uses it
+  up.
+- Operators are `users.is_operator` **or** `BUGGIE_OPERATORS`, via the `operate` gate.
+  `Operators::all()` returns them as accounts. There is no "first user" fallback any
+  more; do not reintroduce one.
+- `access_requests.workspace_id` is nullable: a request from the bare domain is for
+  operators only. Such rows are written through `AccessRequest::forOperators()` and read
+  with `acrossAllWorkspaces()`. Workspace admins reach requests only through the tenant
+  scope, and the policy compares ids as well.
+- The request form answers every accepted submission identically, including ones it
+  drops (existing member, already invited, over the cap). Keep new refusals silent the
+  same way, and keep the notification queued so timing does not tell them apart either.
+
 ## Open source, and the hosted service
 
 Buggie is AGPL-3.0. The same code runs somebody's own server and the commercial hosted

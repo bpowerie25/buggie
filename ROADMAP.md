@@ -23,6 +23,11 @@ Roughly in the order they are likely to happen.
 - **Internationalisation.** The widget strings matter more than the application's: an
   agency's client's users are the ones reading them.
 - **Email verification on sign-up.**
+- **Joining by email domain.** A workspace could name a domain — anybody with an
+  `@kennco.ie` address joins the Kennco workspace without waiting for approval. It
+  needs email verification first, since without it the domain is only a claim, which is
+  why it waits behind the item above. Until then, *Request access* covers it with a
+  person in the loop.
 
 ## Not planned
 

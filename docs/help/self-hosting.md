@@ -42,8 +42,10 @@ docker compose -f docker-compose.selfhost.yml run --rm \
 docker compose -f docker-compose.selfhost.yml up -d
 ```
 
-Migrations run automatically on start. Open your domain, register, and the first
-workspace you create is yours.
+Migrations run automatically on start. Open your domain and register: the first
+account on an empty install is allowed whatever else is set, runs the install, and
+creates the first workspace. Everybody after that arrives by invitation unless you
+choose otherwise — see [Who can join](#who-can-join).
 
 Generate `APP_KEY` **before** the first proper start. With it unset, migrations run
 happily and then every page answers a bare "Server Error"; the container now refuses
@@ -58,13 +60,32 @@ to start and prints the exact command, but it is worth knowing why.
 | `BUGGIE_HOSTED` | Leave `false`. `true` is the commercial service and turns on plan limits. |
 | `DIGEST_DELAY_MINUTES` | How long activity on one issue is gathered before emailing. Default 5. |
 | `MAIL_INBOUND_DOMAIN`, `MAILGUN_SIGNING_KEY` | [Email in](email.md), optional. With no signing key the inbound endpoint accepts nothing. |
-| `BUGGIE_OPERATORS` | Comma-separated addresses allowed into the queue dashboard at `/horizon`. Empty means nobody, which is the default. The dashboard shows jobs from every workspace, which is why it is not tied to a workspace role. |
+| `BUGGIE_OPERATORS` | Comma-separated addresses that operate the install, and the only ones allowed into the queue dashboard at `/horizon`. Empty means nobody is named, which is the default. The dashboard shows jobs from every workspace, which is why it is not tied to a workspace role. |
+| `BUGGIE_REGISTRATION` | `invite`, `request` or `open`. Unset, the mode chosen on Settings → Instance applies, and `invite` if none was. Set, it overrides the screen. |
 | `SENTRY_LARAVEL_DSN` | Optional error reporting, pointed wherever you like. Empty means nothing is sent anywhere. |
 | `RETAIN_*` | [Retention](privacy-and-security.md#retention) windows in days. |
 
 All application configuration comes from the bind-mounted `.env`. Do not move it into
 a compose `environment:` block — container environment variables take precedence over
 everything else in a way that has already caused one destructive mistake here.
+
+## Who can join
+
+A self-hosted install is **invitation-only** by default. `/register` says so, and only
+operators create workspaces. Invitations work in every mode, including for somebody
+with no account yet.
+
+- **`invite`**: the default.
+- **`request`**: a workspace's sign-in page also offers *Request access*. Its owners
+  and admins are emailed and decide under Settings → Access requests; approving sends
+  an ordinary invitation, declining sends nothing. Requests from the bare domain ask for
+  a new workspace and go to operators, who see every request on Settings → Instance.
+- **`open`**: anybody may register and create a workspace.
+
+Operators are the account made on first run, anyone promoted with
+`php artisan buggie:operator you@example.com`, and anybody in `BUGGIE_OPERATORS`.
+`php artisan buggie:audit-signups` lists accounts in no workspace and workspaces no
+operator owns, for checking what was set up while sign-up was open. It changes nothing.
 
 ## The queue worker and the scheduler
 
@@ -142,10 +163,9 @@ Mail is configured in the application, not in `.env`: **Settings → Instance**.
 an SMTP password should be a form, not an edit to a file on the server followed by a
 redeploy.
 
-The screen is reachable only by an operator. On a self-hosted install with nobody named
-in `BUGGIE_OPERATORS`, that is the first account created — it is your server. On the
-hosted service it is whoever is named there, and an empty list means nobody rather than
-everybody.
+The screen is reachable only by an operator: on a self-hosted install that includes the
+account made on first run — it is your server. On the hosted service it is whoever is
+named in `BUGGIE_OPERATORS` or promoted with `buggie:operator`, and nobody otherwise.
 
 Anything set here overrides the environment, which stays as the fallback, so an install
 that would rather configure mail the traditional way can carry on doing so.

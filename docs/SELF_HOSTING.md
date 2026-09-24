@@ -45,11 +45,54 @@ docker compose -f docker-compose.selfhost.yml run --rm \
 docker compose -f docker-compose.selfhost.yml up -d
 ```
 
-Migrations run automatically on start. Open your domain, create an account, and the
-first workspace you make is yours.
+Migrations run automatically on start. Then open your domain and register: on an
+install with no accounts, the first registration is allowed whatever else is set, and
+that account runs the install. See [First run, and who can join](#first-run-and-who-can-join).
 
 `APP_KEY` encrypts sessions and stored credentials. Keep a copy, and do not change it
 once there is data.
+
+## First run, and who can join
+
+**The first account.** On an install with no accounts at all, exactly one person may
+register. That account is the install's **operator**: it configures mail, decides who
+can join, and creates workspaces. Create your first workspace straight afterwards. If
+two people race to register on an empty install, one wins and the other is refused.
+
+The exception is used once and never offered again, even if every account is later
+deleted. To get back in, or to set up an install without a browser, use the command:
+
+```sh
+docker compose -f docker-compose.selfhost.yml exec app php artisan buggie:operator you@example.com
+```
+
+It promotes an existing account, or creates one (it asks for a password, or generates
+and prints one if there is no terminal). `--revoke` removes an operator, and `--list`
+shows who operates the install and why.
+
+**Everybody else arrives by invitation.** Invite people from a workspace's
+**Settings → Members**. Somebody without an account follows the link in the email,
+registers, and lands in the workspace — that works in every mode below.
+
+**Registration mode.** Set under **Settings → Instance → Who can join**:
+
+| Mode | |
+|---|---|
+| `invite` | **The default.** `/register` explains that sign-ups are by invitation. Only operators create workspaces. |
+| `request` | As `invite`, and a workspace's sign-in page offers **Request access**. The workspace's owners and admins are emailed and decide under **Settings → Access requests**; approving sends an ordinary invitation. A request made on the bare domain asks for a new workspace and goes to operators, who see every request on the Instance screen. |
+| `open` | Anyone may register and create a workspace. Right for a public service; almost never right for an agency's own server, because a stranger gets your storage, your outgoing mail, and a subdomain of your domain to put content on. |
+
+To fix the mode from the command line instead, set it in `.env`, where it overrides the
+screen:
+
+```
+BUGGIE_REGISTRATION=invite
+```
+
+A value that is not one of the three is treated as `invite`.
+
+**Operators** are the accounts marked by the first run or by `buggie:operator`, plus
+anybody named in `BUGGIE_OPERATORS`. A workspace owner is not an operator.
 
 ## TLS
 
@@ -86,9 +129,10 @@ the application, is easier to live with: the password is encrypted at rest with 
 `no_service` are different problems with different fixes, and without that the only
 symptom is a channel that is quiet.
 
-The screen is reachable by an **operator**: whoever is named in `BUGGIE_OPERATORS`, or,
-if nobody is named, the first account created on the install. That fallback exists so
-you do not have to edit `.env` before you can configure mail on your own server.
+The screen is reachable by an **operator**: the account made on first run, anybody
+promoted with `buggie:operator`, and whoever is named in `BUGGIE_OPERATORS`. The first
+account being an operator exists so you do not have to edit `.env` before you can
+configure mail on your own server.
 
 Settings saved there override `.env`, and `.env` stays as the fallback.
 
@@ -160,6 +204,29 @@ docker compose -f docker-compose.selfhost.yml up -d
 
 Migrations run on start. Take a database backup first.
 
+### Open sign-up is closed by default
+
+Earlier versions let anybody register on a self-hosted install and create workspaces of
+their own. An install that has never chosen a registration mode is now `invite` after
+upgrading, which is the fix: nothing to do for that part.
+
+Nobody loses anything. Existing members keep their workspaces, and invitations already
+sent still work, including for people who have no account yet. If nobody was named in
+`BUGGIE_OPERATORS`, the account that was your operator before the upgrade (the first
+one created) is still the operator.
+
+Then look at what strangers may have set up while the door was open:
+
+```sh
+docker compose -f docker-compose.selfhost.yml exec app php artisan buggie:audit-signups
+```
+
+It lists accounts that belong to no workspace and workspaces not owned by an operator,
+with dates. It only reports. Removing anything is your decision.
+
+**To reopen sign-up deliberately**, choose **Open** under Settings → Instance → Who can
+join, or set `BUGGIE_REGISTRATION=open`.
+
 ## Operating
 
 The queue dashboard at `/horizon` is closed to everybody until you list yourself:
@@ -169,6 +236,8 @@ BUGGIE_OPERATORS=you@example.com
 ```
 
 It shows jobs across every workspace, which is why it is not tied to a workspace role.
+Being an operator through the first run or `buggie:operator` does not open it — only
+this list does.
 
 Error reporting is off. Set `SENTRY_LARAVEL_DSN` if you want it, pointed wherever you
 like — nothing is ever sent to us.

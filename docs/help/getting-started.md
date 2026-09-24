@@ -48,6 +48,11 @@ exists and let anyone enumerate customer names.
 Registration does not create a workspace for you automatically, and there is no
 email verification step — an account works as soon as it is created.
 
+That is how the hosted service works. **A self-hosted install is invitation-only by
+default**: you register by following an invitation from a workspace, and only the
+people who run the server create workspaces. Some installs let you *Request access*
+from the sign-in page instead. See [Self-hosting](self-hosting.md#who-can-join).
+
 ## Roles
 
 A role is held per workspace, not globally.
