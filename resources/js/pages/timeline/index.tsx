@@ -63,14 +63,30 @@ export default function TimelinePage({
 
     // Refused because somebody else changed the issue first; the reload that comes
     // with the refusal already shows their version.
-    const conflict = (usePage().props.errors as Record<string, string>)?.schedule;
+    const errors = usePage().props.errors as Record<string, string>;
+    // A refused drag, or a link that would make a loop.
+    const conflict = errors?.schedule ?? errors?.key;
+
+    // Per-person display choices, remembered in this browser only.
+    const [allLinks, setAllLinks] = useRemembered('timeline.allLinks', true);
+    const [shiftDependents, setShiftDependents] = useRemembered('timeline.shiftDependents', false);
+
+    const reload = { preserveScroll: true, preserveState: true, only: ['rows', 'undated', 'errors', 'flash'] };
 
     function schedule(key: string, dates: { start_on: string | null; due_on: string | null }, version: string | null) {
         router.patch(
             `/issues/${key}/schedule`,
-            { ...dates, version },
-            { preserveScroll: true, preserveState: true, only: ['rows', 'undated', 'errors', 'flash'] },
+            { ...dates, version, shift_dependents: shiftDependents },
+            reload,
         );
+    }
+
+    function link(blocker: string, blocked: string) {
+        router.post(`/issues/${blocker}/relations`, { key: blocked, type: 'blocks' }, reload);
+    }
+
+    function unlink(blocker: string, blocked: string) {
+        router.delete(`/issues/${blocker}/relations`, { data: { key: blocked, type: 'blocks' }, ...reload });
     }
     const project = query.include.project?.[0] ?? '';
 
@@ -181,12 +197,34 @@ export default function TimelinePage({
                     onReschedule={editable ? (row, dates) => schedule(row.key, dates, row.version) : undefined}
                     // Dropped on a day: a one-day bar there, ready to be stretched.
                     onPlace={editable ? (key, version, day) => schedule(key, { start_on: day, due_on: day }, version) : undefined}
+                    onLink={editable ? link : undefined}
+                    onUnlink={editable ? unlink : undefined}
+                    allLinks={allLinks}
                 />
+
+                <div className="flex flex-wrap gap-x-5 gap-y-1 text-xs text-ink-muted">
+                    <label className="flex items-center gap-1.5">
+                        <input type="checkbox" checked={allLinks} onChange={(e) => setAllLinks(e.target.checked)} />
+                        Show every dependency, not only late ones
+                    </label>
+                    {editable && (
+                        <label className="flex items-center gap-1.5">
+                            <input
+                                type="checkbox"
+                                checked={shiftDependents}
+                                onChange={(e) => setShiftDependents(e.target.checked)}
+                            />
+                            When a bar moves later, move the work waiting on it too
+                        </label>
+                    )}
+                </div>
 
                 {editable && (
                     <p className="text-xs text-ink-subtle">
-                        Drag a bar to move it, or either end to change its dates. With a bar
-                        selected, the arrow keys move it a day and Shift moves its due date.
+                        Drag a bar to move it, or either end to change its dates. Drag the dot
+                        after a bar onto another issue to say it blocks that one; click a line to
+                        remove it. With a bar selected, the arrow keys move it a day and Shift
+                        moves its due date.
                     </p>
                 )}
 
@@ -208,6 +246,10 @@ export default function TimelinePage({
                             A phase, filled in as its issues are done
                         </span>
                     )}
+                    <span className="flex items-center gap-1.5">
+                        <span className="h-0.5 w-4 bg-ink-subtle" />
+                        A dependency
+                    </span>
                     <span className="flex items-center gap-1.5">
                         <span className="h-0.5 w-4 bg-danger" />
                         A blocker that does not finish in time
@@ -271,6 +313,31 @@ export default function TimelinePage({
             </div>
         </AppLayout>
     );
+}
+
+/** A setting kept in this browser. Storage can be missing or refuse; then it is not kept. */
+function useRemembered(key: string, fallback: boolean): [boolean, (value: boolean) => void] {
+    const [value, setValue] = useState(() => {
+        try {
+            const stored = window.localStorage.getItem(key);
+
+            return stored === null ? fallback : stored === '1';
+        } catch {
+            return fallback;
+        }
+    });
+
+    function set(next: boolean) {
+        setValue(next);
+
+        try {
+            window.localStorage.setItem(key, next ? '1' : '0');
+        } catch {
+            // Private window or blocked storage: it lasts for this page only.
+        }
+    }
+
+    return [value, set];
 }
 
 function Key({ className, label }: { className: string; label: string }) {

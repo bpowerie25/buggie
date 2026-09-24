@@ -135,6 +135,9 @@ export function TimelineChart({
     editable = false,
     onReschedule,
     onPlace,
+    onLink,
+    onUnlink,
+    allLinks = true,
 }: {
     rows: TimelineRow[];
     axis: TimelineAxis;
@@ -143,9 +146,18 @@ export function TimelineChart({
     onReschedule?: (row: TimelineRow, dates: { start_on: string | null; due_on: string | null }) => void;
     /** An undated issue dropped onto a day. */
     onPlace?: (key: string, version: string, day: string) => void;
+    /** A line drawn from one bar to another: the first blocks the second. */
+    onLink?: (blocker: string, blocked: string) => void;
+    onUnlink?: (blocker: string, blocked: string) => void;
+    /** Every dependency, rather than only the ones running late. */
+    allLinks?: boolean;
 }) {
     const [drag, setDrag] = useState<Drag | null>(null);
     const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+    // A link being drawn: from which bar, and where the pointer is now (chart pixels).
+    const [linking, setLinking] = useState<{ from: string; x: number; y: number } | null>(null);
+    const [selected, setSelected] = useState<{ blocker: string; blocked: string } | null>(null);
+    const svg = useRef<SVGSVGElement>(null);
     const rows = unfolded(allRows, collapsed);
 
     function toggle(key: string) {
@@ -162,7 +174,10 @@ export function TimelineChart({
     const [pending, setPending] = useState<Record<string, { start: string; end: string }>>({});
     const scroller = useRef<HTMLDivElement>(null);
 
-    useEffect(() => setPending({}), [allRows]);
+    useEffect(() => {
+        setPending({});
+        setSelected(null);
+    }, [allRows]);
 
     if (allRows.length === 0 && !onPlace) {
         return (
@@ -197,7 +212,28 @@ export function TimelineChart({
         setDrag({ key: row.key, mode, originX: event.clientX, delta: 0 });
     }
 
+    /** A point on the page, in the chart's own pixels. */
+    function local(event: { clientX: number; clientY: number }) {
+        const box = svg.current?.getBoundingClientRect();
+
+        return { x: event.clientX - (box?.left ?? 0), y: event.clientY - (box?.top ?? 0) };
+    }
+
+    function beginLink(event: ReactPointerEvent, row: TimelineRow) {
+        if (!onLink || event.button !== 0) return;
+
+        event.preventDefault();
+        event.stopPropagation();
+        svg.current?.setPointerCapture(event.pointerId);
+        setLinking({ from: row.key, ...local(event) });
+    }
+
     function move(event: ReactPointerEvent) {
+        if (linking) {
+            setLinking({ ...linking, ...local(event) });
+            return;
+        }
+
         if (!drag) return;
 
         // Whole days: a plan is in days, and half a day dragged is a day nobody chose.
@@ -207,6 +243,18 @@ export function TimelineChart({
     }
 
     function end() {
+        if (linking) {
+            // Whichever issue row the pointer let go over. A phase header is not work.
+            const target = rows[Math.floor((linking.y - HEADER) / ROW)];
+            setLinking(null);
+
+            if (target && target.kind !== 'phase' && target.key !== linking.from) {
+                onLink?.(linking.from, target.key);
+            }
+
+            return;
+        }
+
         if (!drag) return;
 
         const row = rows.find((r) => r.key === drag.key);
@@ -267,6 +315,32 @@ export function TimelineChart({
         dayNumber(axis.today, axis.from) >= 0 && dayNumber(axis.today, axis.from) <= days;
 
     return (
+        <div className="space-y-2">
+            {selected && (
+                <div className="flex items-center gap-3 rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink">
+                    <span>
+                        <span className="font-mono text-xs">{selected.blocker}</span> blocks{' '}
+                        <span className="font-mono text-xs">{selected.blocked}</span>
+                    </span>
+                    <button
+                        type="button"
+                        onClick={() => {
+                            onUnlink?.(selected.blocker, selected.blocked);
+                            setSelected(null);
+                        }}
+                        className="rounded-md border border-border px-2 py-0.5 text-xs text-danger transition hover:bg-danger-soft"
+                    >
+                        Remove link
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setSelected(null)}
+                        className="ml-auto text-xs text-ink-subtle hover:text-ink"
+                    >
+                        Close
+                    </button>
+                </div>
+            )}
         <div className="flex overflow-hidden rounded-xl border border-border">
             <div className="w-56 shrink-0 border-r border-border sm:w-72">
                 <div style={{ height: HEADER }} className="border-b border-border" />
@@ -328,6 +402,7 @@ export function TimelineChart({
                 }}
             >
                 <svg
+                    ref={svg}
                     width={width}
                     height={height}
                     role={canDrag ? 'application' : 'img'}
@@ -335,7 +410,10 @@ export function TimelineChart({
                     className={`block ${drag ? 'cursor-grabbing select-none' : ''}`}
                     onPointerMove={move}
                     onPointerUp={end}
-                    onPointerCancel={() => setDrag(null)}
+                    onPointerCancel={() => {
+                        setDrag(null);
+                        setLinking(null);
+                    }}
                 >
                     {/* A tint across the header rows, so the stages read as sections. */}
                     {rows.map((row, i) =>
@@ -401,15 +479,16 @@ export function TimelineChart({
                     ))}
 
                     {/*
-                        Only the dependencies that are in trouble get a line. A
-                        connector for every `blocks` relation is a ball of string, and
-                        most of them repeat what the ordering already shows.
+                        Every dependency between two rows on the chart, with the ones
+                        in trouble — a blocker ending after the work waiting on it has
+                        started — in red. With allLinks off, only those.
                     */}
                     {rows.flatMap((row, i) =>
-                        row.conflicts.map((blockerKey) => {
+                        row.blocked_by.map((blockerKey) => {
                             const j = indexOf.get(blockerKey);
+                            const late = row.conflicts.includes(blockerKey);
 
-                            if (j === undefined) return null;
+                            if (j === undefined || (!allLinks && !late)) return null;
 
                             return (
                                 <Connector
@@ -418,12 +497,48 @@ export function TimelineChart({
                                     fromY={rowY(j) + ROW / 2}
                                     toX={x(shown(row).start)}
                                     toY={rowY(i) + ROW / 2}
+                                    late={late}
+                                    label={`${blockerKey} blocks ${row.key}${late ? ', and ends after it starts' : ''}`}
+                                    selected={selected?.blocker === blockerKey && selected.blocked === row.key}
+                                    onSelect={onUnlink ? () => setSelected({ blocker: blockerKey, blocked: row.key }) : undefined}
                                 />
                             );
                         }),
                     )}
+
+                    {/* The handles links are drawn from, just past the end of each bar. */}
+                    {onLink &&
+                        rows.map((row, i) =>
+                            row.kind === 'phase' || row.kind === 'rollup' ? null : (
+                                <circle
+                                    key={`link-${row.key}`}
+                                    cx={xEnd(shown(row).end) + 9}
+                                    cy={rowY(i) + ROW / 2}
+                                    r={3.5}
+                                    className={`cursor-crosshair fill-canvas stroke-ink-subtle hover:stroke-accent ${linking?.from === row.key ? 'stroke-accent' : ''}`}
+                                    strokeWidth={1.5}
+                                    style={{ touchAction: 'none' }}
+                                    onPointerDown={(event) => beginLink(event, row)}
+                                >
+                                    <title>{`Drag onto another issue: ${row.key} blocks it`}</title>
+                                </circle>
+                            ),
+                        )}
+
+                    {linking && indexOf.has(linking.from) && (
+                        <line
+                            x1={xEnd(shown(rows[indexOf.get(linking.from)!]).end) + 9}
+                            y1={rowY(indexOf.get(linking.from)!) + ROW / 2}
+                            x2={linking.x}
+                            y2={linking.y}
+                            strokeWidth={1.5}
+                            strokeDasharray="4 3"
+                            className="pointer-events-none stroke-accent"
+                        />
+                    )}
                 </svg>
             </div>
+        </div>
         </div>
     );
 }
@@ -603,23 +718,46 @@ function Connector({
     fromY,
     toX,
     toY,
+    late,
+    label,
+    selected = false,
+    onSelect,
 }: {
     fromX: number;
     fromY: number;
     toX: number;
     toY: number;
+    late: boolean;
+    label: string;
+    selected?: boolean;
+    onSelect?: () => void;
 }) {
     // Out, down, and back in. A straight diagonal across a dense chart is impossible
     // to follow to its other end.
     const elbow = fromX + 8;
+    const d = `M ${fromX} ${fromY} H ${elbow} V ${toY} H ${toX}`;
 
     return (
-        <path
-            d={`M ${fromX} ${fromY} H ${elbow} V ${toY} H ${toX}`}
-            fill="none"
-            strokeWidth={1}
-            strokeDasharray="2 2"
-            className="stroke-danger"
-        />
+        <g>
+            <title>{label}</title>
+            <path
+                d={d}
+                fill="none"
+                strokeWidth={selected ? 2 : 1}
+                strokeDasharray={late ? '2 2' : undefined}
+                className={late ? 'stroke-danger' : selected ? 'stroke-accent' : 'stroke-ink-subtle'}
+            />
+            {/* A wider invisible line over it, so a one-pixel path can be clicked. */}
+            {onSelect && (
+                <path
+                    d={d}
+                    fill="none"
+                    stroke="transparent"
+                    strokeWidth={8}
+                    className="cursor-pointer"
+                    onClick={onSelect}
+                />
+            )}
+        </g>
     );
 }

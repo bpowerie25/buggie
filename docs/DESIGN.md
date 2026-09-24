@@ -1637,3 +1637,30 @@ what says it is a subtask. A project with no phases draws exactly as before, wit
 
 Not built yet: dragging an issue from one phase to another on the chart, phases in
 the CSV import, and bulk "move to phase".
+
+---
+
+## 28. Dependencies on the timeline
+
+The timeline used to draw a line only for a blocker that finished after the work it
+blocked had started, because every line at once looked like a ball of string. The
+comparison with monday.com made the other half matter: you can't plan with links you
+can't see. So every link between two rows on the chart is now drawn, faint, with late
+links in red as before. A checkbox, remembered in the browser, turns the faint ones off.
+
+**Making and removing links** uses the existing relations endpoint, so the issue page
+and the chart can't disagree about what a link is. `RelateIssues` refuses a blocker
+loop, however long, because nothing in a loop can ever start.
+
+**Moving dependent work (`ShiftDependents`)** is opt-in on each drag, and only moves
+issues later. It uses the chart's own conflict rule: a dependent may start on the day
+its blocker ends. So a red line is exactly what it fixes, and it fixes nothing else. A
+blocker brought forward leaves its dependents alone. The room that opens up is the
+team's to use, and moving work earlier without asking rearranges somebody's week behind
+their back. Closed issues don't move. Each move goes through `UpdateIssue`, so it
+appears in that issue's activity. The walk remembers where it has been, in case loops
+exist in data from before they were refused.
+
+Not handled: working days (weekends count), and other people's timelines don't update
+live. A colleague still has to reload, and a drag on top of their own stale view is
+refused as usual.

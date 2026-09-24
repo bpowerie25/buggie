@@ -12,6 +12,14 @@ today you are running `main`, which is honest rather than ideal — see
 
 ### Added
 
+- **Dependencies on the timeline.** Every "blocks" link between two issues on the chart
+  is drawn as a line, with late ones still in red; a checkbox limits it to the late ones.
+  Staff drag the dot after a bar onto another issue to make it block that one, and click
+  a line to remove it. With *move the work waiting on it too* ticked, moving a bar later
+  pushes the chain behind it later, only as far as each issue must move. Nothing moves
+  earlier by itself, and closed work stays put.
+- **No loops of blockers.** Making A block B when B already waits on A, directly or
+  through other issues, is refused, on the timeline and on the issue page.
 - **Phases.** A project can be split into stages, such as Discovery, Design, Build and
   Launch, in project settings. Put an issue in one from its sidebar, or filter with
   `phase:Design` and `no:phase`. The timeline groups issues under each phase in the
