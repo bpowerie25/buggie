@@ -12,6 +12,10 @@ today you are running `main`, which is honest rather than ideal — see
 
 ### Added
 
+- **Pick an issue by what it's about.** Linking issues, marking a duplicate and
+  merging a report in the inbox now open a search box instead of asking for a key. It
+  suggests recent open work from the same project before anything is typed, then
+  matches partial words of the title in any order, or the start of a key. Staff only.
 - **Swimlanes and colours on the timeline.** Group rows by phase, project, person or
   status (or not at all), each group with a header you can fold away. Colour bars by
   status or by person instead of open/closed/late; late work keeps a red outline.

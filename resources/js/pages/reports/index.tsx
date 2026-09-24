@@ -3,6 +3,7 @@ import { Diagnostics } from '@/components/diagnostics';
 import { Avatar, ClientRepliedBadge, relativeTime } from '@/components/issue-bits';
 import { Popover, PopoverItem } from '@/components/popover';
 import { useHotkeys } from '@/hooks/use-hotkeys';
+import { IssuePicker } from '@/components/issue-picker';
 import { AppLayout } from '@/layouts/app-layout';
 import type { Person, ReportRow, SharedProps } from '@/types';
 import { Head, Link, router, usePage } from '@inertiajs/react';
@@ -14,7 +15,7 @@ import {
     ShieldAlert,
     Trash2,
 } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 
 type Priority = { value: number; label: string; color: string };
 
@@ -59,7 +60,6 @@ export default function ReportsIndex({
     const [active, setActive] = useState(0);
     const [expanded, setExpanded] = useState(false);
     const [merging, setMerging] = useState(false);
-    const mergeRef = useRef<HTMLInputElement>(null);
 
     const report = reports[active];
 
@@ -96,7 +96,6 @@ export default function ReportsIndex({
         a: () => act('accept'),
         m: () => {
             setMerging(true);
-            setTimeout(() => mergeRef.current?.focus(), 0);
         },
         s: () => act('dismiss', { state: 'spam' }),
         x: () => act('dismiss', { state: 'discarded' }),
@@ -312,39 +311,20 @@ export default function ReportsIndex({
                                     )}
                                 </Popover>
 
-                                {merging ? (
-                                    <form
-                                        onSubmit={(e) => {
-                                            e.preventDefault();
-                                            const key = mergeRef.current?.value.trim();
-                                            if (key) act('merge', { key });
-                                        }}
-                                        className="flex items-center gap-1.5"
-                                    >
-                                        <input
-                                            ref={mergeRef}
-                                            placeholder="WEB-142"
-                                            onKeyDown={(e) => e.key === 'Escape' && setMerging(false)}
-                                            className="h-[30px] w-28 rounded-lg border border-border bg-raised px-2 font-mono text-xs text-ink focus:border-accent focus:outline-none"
-                                        />
-                                        <Button size="sm" variant="secondary" type="submit">
-                                            Merge
-                                        </Button>
-                                    </form>
-                                ) : (
-                                    <Button
-                                        size="sm"
-                                        variant="secondary"
-                                        onClick={() => {
-                                            setMerging(true);
-                                            setTimeout(() => mergeRef.current?.focus(), 0);
-                                        }}
-                                    >
-                                        <Merge className="size-4" />
-                                        Merge
-                                        <Key>m</Key>
-                                    </Button>
-                                )}
+                                <Button size="sm" variant="secondary" onClick={() => setMerging(true)}>
+                                    <Merge className="size-4" />
+                                    Merge
+                                    <Key>m</Key>
+                                </Button>
+
+                                <IssuePicker
+                                    open={merging}
+                                    onClose={() => setMerging(false)}
+                                    title="Merge this report into…"
+                                    hint="It becomes another occurrence of the issue you choose, and leaves the inbox."
+                                    project={report.project.slug}
+                                    onPick={(issue) => act('merge', { key: issue.key })}
+                                />
 
                                 <Button
                                     size="sm"

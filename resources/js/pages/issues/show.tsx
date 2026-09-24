@@ -17,6 +17,7 @@ import {
 import { Popover, PopoverItem } from '@/components/popover';
 import { RichTextEditor, RichTextView } from '@/components/rich-text';
 import { Diagnostics, type DiagnosticsData } from '@/components/diagnostics';
+import { IssuePicker, type PickedIssue } from '@/components/issue-picker';
 import { AppLayout } from '@/layouts/app-layout';
 import type {
     Facets,
@@ -28,10 +29,10 @@ import type {
     VisibilityValue,
 } from '@/types';
 import type { RequestPayload } from '@inertiajs/core';
-import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import type { JSONContent } from '@tiptap/react';
 import { Copy, Eye, EyeOff, Lock, Plus, Tag, Timer, Trash2, X } from 'lucide-react';
-import { useState, type FormEvent } from 'react';
+import { useState } from 'react';
 
 /** Whoever wrote or did something, as the reader is allowed to see them. */
 interface Actor {
@@ -311,50 +312,45 @@ function WidgetReporter({
  * Close this issue as a duplicate of another: type its key, and the issue closes,
  * says so in its thread, and its reporter and watchers follow the original instead.
  */
-function MarkDuplicate({ issueKey }: { issueKey: string }) {
+function MarkDuplicate({ issueKey, project }: { issueKey: string; project: string }) {
     const [open, setOpen] = useState(false);
-    const { data, setData, post, processing, errors } = useForm({ key: '' });
+    const [error, setError] = useState<string>();
 
-    if (!open) {
-        return (
+    return (
+        <>
             <button
                 type="button"
-                onClick={() => setOpen(true)}
+                onClick={() => {
+                    setError(undefined);
+                    setOpen(true);
+                }}
                 className="mt-1.5 flex items-center gap-1 rounded border border-dashed border-border-strong px-1.5 py-0.5 text-[11px] text-ink-subtle hover:text-ink"
             >
                 <Copy className="size-3" />
                 Mark as duplicate…
             </button>
-        );
-    }
 
-    return (
-        <form
-            onSubmit={(e) => {
-                e.preventDefault();
-                post(`/issues/${issueKey}/duplicate`, { preserveScroll: true, onSuccess: () => setOpen(false) });
-            }}
-            className="mt-1.5 space-y-1.5"
-        >
-            <p className="text-[11px] text-ink-subtle">
-                Duplicate of which issue? This one closes, and its reporter and watchers follow that one.
-            </p>
-            <div className="flex gap-1.5">
-                <input
-                    value={data.key}
-                    autoFocus
-                    placeholder="KD-12"
-                    aria-label="Key of the original issue"
-                    onChange={(e) => setData('key', e.target.value)}
-                    onKeyDown={(e) => e.key === 'Escape' && setOpen(false)}
-                    className="h-7 w-24 rounded-md border border-border-strong bg-raised px-2 font-mono text-xs text-ink uppercase focus:border-accent focus:outline-none"
-                />
-                <Button type="submit" size="sm" disabled={processing || data.key.trim() === ''}>
-                    Close as duplicate
-                </Button>
-            </div>
-            {errors.key && <p className="text-[11px] text-danger">{errors.key}</p>}
-        </form>
+            <IssuePicker
+                open={open}
+                onClose={() => setOpen(false)}
+                title={`${issueKey} is a duplicate of…`}
+                hint="This one closes, and its reporter and watchers follow the one you choose."
+                project={project}
+                exclude={issueKey}
+                error={error}
+                onPick={(original) =>
+                    router.post(
+                        `/issues/${issueKey}/duplicate`,
+                        { key: original.key },
+                        {
+                            preserveScroll: true,
+                            onSuccess: () => setOpen(false),
+                            onError: (errors) => setError(errors.key),
+                        },
+                    )
+                }
+            />
+        </>
     );
 }
 
@@ -1593,7 +1589,7 @@ export default function ShowIssue({
                             types={relationTypes}
                             editable={can.update}
                         />
-                        {can.update && !issue.duplicate_of && <MarkDuplicate issueKey={issue.key} />}
+                        {can.update && !issue.duplicate_of && <MarkDuplicate issueKey={issue.key} project={issue.project.slug} />}
                     </SidebarRow>
 
                     <SidebarRow label="Reporter">
@@ -1635,23 +1631,20 @@ function Relations({
     types: { value: string; label: string }[];
     editable: boolean;
 }) {
-    const [adding, setAdding] = useState(false);
+    const [type, setType] = useState<string | null>(null);
+    const [error, setError] = useState<string>();
+    const chosen = types.find((t) => t.value === type);
 
-    const { data, setData, post, processing, errors, reset } = useForm({
-        type: types[0]?.value ?? 'relates_to',
-        key: '',
-    });
-
-    function submit(e: FormEvent) {
-        e.preventDefault();
-
-        post(`/issues/${issue.key}/relations`, {
-            preserveScroll: true,
-            onSuccess: () => {
-                reset('key');
-                setAdding(false);
+    function link(related: PickedIssue) {
+        router.post(
+            `/issues/${issue.key}/relations`,
+            { type, key: related.key },
+            {
+                preserveScroll: true,
+                onSuccess: () => setType(null),
+                onError: (errors) => setError(errors.key),
             },
-        });
+        );
     }
 
     return (
@@ -1687,60 +1680,35 @@ function Relations({
                 </ul>
             )}
 
-            {editable &&
-                (adding ? (
-                    <form onSubmit={submit} className="space-y-1.5">
-                        <select
-                            value={data.type}
-                            onChange={(e) => setData('type', e.target.value)}
-                            className="w-full rounded-md border border-border bg-raised px-1.5 py-1 text-xs text-ink"
+            {editable && (
+                <div className="flex flex-wrap gap-1">
+                    {/* Pick the kind of link first, then the issue: the picker's title can then say what will happen. */}
+                    {types.map((t) => (
+                        <button
+                            key={t.value}
+                            type="button"
+                            onClick={() => {
+                                setError(undefined);
+                                setType(t.value);
+                            }}
+                            className="flex items-center gap-1 rounded border border-dashed border-border-strong px-1.5 py-0.5 text-[11px] text-ink-subtle transition hover:text-ink"
                         >
-                            {types.map((type) => (
-                                <option key={type.value} value={type.value}>
-                                    {type.label}
-                                </option>
-                            ))}
-                        </select>
+                            <Plus className="size-3" />
+                            {t.label}
+                        </button>
+                    ))}
+                </div>
+            )}
 
-                        <input
-                            value={data.key}
-                            autoFocus
-                            placeholder="WEB-42"
-                            aria-label="Issue key to link"
-                            onChange={(e) => setData('key', e.target.value.toUpperCase())}
-                            onKeyDown={(e) => e.key === 'Escape' && setAdding(false)}
-                            className="w-full rounded-md border border-border bg-raised px-1.5 py-1 font-mono text-xs text-ink"
-                        />
-
-                        {errors.key && <p className="text-xs text-danger">{errors.key}</p>}
-
-                        <div className="flex gap-1.5">
-                            <button
-                                type="submit"
-                                disabled={processing || data.key === ''}
-                                className="rounded-md bg-accent px-2 py-1 text-xs text-accent-ink disabled:opacity-50"
-                            >
-                                Link
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => setAdding(false)}
-                                className="rounded-md px-2 py-1 text-xs text-ink-muted"
-                            >
-                                Cancel
-                            </button>
-                        </div>
-                    </form>
-                ) : (
-                    <button
-                        type="button"
-                        onClick={() => setAdding(true)}
-                        className="flex items-center gap-1 text-xs text-ink-subtle transition hover:text-ink"
-                    >
-                        <Plus className="size-3" />
-                        Link an issue
-                    </button>
-                ))}
+            <IssuePicker
+                open={type !== null}
+                onClose={() => setType(null)}
+                title={`${issue.key} ${chosen?.label.toLowerCase() ?? 'relates to'}…`}
+                project={issue.project.slug}
+                exclude={issue.key}
+                error={error}
+                onPick={link}
+            />
 
             {!editable && issue.relations.length === 0 && (
                 <span className="text-xs text-ink-subtle">Nothing linked</span>

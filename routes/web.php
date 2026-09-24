@@ -233,6 +233,9 @@ Route::domain('{workspace}.'.$host)
         Route::delete('issues/{issue}/watch', [\App\Http\Controllers\IssueWatchController::class, 'destroy'])
             ->name('issues.unwatch');
 
+        // The issue picker's suggestions, as JSON. Staff only; see the controller.
+        Route::get('issues-lookup', \App\Http\Controllers\IssueLookupController::class)
+            ->name('issues.lookup');
         Route::post('issues/{issue}/relations', [IssueRelationController::class, 'store'])
             ->name('relations.store');
         Route::delete('issues/{issue}/relations', [IssueRelationController::class, 'destroy'])
