@@ -122,6 +122,10 @@ today you are running `main`, which is honest rather than ideal — see
 
 ### Fixed
 
+- **Backups were never reported, including a failed one.** `deploy/backup.sh` wrote
+  its status file to `storage/app`, and the application reads it from `storage/app/private`,
+  the root of its local disk. Operators were told no backup had ever run, every night
+  one did, and would have been told the same on the night one failed.
 - **Marking up a screenshot on a scrolled page drew the box far from the pointer** —
   above it by exactly as far as the page was scrolled, so on a long page often off the
   image altogether. html2canvas leaves a translation by the scroll position set on the

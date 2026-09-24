@@ -32,10 +32,16 @@ uploads="$BACKUP_DIR/storage-$stamp.tar.gz"
 # ── Reporting ──
 # Written through the container: storage/app is a named volume, so what the host can
 # see here and what the application can read are two different directories.
+#
+# storage/app/private, not storage/app: that is the root of the application's local
+# disk, where BackupStatus reads it. Written one level up for its first week, the app
+# said "no backup has ever been recorded" every night a backup ran — and would have
+# said nothing different on the night one failed. BackupStatusTest holds the two paths
+# together.
 report() {
     local ok="$1" stage="$2" detail="$3"
 
-    $COMPOSE exec -T app sh -c "cat > /var/www/html/storage/app/backup-status.json" <<JSON || true
+    $COMPOSE exec -T app sh -c "cat > /var/www/html/storage/app/private/backup-status.json" <<JSON || true
 {"at":"$(date -u +%Y-%m-%dT%H:%M:%SZ)","ok":$ok,"stage":"$stage","detail":"$detail","offsite":$([[ -n "${BUGGIE_BACKUP_REMOTE:-}" ]] && echo true || echo false)}
 JSON
 }

@@ -151,4 +151,21 @@ class BackupStatusTest extends TestCase
             ->assertOk()
             ->assertInertia(fn ($page) => $page->where('backups', null));
     }
+
+    #[Test]
+    public function the_backup_script_writes_where_the_application_reads(): void
+    {
+        // The script writes through the container, so nothing but this ties its path to
+        // the disk the status is read from. It once wrote one directory up, and the app
+        // reported that no backup had ever run through a week of nightly backups.
+        $script = file_get_contents(base_path('deploy/backup.sh'));
+
+        preg_match('#cat > /var/www/html/(\S+backup-status\.json)#', $script, $match);
+
+        $this->assertNotEmpty($match, 'backup.sh no longer writes a status file.');
+        $this->assertSame(
+            str_replace(base_path().'/', '', Storage::disk('local')->path('backup-status.json')),
+            $match[1],
+        );
+    }
 }
