@@ -12,6 +12,12 @@ today you are running `main`, which is honest rather than ideal — see
 
 ### Added
 
+- **A phases-only timeline for clients.** *Timeline for clients* in project settings
+  is now Off, Phases only, or Issues they can open (what "on" used to mean, and what
+  it still means for projects already switched on). With phases only, a client sees
+  each phase with its dates and a percentage done, worked out from all its issues,
+  internal ones included. The payload has no keys, titles, people or counts, so you
+  can plan in detail internally and share only the shape of the job.
 - **Subtasks from the issue page.** Subtasks existed, and the timeline drew them, but
   the only way to make one was the API. The sidebar now has *New subtask*: type a
   title and press Enter, and it's created under the issue, ready for the next one. It

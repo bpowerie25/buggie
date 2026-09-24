@@ -70,7 +70,7 @@ export default function EditProject({
     clientWait,
     widgetModes = [],
     revealedSecret = null,
-    clientTimeline = false,
+    clientTimeline = 'off',
 }: {
     project: ProjectSummary;
     widgetKeys: WidgetKeyRow[];
@@ -88,7 +88,7 @@ export default function EditProject({
     /** Present only on the page load straight after creating or rotating a secret. */
     revealedSecret?: { key: string; secret: string } | null;
     /** Whether clients who hold this project can see its timeline. */
-    clientTimeline?: boolean;
+    clientTimeline?: 'off' | 'issues' | 'phases';
 }) {
     const { data, setData, put, processing, errors } = useForm({
         name: project.name,
@@ -178,22 +178,45 @@ export default function EditProject({
                     </div>
                 </fieldset>
 
-                <label className="flex items-start gap-2 text-sm text-ink-muted">
-                    <input
-                        type="checkbox"
-                        checked={data.client_timeline}
-                        onChange={(e) => setData('client_timeline', e.target.checked)}
-                        className="mt-0.5 rounded border-border-strong"
-                    />
-                    <span>
-                        Show the timeline to clients
-                        <span className="block text-xs text-ink-subtle">
-                            Clients who hold this project see its issues on a read-only
-                            timeline — only the ones they can already open, with no estimates
-                            and the team shown as the workspace unless you choose otherwise.
-                        </span>
-                    </span>
-                </label>
+                <fieldset className="space-y-2">
+                    <legend className="text-sm text-ink">Timeline for clients</legend>
+                    {(
+                        [
+                            ['off', 'Off', 'Clients who hold this project get no timeline.'],
+                            [
+                                'phases',
+                                'Phases only',
+                                'Each phase with its dates and how much is done, and no issues at all. Plan in detail internally; the client sees the shape of the job.',
+                            ],
+                            [
+                                'issues',
+                                'Issues they can open',
+                                'The issues already shared with them, as bars: no estimates, and the team shown as the workspace unless you choose otherwise.',
+                            ],
+                        ] as const
+                    ).map(([value, label, help]) => (
+                        <label key={value} className="flex items-start gap-2 text-sm text-ink-muted">
+                            <input
+                                type="radio"
+                                name="client_timeline"
+                                value={value}
+                                checked={data.client_timeline === value}
+                                onChange={() => setData('client_timeline', value)}
+                                className="mt-0.5 border-border-strong"
+                            />
+                            <span>
+                                {label}
+                                <span className="block text-xs text-ink-subtle">{help}</span>
+                            </span>
+                        </label>
+                    ))}
+                    {data.client_timeline === 'phases' && phases.length === 0 && (
+                        <p className="text-xs text-danger">
+                            This project has no phases yet, so a client would see an empty timeline. Add
+                            them under Phases below.
+                        </p>
+                    )}
+                </fieldset>
 
                 <label className="flex items-center gap-2 text-sm text-ink-muted">
                     <input

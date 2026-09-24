@@ -163,7 +163,26 @@ class Project extends Model
     /** Whether clients who hold this project may see its timeline. Off unless the team says so. */
     public function showsTimelineToClients(): bool
     {
-        return (bool) ($this->settings['client_timeline'] ?? false);
+        return $this->clientTimelineMode() !== null;
+    }
+
+    /**
+     * What a client's timeline shows, or null when they get none.
+     *
+     * - issues: the issues they can already open, as bars.
+     * - phases: the phases alone, each with its dates and how far along it is, and
+     *   no issue at all. For a team that plans in detail internally and wants the
+     *   client to see the shape of the job without sharing any of the work in it.
+     *
+     * A setting saved as plain `true`, from before there was a choice, means issues.
+     */
+    public function clientTimelineMode(): ?string
+    {
+        return match ($this->settings['client_timeline'] ?? false) {
+            true, 'issues' => 'issues',
+            'phases' => 'phases',
+            default => null,
+        };
     }
 
     /** A project's reminder and auto-close settings, each off unless a day count is set. */

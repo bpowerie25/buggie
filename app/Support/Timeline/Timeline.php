@@ -156,6 +156,82 @@ class Timeline
         return $this->build()['undated'];
     }
 
+    /**
+     * A project's phases and nothing else: the client timeline in phases mode.
+     *
+     * Built from every issue in each phase, internal work included, because that is
+     * the whole point: the client sees when Design runs and how far along it is
+     * without a single issue being shared. So what leaves is deliberately thin —
+     * the phase's name, its first and last dates, and a percentage. No keys, no
+     * titles, no people, and no counts, since "4 of 11" says how many issues there
+     * are that they cannot see.
+     *
+     * Cancelled work counts towards neither the dates nor the percentage. A phase
+     * with nothing dated yet has no place on an axis and is listed by name as not
+     * scheduled.
+     *
+     * @return array{rows: array<int, array<string, mixed>>, unscheduled: array<int, string>}
+     */
+    public function phaseSummary(\App\Models\Project $project): array
+    {
+        $rows = [];
+        $unscheduled = [];
+
+        foreach ($project->phases()->get() as $phase) {
+            $issues = Issue::query()
+                ->where('phase_id', $phase->id)
+                ->whereHas('status', fn (Builder $q) => $q->where('category', '!=', StatusCategory::Canceled->value))
+                ->with('status:id,category')
+                ->get(['id', 'status_id', 'start_on', 'due_on']);
+
+            $extents = $issues->map(fn (Issue $issue) => $this->ownExtent($issue))->filter();
+
+            if ($extents->isEmpty()) {
+                $unscheduled[] = $phase->name;
+
+                continue;
+            }
+
+            $start = $extents->map(fn (array $e) => $e[0]->toDateString())->min();
+            $end = $extents->map(fn (array $e) => $e[1]->toDateString())->max();
+
+            if ($start > $this->to->toDateString() || $end < $this->from->toDateString()) {
+                continue;
+            }
+
+            $done = $issues->filter(fn (Issue $issue) => $issue->status->category === StatusCategory::Done)->count();
+            $percent = (int) floor(100 * $done / max($issues->count(), 1));
+
+            $rows[] = [
+                'key' => "group-phase-{$phase->id}",
+                'title' => $phase->name,
+                'project' => $project->name,
+                'status' => '',
+                'assignee' => null,
+                'version' => null,
+                'depth' => 0,
+                'start' => $start,
+                'end' => $end,
+                'start_on' => null,
+                'due_on' => null,
+                'kind' => 'group',
+                'anchor' => 'start',
+                'open' => $percent < 100,
+                'overdue' => false,
+                'children' => 0,
+                'estimate' => null,
+                'blocked_by' => [],
+                'conflicts' => [],
+                'progress' => ['percent' => $percent],
+                'group' => null,
+                'status_color' => null,
+                'assignee_id' => null,
+            ];
+        }
+
+        return ['rows' => $rows, 'unscheduled' => $unscheduled];
+    }
+
     /** Whether the LIMIT cut the result short. */
     public function truncated(): bool
     {

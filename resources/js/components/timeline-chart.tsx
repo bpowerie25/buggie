@@ -40,12 +40,25 @@ export interface TimelineRow {
     /** Sent back with a drag, so one made on top of somebody else's is refused. */
     version: string | null;
     /** On a phase header: its issues done, out of all of them (cancelled aside). */
-    progress?: { done: number; total: number } | null;
+    progress?: { done: number; total: number } | { percent: number } | null;
     /** On an issue under a section header: that header's key. */
     group?: string | null;
     /** For colouring by status or person. Staff only; null for a client. */
     status_color?: string | null;
     assignee_id?: number | null;
+}
+
+/** How far along a section is, from 0 to 1, and how to say it; null when it has no measure. */
+export function progressOf(row: Pick<TimelineRow, 'progress'>): { fraction: number; label: string } | null {
+    const p = row.progress;
+    if (!p) return null;
+
+    // A client's phases-only timeline sends a percentage: counts would say how many
+    // issues there are that they cannot see.
+    if ('percent' in p) return { fraction: p.percent / 100, label: `${p.percent}% done` };
+    if (p.total === 0) return null;
+
+    return { fraction: p.done / p.total, label: `${p.done}/${p.total} done` };
 }
 
 /** How bars are coloured: open, closed and late; the status's own colour; or by person. */
@@ -663,11 +676,11 @@ function Bar({
     if (row.kind === 'group') {
         // The stage's span, with how much of it is done filled in from the left. Not
         // a date anybody set: a phase runs from its first issue to its last.
-        const progress = row.progress && row.progress.total > 0 ? row.progress.done / row.progress.total : 0;
+        const progress = progressOf(row)?.fraction ?? 0;
 
         return (
             <g>
-                <title>{`${row.title} · ${row.start} to ${row.end}${row.progress ? ` · ${row.progress.done} of ${row.progress.total} done` : ''}`}</title>
+                <title>{`${row.title} · ${row.start} to ${row.end}${progressOf(row) ? ` · ${progressOf(row)!.label}` : ''}`}</title>
                 <rect x={left} y={y + ROW / 2 - 4} width={right - left} height={8} rx={4} className="fill-ink-muted/30" />
                 {progress > 0 && (
                     <rect
@@ -745,22 +758,24 @@ function GroupLabel({
     collapsed: boolean;
     onToggle: () => void;
 }) {
+    const progress = progressOf(row);
+    // A header with nothing under it (a phases-only timeline) has nothing to fold.
+    const folds = row.children > 0;
+
     return (
         <button
             type="button"
-            onClick={onToggle}
-            aria-expanded={!collapsed}
+            onClick={folds ? onToggle : undefined}
+            aria-expanded={folds ? !collapsed : undefined}
             style={{ height: ROW }}
-            className="flex w-full items-center gap-1.5 overflow-hidden bg-surface pr-2 pl-2 text-left"
-            title={`${row.title} — ${row.children} on the chart`}
+            className={`flex w-full items-center gap-1.5 overflow-hidden bg-surface pr-2 pl-2 text-left ${folds ? '' : 'cursor-default'}`}
+            title={folds ? `${row.title} — ${row.children} on the chart` : `${row.title}: ${row.start} to ${row.end}`}
         >
-            <span className={`shrink-0 text-[10px] text-ink-subtle transition ${collapsed ? '' : 'rotate-90'}`}>▶</span>
-            <span className="truncate text-xs font-semibold text-ink">{row.title}</span>
-            {row.progress && row.progress.total > 0 && (
-                <span className="ml-auto shrink-0 text-[10px] text-ink-subtle">
-                    {row.progress.done}/{row.progress.total} done
-                </span>
+            {folds && (
+                <span className={`shrink-0 text-[10px] text-ink-subtle transition ${collapsed ? '' : 'rotate-90'}`}>▶</span>
             )}
+            <span className="truncate text-xs font-semibold text-ink">{row.title}</span>
+            {progress && <span className="ml-auto shrink-0 text-[10px] text-ink-subtle">{progress.label}</span>}
         </button>
     );
 }

@@ -19,7 +19,8 @@ class UpdateProjectRequest extends FormRequest
             // before the reminder would mean the reminder never goes.
             'awaiting_reminder_days' => ['nullable', 'integer', 'min:1', 'max:365'],
             // Whether clients who hold the project may see its timeline.
-            'client_timeline' => ['sometimes', 'boolean'],
+            // off, issues or phases; true and false still mean issues and off.
+            'client_timeline' => ['sometimes', \Illuminate\Validation\Rule::in([true, false, 1, 0, '1', '0', 'off', 'issues', 'phases'])],
             'awaiting_close_days' => ['nullable', 'integer', 'min:1', 'max:365', function ($attribute, $value, $fail) {
                 $reminder = $this->input('awaiting_reminder_days');
 

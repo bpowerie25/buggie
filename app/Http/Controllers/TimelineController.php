@@ -77,10 +77,17 @@ class TimelineController extends Controller
 
         $timeline = new Timeline($from, $to, $query, $request->user(), $this->filter, forClient: ! $staff, groupBy: $group);
 
+        // A client on a project shared as phases only sees the phases and no issues.
+        $shown = $staff ? null : $projects->firstWhere('slug', $query->first('project'));
+        $summary = $shown?->clientTimelineMode() === 'phases' ? $timeline->phaseSummary($shown) : null;
+
         return Inertia::render('timeline/index', [
-            'rows' => $timeline->rows(),
-            'undated' => $timeline->undated(),
-            'truncated' => $timeline->truncated(),
+            'rows' => $summary['rows'] ?? $timeline->rows(),
+            'undated' => $summary ? [] : $timeline->undated(),
+            'truncated' => $summary ? false : $timeline->truncated(),
+            // Phases mode: the phases with nothing dated yet, by name.
+            'unscheduled' => $summary['unscheduled'] ?? [],
+            'mode' => $summary ? 'phases' : 'issues',
             'axis' => [
                 'from' => $from->toDateString(),
                 'to' => $to->toDateString(),

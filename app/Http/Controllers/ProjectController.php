@@ -136,7 +136,7 @@ class ProjectController extends Controller
                 'close_days' => $project->clientWaitDays('awaiting_close_days'),
                 'has_status' => $project->awaitingClientStatus() !== null,
             ],
-            'clientTimeline' => $project->showsTimelineToClients(),
+            'clientTimeline' => $project->clientTimelineMode() ?? 'off',
             'statuses' => $project->statuses()->withCount('issues')->get()
                 ->map(fn (Status $status) => [
                     'id' => $status->id,
@@ -231,7 +231,11 @@ class ProjectController extends Controller
         $wait = array_intersect_key($validated, array_flip(['awaiting_reminder_days', 'awaiting_close_days', 'client_timeline']));
 
         if (array_key_exists('client_timeline', $wait)) {
-            $wait['client_timeline'] = (bool) $wait['client_timeline'];
+            $wait['client_timeline'] = match ($wait['client_timeline']) {
+                'phases' => 'phases',
+                true, 1, '1', 'issues' => 'issues',
+                default => false,
+            };
         }
 
         $project->update(array_diff_key($validated, $wait));

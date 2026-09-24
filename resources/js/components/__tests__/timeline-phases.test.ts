@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { barColour, initials, unfolded } from '../timeline-chart';
+import { barColour, initials, progressOf, unfolded } from '../timeline-chart';
 
 describe('folding a phase', () => {
     const rows: { key: string; group?: string | null }[] = [
@@ -34,5 +34,14 @@ describe('colouring and owners', () => {
     it('turns a name into initials', () => {
         expect(initials('Dana Katherine Scully')).toBe('DS');
         expect(initials('matrix')).toBe('M');
+    });
+});
+
+describe('progress', () => {
+    it('says a percentage to a client and a count to the team', () => {
+        expect(progressOf({ progress: { percent: 40 } })).toEqual({ fraction: 0.4, label: '40% done' });
+        expect(progressOf({ progress: { done: 3, total: 4 } })).toEqual({ fraction: 0.75, label: '3/4 done' });
+        expect(progressOf({ progress: { done: 0, total: 0 } })).toBeNull();
+        expect(progressOf({ progress: null })).toBeNull();
     });
 });

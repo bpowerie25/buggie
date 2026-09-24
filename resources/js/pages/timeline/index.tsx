@@ -30,6 +30,8 @@ export default function TimelinePage({
     editable = false,
     group = 'phase',
     groupings = ['phase', 'none'],
+    mode = 'issues',
+    unscheduled = [],
 }: {
     rows: TimelineRow[];
     undated: UndatedRow[];
@@ -42,7 +44,12 @@ export default function TimelinePage({
     group?: string;
     /** The groupings this viewer may choose: fewer for a client. */
     groupings?: string[];
+    /** `phases`: a client shown the project's phases and none of its issues. */
+    mode?: 'issues' | 'phases';
+    /** In phases mode, the phases with nothing dated yet. */
+    unscheduled?: string[];
 }) {
+    const phasesOnly = mode === 'phases';
     const [raw, setRaw] = useState(query.query);
 
     // Adopt a query changed elsewhere — the project dropdown, the back button —
@@ -123,6 +130,7 @@ export default function TimelinePage({
 
             <div className="space-y-6">
                 <div className="flex flex-wrap items-center gap-2">
+                    {!phasesOnly && (
                     <form
                         onSubmit={(e) => {
                             e.preventDefault();
@@ -140,6 +148,7 @@ export default function TimelinePage({
                             className="w-72 rounded-lg border border-border bg-surface px-2.5 py-1.5 font-mono text-xs text-ink placeholder:text-ink-subtle"
                         />
                     </form>
+                    )}
 
                     {/*
                         The dropdown edits the query string rather than sending a
@@ -184,7 +193,7 @@ export default function TimelinePage({
                         className={control}
                     />
 
-                    {groupings.length > 1 && (
+                    {groupings.length > 1 && !phasesOnly && (
                         <select
                             value={group}
                             aria-label="Group by"
@@ -286,6 +295,15 @@ export default function TimelinePage({
                     </p>
                 )}
 
+                {phasesOnly && (
+                    <p className="text-xs text-ink-muted">
+                        The stages of the project, each from its first piece of work to its last,
+                        filled in as the work is done.
+                        {unscheduled.length > 0 && ` Not scheduled yet: ${unscheduled.join(', ')}.`}
+                    </p>
+                )}
+
+                {!phasesOnly && (
                 <div className="flex flex-wrap gap-4 text-xs text-ink-muted">
                     {editable && colourBy !== 'state' ? (
                         <span>
@@ -322,6 +340,7 @@ export default function TimelinePage({
                         A blocker that does not finish in time
                     </span>
                 </div>
+                )}
 
                 {truncated && (
                     <p className="text-xs text-ink-subtle">
