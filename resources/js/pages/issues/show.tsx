@@ -32,7 +32,7 @@ import type { RequestPayload } from '@inertiajs/core';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import type { JSONContent } from '@tiptap/react';
 import { Copy, Eye, EyeOff, Lock, Plus, Tag, Timer, Trash2, X } from 'lucide-react';
-import { useState } from 'react';
+import { useState, type FormEvent } from 'react';
 
 /** Whoever wrote or did something, as the reader is allowed to see them. */
 interface Actor {
@@ -348,6 +348,203 @@ function MarkDuplicate({ issueKey, project }: { issueKey: string; project: strin
                             onError: (errors) => setError(errors.key),
                         },
                     )
+                }
+            />
+        </>
+    );
+}
+
+/**
+ * The issue's place in the one-level hierarchy: the parent it is part of, or the
+ * subtasks under it, with the controls to change either. A parent cannot also be a
+ * subtask, so only one of the two ever shows. SetParent refuses what would break the
+ * tree, and its reasons are shown where the choice was made.
+ */
+function Subtasks({
+    issueKey,
+    project,
+    parent,
+    subtasks,
+    editable,
+}: {
+    issueKey: string;
+    project: { id: number; slug: string };
+    parent: { key: string; title: string } | null;
+    subtasks: { key: string; title: string; open: boolean }[];
+    editable: boolean;
+}) {
+    const [picking, setPicking] = useState<'parent' | 'child' | null>(null);
+    const [error, setError] = useState<string>();
+    const [title, setTitle] = useState('');
+    const [adding, setAdding] = useState(false);
+    const [saving, setSaving] = useState(false);
+
+    function setParent(child: string, parentKey: string | null) {
+        router.patch(
+            `/issues/${child}/parent`,
+            { parent: parentKey },
+            {
+                preserveScroll: true,
+                onSuccess: () => setPicking(null),
+                onError: (errors) => setError(errors.parent),
+            },
+        );
+    }
+
+    function create(event: FormEvent) {
+        event.preventDefault();
+        if (title.trim() === '') return;
+
+        setSaving(true);
+        router.post(
+            '/issues',
+            { project_id: project.id, title: title.trim(), parent: issueKey, stay: true },
+            {
+                preserveScroll: true,
+                // Straight on to the next one: subtasks are usually added in a run.
+                onSuccess: () => setTitle(''),
+                onError: (errors) => setError(errors.parent ?? errors.title),
+                onFinish: () => setSaving(false),
+            },
+        );
+    }
+
+    const detach = (key: string) => (
+        <button
+            type="button"
+            aria-label={`Stop ${key} being a subtask`}
+            title="No longer a subtask. The issue is kept."
+            onClick={() => setParent(key, null)}
+            className="ml-auto shrink-0 opacity-0 transition group-hover:opacity-100 focus:opacity-100"
+        >
+            <X className="size-3 text-ink-subtle hover:text-danger" />
+        </button>
+    );
+
+    const dashed =
+        'flex items-center gap-1 rounded border border-dashed border-border-strong px-1.5 py-0.5 text-[11px] text-ink-subtle transition hover:text-ink';
+
+    return (
+        <>
+            {parent ? (
+                <SidebarRow label="Part of">
+                    <div className="group flex items-center gap-1.5">
+                        <Link
+                            href={`/issues/${parent.key}`}
+                            className="min-w-0 truncate text-sm text-accent underline underline-offset-2"
+                        >
+                            <span className="font-mono text-xs">{parent.key}</span> {parent.title}
+                        </Link>
+                        {editable && detach(issueKey)}
+                    </div>
+                </SidebarRow>
+            ) : (
+                editable &&
+                subtasks.length === 0 && (
+                    <SidebarRow label="Part of">
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setError(undefined);
+                                setPicking('parent');
+                            }}
+                            className={dashed}
+                        >
+                            Make this a subtask of…
+                        </button>
+                    </SidebarRow>
+                )
+            )}
+
+            {!parent && (subtasks.length > 0 || editable) && (
+                <SidebarRow label="Subtasks">
+                    <div className="space-y-1">
+                        {subtasks.length > 0 && (
+                            <span className="text-xs text-ink-subtle">
+                                {/* Counted, because "3 of 5 done" is the only thing
+                                    anybody wants from a subtask list at a glance. */}
+                                {subtasks.filter((c) => !c.open).length} of {subtasks.length} done
+                            </span>
+                        )}
+                        {subtasks.map((child) => (
+                            <div key={child.key} className="group flex items-center gap-1.5">
+                                <Link
+                                    href={`/issues/${child.key}`}
+                                    className="min-w-0 truncate text-sm text-ink hover:text-accent"
+                                >
+                                    <span
+                                        className={`font-mono text-xs ${child.open ? 'text-ink-subtle' : 'text-success'}`}
+                                    >
+                                        {child.key}
+                                    </span>{' '}
+                                    <span className={child.open ? '' : 'text-ink-subtle line-through'}>{child.title}</span>
+                                </Link>
+                                {editable && detach(child.key)}
+                            </div>
+                        ))}
+
+                        {editable &&
+                            (adding ? (
+                                <form onSubmit={create} className="pt-0.5">
+                                    <input
+                                        value={title}
+                                        autoFocus
+                                        disabled={saving}
+                                        maxLength={255}
+                                        placeholder="Subtask title, then Enter"
+                                        aria-label="New subtask title"
+                                        onChange={(e) => setTitle(e.target.value)}
+                                        onKeyDown={(e) => e.key === 'Escape' && setAdding(false)}
+                                        onBlur={() => title.trim() === '' && setAdding(false)}
+                                        className="w-full rounded-md border border-border-strong bg-raised px-2 py-1 text-sm text-ink focus:border-accent focus:outline-none"
+                                    />
+                                </form>
+                            ) : (
+                                <div className="flex flex-wrap gap-1 pt-0.5">
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setError(undefined);
+                                            setAdding(true);
+                                        }}
+                                        className={dashed}
+                                    >
+                                        <Plus className="size-3" />
+                                        New subtask
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setError(undefined);
+                                            setPicking('child');
+                                        }}
+                                        className={dashed}
+                                    >
+                                        <Plus className="size-3" />
+                                        Add existing…
+                                    </button>
+                                </div>
+                            ))}
+
+                        {error && !picking && <p className="text-[11px] text-danger">{error}</p>}
+                    </div>
+                </SidebarRow>
+            )}
+
+            <IssuePicker
+                open={picking !== null}
+                onClose={() => setPicking(null)}
+                title={picking === 'parent' ? `${issueKey} is part of…` : `Add a subtask to ${issueKey}`}
+                hint={
+                    picking === 'parent'
+                        ? 'Choose the bigger piece of work this belongs to. It must be in the same project.'
+                        : 'The issue you choose moves under this one. It must be in the same project.'
+                }
+                project={project.slug}
+                exclude={issueKey}
+                error={error}
+                onPick={(picked) =>
+                    picking === 'parent' ? setParent(issueKey, picked.key) : setParent(picked.key, issueKey)
                 }
             />
         </>
@@ -1486,45 +1683,13 @@ export default function ShowIssue({
                         </SidebarRow>
                     ))}
 
-                    {parent && (
-                        <SidebarRow label="Part of">
-                            <Link
-                                href={`/issues/${parent.key}`}
-                                className="text-sm text-accent underline underline-offset-2"
-                            >
-                                <span className="font-mono text-xs">{parent.key}</span>{' '}
-                                {parent.title}
-                            </Link>
-                        </SidebarRow>
-                    )}
-
-                    {children.length > 0 && (
-                        <SidebarRow label="Subtasks">
-                            <div className="space-y-1">
-                                {/* Counted, because "3 of 5 done" is the only thing
-                                    anybody wants from a subtask list at a glance. */}
-                                <span className="text-xs text-ink-subtle">
-                                    {children.filter((c) => !c.open).length} of {children.length} done
-                                </span>
-                                {children.map((child) => (
-                                    <Link
-                                        key={child.key}
-                                        href={`/issues/${child.key}`}
-                                        className="block truncate text-sm text-ink hover:text-accent"
-                                    >
-                                        <span
-                                            className={`font-mono text-xs ${
-                                                child.open ? 'text-ink-subtle' : 'text-success'
-                                            }`}
-                                        >
-                                            {child.key}
-                                        </span>{' '}
-                                        {child.title}
-                                    </Link>
-                                ))}
-                            </div>
-                        </SidebarRow>
-                    )}
+                    <Subtasks
+                        issueKey={issue.key}
+                        project={issue.project}
+                        parent={parent}
+                        subtasks={children}
+                        editable={can.update}
+                    />
 
                     {time && (
                         <SidebarRow label="Time">

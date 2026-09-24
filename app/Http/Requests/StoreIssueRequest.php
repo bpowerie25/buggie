@@ -23,6 +23,9 @@ class StoreIssueRequest extends FormRequest
                 Rule::exists('projects', 'id')->where('workspace_id', $workspaceId),
             ],
             'title' => ['required', 'string', 'max:255'],
+            // A key: created as a subtask of that issue. Resolved and checked in the
+            // controller, against the workspace scope.
+            'parent' => ['nullable', 'string', 'max:40'],
             'description' => ['nullable', 'array'],
             'type' => ['required', new Enum(IssueType::class)],
             'priority' => ['required', Rule::in(array_column(IssuePriority::cases(), 'value'))],

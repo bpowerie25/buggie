@@ -194,9 +194,28 @@ class IssueController extends Controller
 
         $project = Project::findOrFail($request->integer('project_id'));
 
+        // Created as a subtask: the parent is found in this workspace or not at all,
+        // and the issue is not kept if SetParent refuses the pairing.
+        $parent = $request->filled('parent')
+            ? Issue::where('key', strtoupper($request->string('parent')->toString()))->first()
+            : null;
+
+        if ($request->filled('parent') && $parent === null) {
+            throw \Illuminate\Validation\ValidationException::withMessages(['parent' => 'No issue with that key in this workspace.']);
+        }
+
         // Client visibility is forced inside the action, so every entry point gets
         // it rather than only this one.
-        $issue = $action->handle($project, $request->validated(), $request->user());
+        $issue = DB::transaction(function () use ($action, $project, $request, $parent) {
+            $issue = $action->handle($project, collect($request->validated())->except('parent')->all(), $request->user());
+
+            if ($parent !== null) {
+                $this->authorize('update', $parent);
+                app(\App\Actions\SetParent::class)->handle($issue, $parent);
+            }
+
+            return $issue;
+        });
 
         // Added from a board column: stay on the board, where the card now is.
         if ($request->boolean('stay')) {

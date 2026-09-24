@@ -12,6 +12,12 @@ today you are running `main`, which is honest rather than ideal — see
 
 ### Added
 
+- **Subtasks from the issue page.** Subtasks existed, and the timeline drew them, but
+  the only way to make one was the API. The sidebar now has *New subtask*: type a
+  title and press Enter, and it's created under the issue, ready for the next one. It
+  also has *Add existing…* and *Make this a subtask of…*, which use the issue picker,
+  and an × to detach one. Subtasks stay one level deep and in the parent's project,
+  and the reason is shown when a choice breaks that.
 - **Pick an issue by what it's about.** Linking issues, marking a duplicate and
   merging a report in the inbox now open a search box instead of asking for a key. It
   suggests recent open work from the same project before anything is typed, then
