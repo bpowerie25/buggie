@@ -34,9 +34,9 @@ class ProjectTest extends TestCase
         );
 
         $this->assertSame('MS', $project->key);
-        $this->assertCount(6, $project->statuses);
+        $this->assertCount(7, $project->statuses);
         $this->assertSame(
-            ['Backlog', 'Todo', 'In Progress', 'In Review', 'Done', "Won't Fix"],
+            ['New', 'Backlog', 'Todo', 'In Progress', 'In Review', 'Done', "Won't Fix"],
             $project->statuses->pluck('name')->all(),
         );
 
@@ -44,6 +44,9 @@ class ProjectTest extends TestCase
         $default = $project->statuses->firstWhere('is_default', true);
         $this->assertNotNull($default);
         $this->assertTrue($default->category->isOpen());
+
+        // And exactly one place for a client's issue to start, which is not it.
+        $this->assertSame(['New'], $project->statuses->where('is_triage', true)->pluck('name')->values()->all());
     }
 
     #[Test]
@@ -57,7 +60,7 @@ class ProjectTest extends TestCase
 
         $this->assertDatabaseMissing('statuses', ['workspace_id' => null]);
         $this->assertSame(
-            6,
+            7,
             \App\Models\Status::withoutGlobalScopes()
                 ->where('workspace_id', $workspace->id)
                 ->count(),

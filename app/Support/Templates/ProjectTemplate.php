@@ -16,7 +16,7 @@ use App\Enums\StatusCategory;
 class ProjectTemplate
 {
     /**
-     * @param  array<int, array{name: string, category: StatusCategory, color: string, is_default: bool, wip_limit: int|null}>  $statuses
+     * @param  array<int, array{name: string, category: StatusCategory, color: string, is_default: bool, is_triage: bool, wip_limit: int|null}>  $statuses
      * @param  array<int, array{name: string, color: string, description: string|null}>  $labels
      * @param  array<int, array{name: string, type: CustomFieldType, options: array<int, string>|null, required: bool}>  $fields
      */
@@ -47,7 +47,7 @@ class ProjectTemplate
     }
 
     /**
-     * @return array<int, array{name: string, category: StatusCategory, color: string, is_default: bool, wip_limit: int|null}>
+     * @return array<int, array{name: string, category: StatusCategory, color: string, is_default: bool, is_triage: bool, wip_limit: int|null}>
      *
      * @throws InvalidTemplate
      */
@@ -96,11 +96,25 @@ class ProjectTemplate
                 'category' => $category,
                 'color' => self::color($key, $status['color'] ?? null, "the status “{$name}”"),
                 'is_default' => (bool) ($status['is_default'] ?? false),
+                'is_triage' => (bool) ($status['is_triage'] ?? false),
                 'wip_limit' => self::wipLimit($key, $status['wip_limit'] ?? null, $name),
             ];
         }
 
         self::assertWorkable($key, $statuses);
+
+        // Every project needs somewhere for a client's issue to start. Added here
+        // rather than written into each template, and added to the parsed list
+        // rather than behind it, so that what a template says it creates — on the
+        // create form too — is exactly what it creates.
+        if (! in_array(true, array_column($statuses, 'is_triage'), true)) {
+            array_unshift($statuses, [
+                ...\App\Models\Status::TRIAGE,
+                'name' => in_array('new', $names, true) ? 'Untriaged' : \App\Models\Status::TRIAGE['name'],
+                'category' => StatusCategory::from(\App\Models\Status::TRIAGE['category']),
+                'wip_limit' => null,
+            ]);
+        }
 
         return $statuses;
     }
@@ -141,6 +155,18 @@ class ProjectTemplate
 
         if (! $default['category']->isOpen()) {
             throw InvalidTemplate::for($key, "the default status “{$default['name']}” is closed; new issues cannot start closed.");
+        }
+
+        // Optional — one is added if a template has none — but never two, and never
+        // closed: a client's issue must start somewhere somebody will look.
+        $triage = array_filter($statuses, fn (array $s) => $s['is_triage'] ?? false);
+
+        if (count($triage) > 1) {
+            throw InvalidTemplate::for($key, count($triage).' statuses are marked as where client issues start; there can be one.');
+        }
+
+        if (($first = reset($triage)) !== false && ! $first['category']->isOpen()) {
+            throw InvalidTemplate::for($key, "“{$first['name']}” is closed, so a client's issue would start closed.");
         }
     }
 

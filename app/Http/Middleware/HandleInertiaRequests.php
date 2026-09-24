@@ -83,8 +83,10 @@ class HandleInertiaRequests extends Middleware
                 : [],
 
             // Staff only: the badge should not tell a client an inbox exists.
+            // Reports, plus issues clients filed that nobody has looked at yet: both
+            // are listed on the Triage screen, so both are what the badge counts.
             'inboxCount' => fn () => $user && $workspace && $user->can('viewAny', Report::class)
-                ? Report::awaitingTriage()->count()
+                ? Report::awaitingTriage()->count() + \App\Models\Issue::awaitingTriage()->count()
                 : 0,
 
             // Only for the people who can decide them, and only this workspace's.

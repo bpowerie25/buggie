@@ -42,9 +42,17 @@ class CreateIssue
         // This lives in the action rather than the controller so that every way in
         // gets it: the screens, the API, and whatever comes next. It used to live in
         // one controller, and the API promptly disagreed with it.
-        if ($reporter !== null && ! ($reporter->membershipIn($project->workspace)?->isStaff() ?? false)) {
+        $raisedByClient = $reporter !== null
+            && ! ($reporter->membershipIn($project->workspace)?->isStaff() ?? false);
+
+        if ($raisedByClient) {
             $attributes['visibility'] = \App\Enums\IssueVisibility::Client->value;
             $attributes['assignee_id'] = null;
+
+            // Nor do they choose where it starts. The form never offered them a
+            // status, but the request would have taken one — straight into "Done",
+            // or into the team's ready-to-work queue with nobody having looked.
+            unset($attributes['status_id']);
         }
 
         // Validated before the transaction opens rather than inside it: a rejected
@@ -53,10 +61,19 @@ class CreateIssue
         // insert leaves a visible gap.
         $customFields = $this->fields->validate($project, $attributes['custom_fields'] ?? []);
 
-        return DB::transaction(function () use ($project, $attributes, $reporter, $customFields) {
-            $status = $attributes['status_id'] ?? $project->defaultStatus()?->id;
+        return DB::transaction(function () use ($project, $attributes, $reporter, $customFields, $raisedByClient) {
+            $status = $attributes['status_id'] ?? $this->startingStatus($project, $raisedByClient)?->id;
 
             abort_if($status === null, 422, 'This project has no statuses configured.');
+
+            // Validated against the workspace by the request; this is the project.
+            // A status from a sibling project would put the issue in a workflow its
+            // own project does not have.
+            abort_unless(
+                $project->statuses()->whereKey($status)->exists(),
+                422,
+                'That status belongs to another project.',
+            );
 
             $description = $attributes['description'] ?? null;
             $number = $project->nextIssueNumber();
@@ -122,5 +139,15 @@ class CreateIssue
 
             return $issue;
         });
+    }
+
+    /**
+     * A client's issue waits in "New" until somebody on the team has looked at it,
+     * and is listed on the Triage screen meanwhile. Staff are triaging as they file,
+     * so theirs start in the project's default — and they can pick another.
+     */
+    private function startingStatus(Project $project, bool $raisedByClient): ?\App\Models\Status
+    {
+        return ($raisedByClient ? $project->triageStatus() : null) ?? $project->defaultStatus();
     }
 }

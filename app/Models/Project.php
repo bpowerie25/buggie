@@ -140,6 +140,12 @@ class Project extends Model
             ?? $this->statuses()->orderBy('position')->first();
     }
 
+    /** Where a client's issue starts. Null only if a team has deleted it. */
+    public function triageStatus(): ?Status
+    {
+        return $this->statuses()->where('is_triage', true)->first();
+    }
+
     public function defaultAssignee(): BelongsTo
     {
         return $this->belongsTo(User::class, 'default_assignee_id');

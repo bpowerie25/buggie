@@ -10,13 +10,23 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['project_id', 'name', 'category', 'color', 'position', 'is_default', 'wip_limit'])]
+#[Fillable(['project_id', 'name', 'category', 'color', 'position', 'is_default', 'is_triage', 'wip_limit'])]
 class Status extends Model
 {
     use BelongsToWorkspace, HasFactory;
 
+    /**
+     * Where an issue raised by a client starts, until somebody on the team looks at it.
+     *
+     * Every project has one, whatever its template: ApplyProjectSetup adds it when a
+     * template or a copied project lacks it. Recognised by its flag, never its name —
+     * its category is shared with "Backlog", and the name can be changed.
+     */
+    public const TRIAGE = ['name' => 'New', 'category' => 'backlog', 'color' => '#38bdf8', 'is_default' => false, 'is_triage' => true];
+
     /** Seeded for every new project. Names are editable; categories are not. */
     public const DEFAULTS = [
+        self::TRIAGE,
         ['name' => 'Backlog',     'category' => 'backlog',   'color' => '#94a3b8', 'is_default' => false],
         ['name' => 'Todo',        'category' => 'unstarted', 'color' => '#64748b', 'is_default' => true],
         ['name' => 'In Progress', 'category' => 'started',   'color' => '#f59e0b', 'is_default' => false],
@@ -30,6 +40,7 @@ class Status extends Model
         return [
             'category' => StatusCategory::class,
             'is_default' => 'boolean',
+            'is_triage' => 'boolean',
             'position' => 'integer',
             'wip_limit' => 'integer',
         ];

@@ -5,7 +5,7 @@ import { Popover, PopoverItem } from '@/components/popover';
 import { useHotkeys } from '@/hooks/use-hotkeys';
 import { AppLayout } from '@/layouts/app-layout';
 import type { Person, ReportRow, SharedProps } from '@/types';
-import { Head, router, usePage } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
     Check,
     Inbox,
@@ -17,6 +17,15 @@ import {
 import { useRef, useState } from 'react';
 
 type Priority = { value: number; label: string; color: string };
+
+/** An issue a client filed that is still in "New". */
+type ClientIssue = {
+    key: string;
+    title: string;
+    project: string;
+    reporter: string | null;
+    created_at: string;
+};
 type Type = { value: string; label: string };
 
 /**
@@ -33,6 +42,7 @@ export default function ReportsIndex({
     types,
     members,
     pending,
+    clientIssues = [],
 }: {
     reports: ReportRow[];
     projects: { id: number; name: string; key: string; slug: string }[];
@@ -41,6 +51,7 @@ export default function ReportsIndex({
     types: Type[];
     members: Person[];
     pending: number;
+    clientIssues?: ClientIssue[];
 }) {
     const { auth } = usePage<SharedProps>().props;
     const [active, setActive] = useState(0);
@@ -139,7 +150,9 @@ export default function ReportsIndex({
         >
             <Head title={pending > 0 ? `Triage (${pending})` : 'Triage'} />
 
-            {reports.length === 0 ? (
+            {clientIssues.length > 0 && <RaisedByClients issues={clientIssues} />}
+
+            {reports.length === 0 && clientIssues.length > 0 ? null : reports.length === 0 ? (
                 <div className="rounded-xl border border-dashed border-border-strong p-12 text-center">
                     <Inbox className="mx-auto size-6 text-ink-subtle" />
                     <p className="mt-3 text-sm font-medium text-ink">Inbox zero</p>
@@ -365,6 +378,41 @@ export default function ReportsIndex({
     );
 }
 
+
+/**
+ * Issues clients filed, waiting in "New". Already issues, so they open on their own
+ * page; moving one to any other status is what takes it off this list.
+ */
+function RaisedByClients({ issues }: { issues: ClientIssue[] }) {
+    return (
+        <section className="mb-6">
+            <h2 className="text-sm font-semibold text-ink">Raised by clients</h2>
+            <p className="mt-0.5 text-xs text-ink-muted">
+                Waiting in New. Change the status to take one off this list.
+            </p>
+            <ul className="mt-3 divide-y divide-border overflow-hidden rounded-xl border border-border bg-raised">
+                {issues.map((issue) => (
+                    <li key={issue.key}>
+                        <Link
+                            href={`/issues/${issue.key}`}
+                            className="flex items-center gap-3 px-4 py-2.5 transition hover:bg-surface"
+                        >
+                            <span className="shrink-0 font-mono text-[11px] text-ink-subtle">
+                                {issue.key}
+                            </span>
+                            <span className="min-w-0 flex-1 truncate text-sm text-ink">
+                                {issue.title}
+                            </span>
+                            <span className="shrink-0 text-xs text-ink-subtle">
+                                {issue.reporter ?? 'A client'} · {relativeTime(issue.created_at)}
+                            </span>
+                        </Link>
+                    </li>
+                ))}
+            </ul>
+        </section>
+    );
+}
 
 function Key({ children }: { children: string }) {
     return (

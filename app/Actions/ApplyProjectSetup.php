@@ -34,6 +34,7 @@ class ApplyProjectSetup
                 'category' => $status['category']->value,
                 'color' => $status['color'],
                 'is_default' => $status['is_default'],
+                'is_triage' => $status['is_triage'] ?? false,
                 'wip_limit' => $status['wip_limit'],
                 'position' => $position,
             ]);
@@ -118,6 +119,7 @@ class ApplyProjectSetup
                 'category' => $status->category->value,
                 'color' => $status->color,
                 'is_default' => $status->is_default,
+                'is_triage' => $status->is_triage,
                 'wip_limit' => $status->wip_limit,
 
                 // Renumbered from zero rather than carried across: the source may
@@ -125,6 +127,9 @@ class ApplyProjectSetup
                 'position' => $position,
             ]);
         }
+
+        // A source whose team deleted its "New" still yields a project with one.
+        $this->ensureTriageStatus($target);
 
         foreach (CustomField::where('project_id', $source->id)->inOrder()->get() as $position => $field) {
             CustomField::create([
@@ -185,5 +190,26 @@ class ApplyProjectSetup
         if (! $defaults->first()->category->isOpen()) {
             throw InvalidTemplate::workflow('the default status is closed; new issues cannot start closed.');
         }
+    }
+
+    /**
+     * Every project has somewhere for a client's issue to start. Templates list their
+     * own workflows and need not each remember it, so it is added here, at the top.
+     */
+    private function ensureTriageStatus(Project $project): void
+    {
+        if ($project->statuses()->where('is_triage', true)->exists()) {
+            return;
+        }
+
+        $project->statuses()->increment('position');
+
+        $taken = $project->statuses()->whereRaw('lower(name) = ?', ['new'])->exists();
+
+        $project->statuses()->create([
+            ...Status::TRIAGE,
+            'name' => $taken ? 'Untriaged' : Status::TRIAGE['name'],
+            'position' => 0,
+        ]);
     }
 }

@@ -53,6 +53,25 @@ class ReportController extends Controller
                 ->orderBy('name')->get(['users.id', 'users.name'])
                 ->map(fn ($u) => ['id' => $u->id, 'name' => $u->name]),
             'pending' => Report::awaitingTriage()->count(),
+
+            // Issues a client filed, waiting in "New". Not reports — they are already
+            // issues, and the client can see them — but they need the same first look.
+            'clientIssues' => Issue::awaitingTriage()
+                ->with(['project:id,key,name,slug', 'reporter:id,name', 'status:id,name,color,category'])
+                ->when(
+                    $request->filled('project'),
+                    fn ($q) => $q->whereHas('project', fn ($p) => $p->where('slug', $request->string('project'))),
+                )
+                ->oldest()
+                ->limit(100)
+                ->get()
+                ->map(fn (Issue $issue) => [
+                    'key' => $issue->key,
+                    'title' => $issue->title,
+                    'project' => $issue->project->key,
+                    'reporter' => $issue->reporter?->name,
+                    'created_at' => $issue->created_at->toIso8601String(),
+                ]),
         ]);
     }
 

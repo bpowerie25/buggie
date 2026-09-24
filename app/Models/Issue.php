@@ -223,6 +223,23 @@ class Issue extends Model
         return $query->whereHas('status', fn (Builder $q) => $q->open());
     }
 
+    /**
+     * Raised by a client and not yet looked at: still in its project's triage status.
+     *
+     * Listed on the Triage screen beside the reports. Moving the issue to any other
+     * status is what takes it off, so there is no separate "triaged" flag to forget.
+     */
+    public function scopeAwaitingTriage(Builder $query): Builder
+    {
+        return $query
+            ->whereHas('status', fn (Builder $q) => $q->where('is_triage', true))
+            ->whereExists(fn ($q) => $q->selectRaw('1')
+                ->from('workspace_user')
+                ->whereColumn('workspace_user.user_id', 'issues.reporter_id')
+                ->whereColumn('workspace_user.workspace_id', 'issues.workspace_id')
+                ->where('workspace_user.role', \App\Enums\WorkspaceRole::Client->value));
+    }
+
     public function scopeClosed(Builder $query): Builder
     {
         return $query->whereHas('status', fn (Builder $q) => $q->closed());

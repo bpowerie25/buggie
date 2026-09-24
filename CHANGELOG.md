@@ -14,6 +14,11 @@ today you are running `main`, which is honest rather than ideal — see
 
 - **An issue's type can be changed from its sidebar**, like status and priority, and
   the activity feed says what it changed from and to. Staff only; a client sees it.
+- **Client issues start in "New" and appear in Triage.** An issue a client filed used
+  to start in the project's default status — the team's ready queue, "Scoped" on the
+  client website template — as though somebody had already looked at it. Every
+  project now has a **New** status, added at the top of existing workflows on upgrade,
+  and the Triage screen lists client issues waiting in it. Staff issues are unchanged.
 - **A registration mode**: open, by invitation, or by invitation and on request, set
   under Settings → Instance or with `BUGGIE_REGISTRATION`. In `request` mode a
   workspace's sign-in page offers *Request access*; its owners and admins are emailed
@@ -58,6 +63,9 @@ today you are running `main`, which is honest rather than ideal — see
 
 ### Fixed
 
+- A client filing an issue could set its starting status by adding `status_id` to the
+  request — straight into "Done" — although the form never offered one. And any
+  issue could be created in a status belonging to another project of the workspace.
 - The board rendered empty columns when grouped by anything other than status, and
   drops were silently inert. It resolved every drop to a status by name regardless of
   the grouping.

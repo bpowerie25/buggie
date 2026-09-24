@@ -671,7 +671,8 @@ class ProjectTemplateTest extends TestCase
 
         $project = $this->create($workspace, ['name' => 'Doomed', 'template' => 'broken']);
 
-        $this->assertSame(['Todo', 'Done'], $this->statusesOf($project)->pluck('name')->all());
+        // New is added to every workflow that lacks one: where a client's issue starts.
+        $this->assertSame(['New', 'Todo', 'Done'], $this->statusesOf($project)->pluck('name')->all());
         $this->assertSame(['Estimate'], $this->fieldsOf($project)->pluck('name')->all());
         $this->assertDatabaseHas('labels', ['workspace_id' => $workspace->id, 'name' => 'Repaired']);
     }

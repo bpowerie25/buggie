@@ -29,15 +29,16 @@ closed one records `closed_at` and writes a *closed* event, and `resolved_at` is
 only when the destination is `done` — a cancelled issue is closed but was never
 resolved. Moving back the other way clears both and writes a *reopened* event.
 
-## The default six
+## The default seven
 
 Unless you [start it from a template](projects.md#starting-from-a-template), every
 new project starts with:
 
 | Name | Category | |
 |---|---|---|
+| New | backlog | where an issue raised by a **client** starts |
 | Backlog | backlog | |
-| Todo | unstarted | the default for new issues |
+| Todo | unstarted | the default for new issues raised by staff |
 | In Progress | started | |
 | In Review | started | |
 | Done | done | |
@@ -45,6 +46,12 @@ new project starts with:
 
 Two statuses sharing a category is normal and expected — "In Progress" and "In
 Review" both mean started.
+
+**New** is on every project, whatever its template. A client's issue waits there,
+listed under *Raised by clients* on the [Triage](triage.md) screen, until somebody moves
+it to any other status. Staff are triaging as they file, so their issues start in the
+default instead. New can be renamed; if it is removed, client issues start in the
+default like everybody else's.
 
 ## Editing the workflow
 
