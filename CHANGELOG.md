@@ -12,6 +12,17 @@ today you are running `main`, which is honest rather than ideal — see
 
 ### Added
 
+- **Blocker reporting.**
+  - Three new filters: `is:blocked`, `is:blocking` and `is:delaying`. A blocker is
+    *delaying* when the work waiting on it can't start when planned. An open blocker
+    past its date counts as ending today at the earliest.
+  - List rows and board cards show "Blocked by KD-12", in red with the days lost
+    when it's late, and "Delaying 3 · 5 days" on the blocker itself.
+  - Insights gains a **Blockers** panel: open blockers ranked by the delay they're
+    causing, then by how much work waits on them, including down a chain.
+  - Insights also gains **Delays caused**: work the timeline pushed later because its
+    blocker moved, and by how many days.
+  - A client is only ever told about blockers they could open themselves.
 - **A phases-only timeline for clients.** *Timeline for clients* in project settings
   is now Off, Phases only, or Issues they can open (what "on" used to mean, and what
   it still means for projects already switched on). With phases only, a client sees

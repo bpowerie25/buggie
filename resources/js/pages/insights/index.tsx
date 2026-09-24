@@ -61,6 +61,8 @@ export default function InsightsPage({
     byAssignee,
     byStatus,
     ageing,
+    blockers = [],
+    delaysCaused = [],
     filters,
     projects,
 }: {
@@ -72,6 +74,25 @@ export default function InsightsPage({
     byAssignee: Row[];
     byStatus: Row[];
     ageing: { key: string; title: string; project: string | null; status: string | null; days: number }[];
+    blockers?: {
+        key: string;
+        title: string;
+        project: string | null;
+        status: string;
+        assignee: string | null;
+        waiting: number;
+        chain: number;
+        delay_days: number;
+        since: string | null;
+    }[];
+    delaysCaused?: {
+        blocker: string;
+        key: string | null;
+        title: string | null;
+        days: number | null;
+        by: string | null;
+        at: string;
+    }[];
     filters: { from: string; to: string; project_id: number | null };
     projects: { id: number; name: string }[];
 }) {
@@ -202,6 +223,88 @@ export default function InsightsPage({
                         <BarList rows={byStatus} empty="Nothing open." />
                     </Panel>
                 </div>
+
+                <Panel title="Blockers">
+                    {blockers.length === 0 ? (
+                        <p className="py-4 text-sm text-ink-subtle">Nothing open is waiting on anything open.</p>
+                    ) : (
+                        <>
+                            <p className="mb-2 text-xs text-ink-subtle">
+                                Open work other open work is waiting on, worst first. Red means the work
+                                waiting can't start when it was planned to. Filter with{' '}
+                                <Link href="/issues?q=is:delaying" className="font-mono text-accent">
+                                    is:delaying
+                                </Link>
+                                ,{' '}
+                                <Link href="/issues?q=is:blocking" className="font-mono text-accent">
+                                    is:blocking
+                                </Link>{' '}
+                                or{' '}
+                                <Link href="/issues?q=is:blocked" className="font-mono text-accent">
+                                    is:blocked
+                                </Link>
+                                .
+                            </p>
+                            <ul className="divide-y divide-border">
+                                {blockers.map((b) => (
+                                    <li key={b.key} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2">
+                                        <Link href={`/issues/${b.key}`} className="shrink-0 font-mono text-xs text-accent">
+                                            {b.key}
+                                        </Link>
+                                        <span className="min-w-0 flex-1 truncate text-sm text-ink">{b.title}</span>
+                                        <span className="shrink-0 text-xs text-ink-subtle">{b.assignee ?? 'Unassigned'}</span>
+                                        <span className="shrink-0 text-xs text-ink-subtle">{b.status}</span>
+                                        <span
+                                            className="shrink-0 text-xs text-ink-muted"
+                                            title={b.chain > b.waiting ? `${b.waiting} directly, ${b.chain} counting what waits on those` : undefined}
+                                        >
+                                            {b.chain} waiting
+                                        </span>
+                                        {b.since && <span className="shrink-0 text-xs text-ink-subtle">since {b.since}</span>}
+                                        <span
+                                            className={`w-24 shrink-0 text-right text-xs font-medium ${b.delay_days > 0 ? 'text-danger' : 'text-ink-subtle'}`}
+                                        >
+                                            {b.delay_days > 0 ? `${b.delay_days} day${b.delay_days === 1 ? '' : 's'} late` : 'On time'}
+                                        </span>
+                                    </li>
+                                ))}
+                            </ul>
+                        </>
+                    )}
+                </Panel>
+
+                {delaysCaused.length > 0 && (
+                    <Panel title="Delays caused">
+                        <p className="mb-2 text-xs text-ink-subtle">
+                            Work pushed later on the timeline because something it was waiting on moved.
+                        </p>
+                        <ul className="divide-y divide-border">
+                            {delaysCaused.map((d, i) => (
+                                <li key={i} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2 text-sm">
+                                    <Link href={`/issues/${d.blocker}`} className="shrink-0 font-mono text-xs text-danger">
+                                        {d.blocker}
+                                    </Link>
+                                    <span className="text-ink-subtle">pushed</span>
+                                    {d.key && (
+                                        <Link href={`/issues/${d.key}`} className="shrink-0 font-mono text-xs text-accent">
+                                            {d.key}
+                                        </Link>
+                                    )}
+                                    <span className="min-w-0 flex-1 truncate text-ink">{d.title}</span>
+                                    {d.days !== null && (
+                                        <span className="shrink-0 text-xs font-medium text-danger">
+                                            {d.days} day{d.days === 1 ? '' : 's'}
+                                        </span>
+                                    )}
+                                    <span className="shrink-0 text-xs text-ink-subtle">
+                                        {d.at}
+                                        {d.by ? ` · ${d.by}` : ''}
+                                    </span>
+                                </li>
+                            ))}
+                        </ul>
+                    </Panel>
+                )}
 
                 <Panel title="Open longest">
                     {ageing.length === 0 ? (

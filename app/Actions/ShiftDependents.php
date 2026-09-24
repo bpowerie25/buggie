@@ -61,6 +61,7 @@ class ShiftDependents
                     $this->update->handle($dependent, [
                         'start_on' => $dependent->start_on?->copy()->addDays($days)->toDateString(),
                         'due_on' => $dependent->due_on?->copy()->addDays($days)->toDateString(),
+                        'because' => $current->key,
                     ], $actor);
 
                     $moved[] = $dependent->key;

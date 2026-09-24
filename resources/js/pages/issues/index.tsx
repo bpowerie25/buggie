@@ -2,6 +2,7 @@ import { Button } from '@/components/button';
 import { IssueBoard } from '@/components/issue-board';
 import {
     Avatar,
+    BlockageBadges,
     ClientRepliedBadge,
     LabelPill,
     PriorityBars,
@@ -772,6 +773,7 @@ function Row({
             </Link>
 
             {issue.client_replied && <ClientRepliedBadge />}
+            <BlockageBadges blockedBy={issue.blocked_by} delaying={issue.delaying} />
 
             <span className="hidden shrink-0 rounded bg-surface px-1.5 py-0.5 text-[11px] text-ink-muted lg:inline">
                 {issue.project.key}

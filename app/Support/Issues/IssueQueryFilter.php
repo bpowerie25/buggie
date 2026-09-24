@@ -45,6 +45,7 @@ class IssueQueryFilter
         $this->parent($query, $parsed);
         $this->absence($query, $parsed);
         $this->overdue($query, $parsed);
+        $this->blocking($query, $parsed, $viewer);
 
         return $query;
     }
@@ -68,6 +69,51 @@ class IssueQueryFilter
 
         $query->whereNotNull('due_on')
             ->whereDate('due_on', '<', now()->startOfDay()->toDateString());
+    }
+
+    /**
+     * `is:blocked` — waiting on something still open. `is:blocking` — something open
+     * is waiting on it. `is:delaying` — blocking, and the work waiting on it cannot
+     * start when it was planned to. Either can be negated: `-is:blocked` is the work nothing is
+     * holding up.
+     *
+     * Only an open blocker counts. A "blocks" link to finished work is history, and
+     * reporting it as a blockage is how a list like this stops being believed.
+     *
+     * For a client, only a blocker they could open counts. Otherwise `is:blocked`
+     * would tell them that something they cannot see exists and is in the way.
+     */
+    private function blocking(Builder $query, IssueQuery $parsed, User $viewer): void
+    {
+        $workspace = app(Tenancy::class)->current();
+        $staff = $workspace !== null && ($viewer->membershipIn($workspace)?->isStaff() ?? false);
+
+        $other = fn (Builder $q) => $q->open()->unless($staff, fn (Builder $q) => $q->visibleToClient($viewer));
+
+        foreach (['blocked' => \App\Enums\RelationType::BlockedBy, 'blocking' => \App\Enums\RelationType::Blocks] as $value => $type) {
+            $constraint = fn (Builder $r) => $r->where('type', $type->value)->whereHas('relatedIssue', $other);
+
+            if ($parsed->has('is', $value)) {
+                $query->whereHas('relations', $constraint);
+            }
+
+            if ($parsed->has('is', $value, negated: true)) {
+                $query->whereDoesntHave('relations', $constraint);
+            }
+        }
+
+        // `is:delaying`: an open blocker that work waiting on it cannot start on time
+        // because of. Blockage has the rule; this is the same rule in SQL.
+        $delaying = fn (Builder $r) => $r->where('type', \App\Enums\RelationType::Blocks->value)
+            ->whereHas('relatedIssue', fn (Builder $q) => Blockage::sql($other($q)));
+
+        if ($parsed->has('is', 'delaying')) {
+            $query->open()->whereHas('relations', $delaying);
+        }
+
+        if ($parsed->has('is', 'delaying', negated: true)) {
+            $query->where(fn (Builder $q) => $q->closed()->orWhereDoesntHave('relations', $delaying));
+        }
     }
 
     private function project(Builder $query, IssueQuery $parsed): void

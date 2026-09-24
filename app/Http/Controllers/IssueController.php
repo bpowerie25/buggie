@@ -77,12 +77,16 @@ class IssueController extends Controller
             ? $base()->whereIn('issues.id', $this->boardIds($base, $query, $request->user()))
             : $this->filter->apply($base(), $query, $request->user());
 
-        return $builder
+        $issues = $builder
             ->with([
                 'status:id,name,category,color,position',
                 'assignee:id,name',
                 'labels:id,name,color',
                 'project:id,key,slug,name',
+                // For the blocked and delaying badges.
+                'relations' => fn ($q) => $q
+                    ->whereIn('type', [\App\Enums\RelationType::Blocks->value, \App\Enums\RelationType::BlockedBy->value])
+                    ->with(['relatedIssue:id,key,status_id,start_on,due_on', 'relatedIssue.status:id,category']),
             ])
             /*
              * The board is in the order somebody dragged it into; the list is in the
@@ -99,9 +103,53 @@ class IssueController extends Controller
             )
             // A hard ceiling; the list virtualises but the payload should stay sane.
             ->limit(1000)
-            ->get()
-            ->map($this->summary(...))
+            ->get();
+
+        // A client is told only about blockers they could open themselves: a badge
+        // saying "blocked by WEB-9" names work they have no business knowing exists.
+        $related = $issues->flatMap(fn (Issue $issue) => $issue->relations->pluck('related_issue_id'))->unique()->values();
+        $visible = $this->isStaff($request->user())
+            ? null
+            : Issue::visibleToClient($request->user())->whereIn('id', $related)->pluck('id')->flip();
+
+        return $issues
+            ->map(fn (Issue $issue) => [...$this->summary($issue), ...$this->blockage($issue, $visible)])
             ->values();
+    }
+
+    /**
+     * What an issue in a list is waiting on, and what it is holding up.
+     *
+     * - blocked_by: its open blockers, each with how many days it is delaying this.
+     * - delaying: how much open work it holds up past that work's planned start,
+     *   and by how many days at most. Null when it is holding nothing up.
+     *
+     * @param  \Illuminate\Support\Collection<int, int>|null  $visible  ids a client may know of; null for staff
+     * @return array<string, mixed>
+     */
+    private function blockage(Issue $issue, ?Collection $visible): array
+    {
+        $open = fn (\App\Models\IssueRelation $r) => $r->relatedIssue !== null
+            && $r->relatedIssue->status->category->isOpen()
+            && ($visible === null || $visible->has($r->related_issue_id));
+
+        $blockers = $issue->relations
+            ->filter(fn ($r) => $r->type === \App\Enums\RelationType::BlockedBy && $open($r))
+            ->map(fn ($r) => [
+                'key' => $r->relatedIssue->key,
+                'delay_days' => \App\Support\Issues\Blockage::days($r->relatedIssue, $issue),
+            ])
+            ->values();
+
+        $delays = $issue->relations
+            ->filter(fn ($r) => $r->type === \App\Enums\RelationType::Blocks && $open($r))
+            ->map(fn ($r) => \App\Support\Issues\Blockage::days($issue, $r->relatedIssue))
+            ->filter();
+
+        return [
+            'blocked_by' => $blockers,
+            'delaying' => $delays->isEmpty() ? null : ['count' => $delays->count(), 'days' => $delays->max()],
+        ];
     }
 
     /**

@@ -63,6 +63,8 @@ class InsightsController extends Controller
             'byAssignee' => $insights->byAssignee(),
             'byStatus' => $insights->byStatus(),
             'ageing' => $insights->ageing(),
+            'blockers' => $insights->blockers(),
+            'delaysCaused' => $insights->delaysCaused(),
             'filters' => [
                 'from' => $from->toDateString(),
                 'to' => $to->toDateString(),

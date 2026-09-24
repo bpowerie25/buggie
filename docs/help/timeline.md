@@ -75,12 +75,13 @@ they show up two ways.
 Every blocked issue is **named as blocked**: a ⛔ and a count beside the title, with
 the blockers listed on hover.
 
-Only a blocker **that does not finish in time** gets a connector — a dashed red line
-from the blocker's end to the blocked issue's start. That is deliberate. A line for
-every blocking relation turns a busy quarter into a ball of string, and most of those
-lines repeat something the ordering already shows. A blocker that is still running
-after the thing it blocks was supposed to start is the one worth interrupting somebody
-about.
+Every link between two issues on the chart is a faint line from the blocker's end to
+the blocked issue's start. A blocker **that does not finish in time** is a dashed red
+line. Untick *Show every dependency* to see only the red ones.
+
+Staff draw a link by dragging the dot after a bar onto another issue, and remove one
+by clicking its line. With *move the work waiting on it too* ticked, moving a bar later
+pushes the chain behind it later, and Insights records the delay under *Delays caused*.
 
 A blocker that is not on screen — filtered out, or outside the date range — is still
 named, but has nowhere for a line to go.

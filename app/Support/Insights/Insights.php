@@ -3,6 +3,8 @@
 namespace App\Support\Insights;
 
 use App\Models\Issue;
+use App\Support\Issues\Blockage;
+use App\Enums\RelationType;
 use App\Models\Report;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
@@ -199,7 +201,126 @@ class Insights
             ->all();
     }
 
-    // ------------------------------------------------------------------ internals
+    /**
+     * The open blockers, worst first: the list for a stand-up.
+     *
+     * Ranked by the delay they are causing now (see Blockage), then by how much open
+     * work waits on them — through a chain as well as directly, because the blocker
+     * at the head of a chain holds up everything behind it. `since` is when the
+     * oldest of its links was made, which is as close as the data comes to "how long
+     * has this been in the way".
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function blockers(int $limit = 10): array
+    {
+        $blocks = RelationType::Blocks->value;
+
+        $blockers = $this->scoped()->open()
+            ->whereHas('relations', fn (Builder $r) => $r->where('type', $blocks)->whereHas('relatedIssue', fn (Builder $q) => $q->open()))
+            ->with([
+                'status:id,name,category',
+                'project:id,name',
+                'assignee:id,name',
+                'relations' => fn ($q) => $q->where('type', $blocks)->with(['relatedIssue', 'relatedIssue.status:id,category']),
+            ])
+            ->get();
+
+        // Every open-to-open "blocks" link in the workspace, walked in memory: a chain
+        // can leave the project being looked at, and the work at the end of it is
+        // still waiting.
+        $edges = \App\Models\IssueRelation::where('type', $blocks)
+            ->whereHas('issue', fn (Builder $q) => $q->open())
+            ->whereHas('relatedIssue', fn (Builder $q) => $q->open())
+            ->get(['issue_id', 'related_issue_id'])
+            ->groupBy('issue_id')
+            ->map(fn ($rows) => $rows->pluck('related_issue_id')->all());
+
+        return $blockers
+            ->map(function (Issue $issue) use ($edges) {
+                $waiting = $issue->relations->filter(fn ($r) => $r->relatedIssue?->status->category->isOpen());
+                $delay = $waiting->map(fn ($r) => Blockage::days($issue, $r->relatedIssue))->max() ?? 0;
+
+                return [
+                    'key' => $issue->key,
+                    'title' => $issue->title,
+                    'project' => $issue->project?->name,
+                    'status' => $issue->status->name,
+                    'assignee' => $issue->assignee?->name,
+                    'waiting' => $waiting->count(),
+                    'chain' => $this->downstream($issue->id, $edges),
+                    'delay_days' => $delay,
+                    'since' => $waiting->min(fn ($r) => $r->created_at)?->toDateString(),
+                ];
+            })
+            ->sortBy([['delay_days', 'desc'], ['chain', 'desc'], ['key', 'asc']])
+            ->take($limit)
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Work pushed later because its blocker moved, in the window: the delays already
+     * caused, as opposed to the ones building up. Written by ShiftDependents, which
+     * notes the blocker on the dates_changed event, so only moves made with "move the
+     * work waiting on it too" appear here.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function delaysCaused(int $limit = 10): array
+    {
+        [$from, $to] = $this->window();
+
+        return \App\Models\IssueEvent::query()
+            ->where('type', \App\Enums\IssueEventType::DatesChanged->value)
+            ->whereNotNull('data->because')
+            ->whereBetween('created_at', [$from, $to])
+            ->whereHas('issue', fn (Builder $q) => $q->when($this->projectId, fn (Builder $q, $id) => $q->where('issues.project_id', $id)))
+            ->with(['issue:id,key,title', 'actor:id,name'])
+            ->latest('created_at')
+            ->limit($limit)
+            ->get()
+            ->map(function (\App\Models\IssueEvent $event) {
+                $was = $event->data['from']['start_on'] ?? $event->data['from']['due_on'] ?? null;
+                $now = $event->data['to']['start_on'] ?? $event->data['to']['due_on'] ?? null;
+
+                return [
+                    'blocker' => $event->data['because'],
+                    'key' => $event->issue?->key,
+                    'title' => $event->issue?->title,
+                    'days' => $was && $now ? (int) CarbonImmutable::parse($was)->diffInDays(CarbonImmutable::parse($now)) : null,
+                    'by' => $event->actor?->name,
+                    'at' => $event->created_at->toDateString(),
+                ];
+            })
+            ->all();
+    }
+
+        // ------------------------------------------------------------------ internals
+
+    /**
+     * How many distinct issues wait on this one, directly or down a chain.
+     *
+     * @param  \Illuminate\Support\Collection<int, array<int, int>>  $edges
+     */
+    private function downstream(int $id, \Illuminate\Support\Collection $edges): int
+    {
+        $seen = [];
+        $stack = $edges->get($id, []);
+
+        while ($stack !== [] && count($seen) < 1000) {
+            $next = array_pop($stack);
+
+            if ($next === $id || isset($seen[$next])) {
+                continue;
+            }
+
+            $seen[$next] = true;
+            array_push($stack, ...$edges->get($next, []));
+        }
+
+        return count($seen);
+    }
 
     /**
      * Columns are qualified as issues.* throughout.

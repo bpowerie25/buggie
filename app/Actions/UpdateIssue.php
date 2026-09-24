@@ -429,7 +429,14 @@ class UpdateIssue
         $to = ['start_on' => $issue->start_on?->toDateString(), 'due_on' => $issue->due_on?->toDateString()];
 
         if ($from !== $to) {
-            $issue->recordEvent(IssueEventType::DatesChanged, ['from' => $from, 'to' => $to], $actor);
+            $issue->recordEvent(IssueEventType::DatesChanged, [
+                'from' => $from,
+                'to' => $to,
+                // Set only by ShiftDependents: the blocker whose move pushed this one,
+                // so the delay it caused is on record after the fact. Never from a
+                // request; UpdateIssueRequest does not accept it.
+                ...(isset($attributes['because']) ? ['because' => $attributes['because']] : []),
+            ], $actor);
         }
     }
 

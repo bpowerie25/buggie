@@ -119,6 +119,52 @@ export function relativeTime(iso: string): string {
 }
 
 /** A client has answered and nobody on the team has looked since. Staff only. */
+/**
+ * Whether an issue is waiting on something, or holding something up — red when it is
+ * costing days. Nothing at all when it is neither.
+ */
+export function BlockageBadges({
+    blockedBy = [],
+    delaying = null,
+}: {
+    blockedBy?: { key: string; delay_days: number }[];
+    delaying?: { count: number; days: number } | null;
+}) {
+    const late = blockedBy.filter((b) => b.delay_days > 0);
+    const worst = Math.max(0, ...blockedBy.map((b) => b.delay_days));
+
+    return (
+        <>
+            {blockedBy.length > 0 && (
+                <span
+                    title={blockedBy
+                        .map((b) => `${b.key}${b.delay_days > 0 ? `, delaying this ${days(b.delay_days)}` : ''}`)
+                        .join('\n')}
+                    className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium ${
+                        late.length > 0 ? 'bg-danger-soft text-danger' : 'bg-surface text-ink-muted'
+                    }`}
+                >
+                    Blocked by {blockedBy[0].key}
+                    {blockedBy.length > 1 ? ` +${blockedBy.length - 1}` : ''}
+                    {worst > 0 ? ` · ${days(worst)} late` : ''}
+                </span>
+            )}
+            {delaying && (
+                <span
+                    title={`${delaying.count} waiting issue${delaying.count === 1 ? '' : 's'} can't start on time because of this`}
+                    className="shrink-0 rounded bg-danger-soft px-1.5 py-0.5 text-[10px] font-medium text-danger"
+                >
+                    Delaying {delaying.count} · {days(delaying.days)}
+                </span>
+            )}
+        </>
+    );
+}
+
+function days(n: number): string {
+    return `${n} day${n === 1 ? '' : 's'}`;
+}
+
 export function ClientRepliedBadge() {
     return (
         <span className="shrink-0 rounded bg-success/10 px-1.5 py-0.5 text-[10px] font-medium text-success">

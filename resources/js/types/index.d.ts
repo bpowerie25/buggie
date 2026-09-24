@@ -130,6 +130,10 @@ export interface IssueRow {
     updated_at: string;
     /** A client has answered and nobody on the team has looked since. Staff only. */
     client_replied?: boolean;
+    /** Open blockers, each with the days it is delaying this issue (0 when it is not). */
+    blocked_by?: { key: string; delay_days: number }[];
+    /** Open work this is holding up past its planned start; null when none. */
+    delaying?: { count: number; days: number } | null;
     /** Always shown on the board, whatever the filter says. */
     pinned?: boolean;
 }

@@ -1,5 +1,6 @@
 import {
     Avatar,
+    BlockageBadges,
     ClientRepliedBadge,
     LabelPill,
     PriorityBars,
@@ -130,6 +131,11 @@ function Card({
             {issue.client_replied && (
                 <div className="mt-1.5">
                     <ClientRepliedBadge />
+                </div>
+            )}
+            {((issue.blocked_by?.length ?? 0) > 0 || issue.delaying) && (
+                <div className="mt-1.5 flex flex-wrap gap-1">
+                    <BlockageBadges blockedBy={issue.blocked_by} delaying={issue.delaying} />
                 </div>
             )}
 

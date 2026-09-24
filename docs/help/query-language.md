@@ -25,10 +25,11 @@ Values containing spaces are quoted: `label:"needs repro"`.
 
 | Key | Values | |
 |---|---|---|
-| `is` | `open`, `closed`, `any`, `overdue` | Defaults to `open`. An unrecognised value falls back to `open` rather than showing nothing. `is:overdue` is open issues past their due date — something due today has until the end of the day. It replaces `is:open` rather than combining with it, because a closed issue is finished rather than late. See [Notifications](notifications.md#due-dates). |
+| `is` | `open`, `closed`, `any`, `overdue`, `blocked`, `blocking`, `delaying` | Defaults to `open`. An unrecognised value falls back to `open` rather than showing nothing. `is:overdue` is open issues past their due date — something due today has until the end of the day. It replaces `is:open` rather than combining with it, because a closed issue is finished rather than late. See [Notifications](notifications.md#due-dates). `is:blocked` is waiting on open work; `is:blocking` is open work that something open waits on; `is:delaying` is a blocker that the work waiting on it cannot start on time because of — see below. A client only ever counts blockers they could open themselves. |
 | `project` | a project slug | `project:marketing-site` |
 | `assignee` | `@me`, `me`, a name, a user id, or `none` | |
 | `reporter` | the same values | Who filed it. |
+| `phase` | a phase name | `phase:Design`, and `no:phase` for work not yet in one. |
 | `version` | a release name | `version:2.4.1`. Names are unique per project, so two projects may each have a 2.4.1. |
 | `label` | a label name | Repeatable. |
 | `type` | `bug`, `feature`, `task`, `question` | |
@@ -108,6 +109,13 @@ is:open no:assignee priority:urgent  urgent and unowned
 assignee:@me is:open                 my open work
 is:overdue                           open and past its due date
 assignee:@me is:overdue              my own work that is late
+is:delaying                          blockers costing days right now
+assignee:@me is:blocked              my work that is waiting on somebody
+
+A blocker is **delaying** when the work waiting on it was planned to start before the
+blocker ends. An open blocker already past its date, or with no date at all, is
+counted as ending today at the earliest, since it cannot finish in the past. The
+number of days is the gap, and it is what the red badges and Insights show.
 reporter:@me                         things I filed
 label:regression -label:wontfix      regressions we have not given up on
 type:question                        questions rather than bugs
