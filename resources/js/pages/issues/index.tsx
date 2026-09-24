@@ -144,7 +144,69 @@ export default function IssuesIndex({
         [],
     );
 
-    const groups = useMemo(() => groupIssues(rows, groupBy), [rows, groupBy]);
+    /*
+     * The projects this board is about: the one the query names, or every project
+     * the viewer can see. Their workflows are the columns, whether or not any card is
+     * in them — a column that exists only while it has cards is a column you cannot
+     * drop the first card into.
+     */
+    const boardProjects = useMemo(() => {
+        const include = query.include.project ?? [];
+        const exclude = query.exclude.project ?? [];
+
+        return (facets?.projects ?? []).filter(
+            (p) => (include.length === 0 || include.includes(p.slug)) && !exclude.includes(p.slug),
+        );
+    }, [facets, query]);
+
+    const workflow = useMemo(() => {
+        if (groupBy !== 'status') return [];
+
+        const seen = new Map<string, IssueStatus>();
+
+        for (const project of boardProjects) {
+            for (const status of facets?.statuses_by_project[project.id] ?? []) {
+                if (!seen.has(status.name)) seen.set(status.name, status);
+            }
+        }
+
+        return [...seen.values()];
+    }, [boardProjects, facets, groupBy]);
+
+    const groups = useMemo(() => groupIssues(rows, groupBy, workflow), [rows, groupBy, workflow]);
+
+    function addTargets(column: string) {
+        return boardProjects
+            .filter((p) => (facets?.statuses_by_project[p.id] ?? []).some((s) => s.name === column))
+            .map((p) => ({ projectId: p.id, projectName: p.name }));
+    }
+
+    function addCard(column: string, title: string, projectId: number) {
+        const status = (facets?.statuses_by_project[projectId] ?? []).find((s) => s.name === column);
+
+        router.post(
+            '/issues',
+            {
+                project_id: projectId,
+                title,
+                status_id: status?.id ?? null,
+                type: 'task',
+                priority: 0,
+                visibility: 'internal',
+                // Stay on the board, where the new card now is.
+                stay: true,
+            },
+            { preserveScroll: true, only: ['issues', 'flash', 'errors'] },
+        );
+    }
+
+    function togglePin(issue: IssueRow) {
+        router.patch(
+            `/issues/${issue.key}`,
+            { board_pinned: !issue.pinned },
+            { preserveScroll: true, only: ['issues', 'flash'] },
+        );
+    }
 
     /**
      * What dropping a card in a column means, which depends entirely on what the
@@ -522,11 +584,15 @@ export default function IssuesIndex({
                 </div>
             )}
 
-            {rows.length === 0 ? (
+            {rows.length === 0 && (layout !== 'board' || groups.length === 0) ? (
                 <EmptyState query={query} />
             ) : layout === 'board' ? (
                 <IssueBoard
                     columns={groups}
+                    // Adding lands a card in a status, so only on a status board.
+                    onAdd={editable && groupBy === 'status' ? addCard : undefined}
+                    addTargets={addTargets}
+                    onTogglePin={editable ? togglePin : undefined}
                     // Dragging cannot express "move to another project": that changes
                     // the issue's key and its number. Cards are not draggable there
                     // rather than draggable and inert.
@@ -986,8 +1052,14 @@ function uniqueStatuses(facets?: Facets): IssueStatus[] {
 function groupIssues(
     issues: IssueRow[],
     groupBy: GroupBy,
+    workflow: IssueStatus[] = [],
 ): { name: string; status: IssueStatus | null; issues: IssueRow[] }[] {
     const map = new Map<string, { name: string; status: IssueStatus | null; issues: IssueRow[] }>();
+
+    // Every status is a column, empty or not.
+    for (const status of workflow) {
+        map.set(status.name, { name: status.name, status, issues: [] });
+    }
 
     for (const issue of issues) {
         const [name, status] = ((): [string, IssueStatus | null] => {
@@ -1007,6 +1079,11 @@ function groupIssues(
         existing
             ? existing.issues.push(issue)
             : map.set(name, { name, status, issues: [issue] });
+    }
+
+    // Pinned cards head their column; the rest keep the order they were dragged into.
+    for (const column of map.values()) {
+        column.issues.sort((a, b) => Number(Boolean(b.pinned)) - Number(Boolean(a.pinned)));
     }
 
     return [...map.values()].sort((a, b) => {

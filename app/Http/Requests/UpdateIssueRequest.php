@@ -27,6 +27,8 @@ class UpdateIssueRequest extends FormRequest
             'priority' => ['sometimes', Rule::in(array_column(IssuePriority::cases(), 'value'))],
             'visibility' => ['sometimes', new Enum(IssueVisibility::class)],
             'client_audience' => ['sometimes', new Enum(\App\Enums\ClientAudience::class)],
+            // Pinned cards stay on the board whatever the filter says.
+            'board_pinned' => ['sometimes', 'boolean'],
             // Whether each one is a client on this issue's project is checked in the
             // action, which knows the issue.
             'client_share_ids' => ['sometimes', 'array', 'max:100'],

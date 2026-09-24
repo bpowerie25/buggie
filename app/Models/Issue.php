@@ -56,6 +56,7 @@ class Issue extends Model
             // Who sent a widget report and how sure we are. Informational; access
             // comes only from reporter_id. See ReporterLink.
             'reporter_identity' => \App\Enums\ReporterIdentity::class,
+            'board_pinned_at' => 'datetime',
         ];
     }
 

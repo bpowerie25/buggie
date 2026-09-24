@@ -19,18 +19,49 @@ import {
     type DragStartEvent,
 } from '@dnd-kit/core';
 import { Link } from '@inertiajs/react';
-import { useState } from 'react';
+import { Pin, Plus } from 'lucide-react';
+import { useState, type FormEvent } from 'react';
 
-function Card({ issue, dragging }: { issue: IssueRow; dragging?: boolean }) {
+function Card({
+    issue,
+    dragging,
+    onTogglePin,
+}: {
+    issue: IssueRow;
+    dragging?: boolean;
+    onTogglePin?: (issue: IssueRow) => void;
+}) {
     return (
         <div
-            className={`rounded-lg border border-border bg-raised p-2.5 ${
-                dragging ? 'rotate-1 shadow-lg' : ''
-            }`}
+            className={`group rounded-lg border bg-raised p-2.5 ${
+                issue.pinned ? 'border-accent/50' : 'border-border'
+            } ${dragging ? 'rotate-1 shadow-lg' : ''}`}
         >
             <div className="flex items-center gap-1.5">
                 <TypeIcon type={issue.type} className="size-3.5" />
-                <span className="font-mono text-[11px] text-ink-subtle">{issue.key}</span>
+                {/* The key opens the issue; the rest of the card drags. A drag only
+                    starts after a few pixels of travel, so a click here is a click. */}
+                <Link
+                    href={`/issues/${issue.key}`}
+                    className="font-mono text-[11px] text-ink-subtle hover:text-accent hover:underline"
+                >
+                    {issue.key}
+                </Link>
+                {onTogglePin ? (
+                    <button
+                        type="button"
+                        onClick={() => onTogglePin(issue)}
+                        aria-label={issue.pinned ? `Unpin ${issue.key}` : `Pin ${issue.key} to the board`}
+                        title={issue.pinned ? 'Pinned: always on the board. Click to unpin.' : 'Pin: always show on the board'}
+                        className={`rounded p-0.5 transition ${
+                            issue.pinned ? 'text-accent' : 'text-ink-subtle opacity-0 group-hover:opacity-100 focus:opacity-100'
+                        }`}
+                    >
+                        <Pin className="size-3" />
+                    </button>
+                ) : (
+                    issue.pinned && <Pin aria-label="Pinned" className="size-3 text-accent" />
+                )}
                 <span className="ml-auto">
                     <PriorityBars
                         priority={issue.priority}
@@ -67,10 +98,12 @@ function DraggableCard({
     issue,
     column,
     editable,
+    onTogglePin,
 }: {
     issue: IssueRow;
     column: string;
     editable: boolean;
+    onTogglePin?: (issue: IssueRow) => void;
 }) {
     const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
         id: issue.key,
@@ -99,14 +132,7 @@ function DraggableCard({
             {...attributes}
             className={`${isDragging ? 'opacity-40' : ''} ${editable ? 'cursor-grab active:cursor-grabbing' : ''}`}
         >
-            {/* The whole card drags; the key is the click target, so dragging never
-                fights with navigating. */}
-            <Card issue={issue} />
-            <Link
-                href={`/issues/${issue.key}`}
-                className="sr-only"
-                aria-label={`Open ${issue.key}`}
-            />
+            <Card issue={issue} onTogglePin={onTogglePin} />
         </div>
     );
 }
@@ -147,16 +173,28 @@ function WipCount({ count, limit }: { count: number; limit: number | null }) {
     );
 }
 
+/** Where a card added to a column can go: the projects that have this status. */
+export interface AddTarget {
+    projectId: number;
+    projectName: string;
+}
+
 function Column({
     name,
     status,
     issues,
     editable,
+    addTargets,
+    onAdd,
+    onTogglePin,
 }: {
     name: string;
     status: IssueStatus | null;
     issues: IssueRow[];
     editable: boolean;
+    addTargets: AddTarget[];
+    onAdd?: (column: string, title: string, projectId: number) => void;
+    onTogglePin?: (issue: IssueRow) => void;
 }) {
     const { setNodeRef, isOver } = useDroppable({ id: name, disabled: !editable });
 
@@ -180,10 +218,101 @@ function Column({
                         issue={issue}
                         column={name}
                         editable={editable}
+                        onTogglePin={onTogglePin}
                     />
                 ))}
+
+                {issues.length === 0 && (
+                    <p className="px-1.5 py-3 text-center text-[11px] text-ink-subtle">Nothing here</p>
+                )}
             </div>
+
+            {onAdd && addTargets.length > 0 && <AddCard column={name} targets={addTargets} onAdd={onAdd} />}
         </section>
+    );
+}
+
+/**
+ * A card straight into a column: type a title, press Enter. Asks which project only
+ * when more than one project on the board has this status.
+ */
+function AddCard({
+    column,
+    targets,
+    onAdd,
+}: {
+    column: string;
+    targets: AddTarget[];
+    onAdd: (column: string, title: string, projectId: number) => void;
+}) {
+    const [open, setOpen] = useState(false);
+    const [title, setTitle] = useState('');
+    const [projectId, setProjectId] = useState(targets[0]?.projectId ?? 0);
+
+    function submit(e: FormEvent) {
+        e.preventDefault();
+        if (title.trim() === '') return;
+
+        onAdd(column, title.trim(), projectId);
+        setTitle('');
+    }
+
+    if (!open) {
+        return (
+            <button
+                type="button"
+                onClick={() => setOpen(true)}
+                className="mt-1.5 flex items-center gap-1 rounded-md px-1.5 py-1 text-xs text-ink-subtle transition hover:bg-raised hover:text-ink"
+            >
+                <Plus className="size-3.5" />
+                Add card
+            </button>
+        );
+    }
+
+    return (
+        <form onSubmit={submit} className="mt-1.5 space-y-1.5">
+            <textarea
+                value={title}
+                autoFocus
+                rows={2}
+                maxLength={255}
+                aria-label={`New card in ${column}`}
+                placeholder="What needs doing?"
+                onChange={(e) => setTitle(e.target.value)}
+                onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) submit(e);
+                    if (e.key === 'Escape') setOpen(false);
+                }}
+                className="w-full resize-none rounded-lg border border-border-strong bg-raised px-2 py-1.5 text-xs text-ink focus:border-accent focus:outline-none"
+            />
+            {targets.length > 1 && (
+                <select
+                    value={projectId}
+                    aria-label="Project"
+                    onChange={(e) => setProjectId(Number(e.target.value))}
+                    className="w-full rounded-lg border border-border-strong bg-raised px-2 py-1 text-xs text-ink"
+                >
+                    {targets.map((target) => (
+                        <option key={target.projectId} value={target.projectId}>
+                            {target.projectName}
+                        </option>
+                    ))}
+                </select>
+            )}
+            <div className="flex gap-1.5">
+                <button type="submit" className="rounded-md bg-accent px-2 py-1 text-xs font-medium text-white">
+                    Add
+                </button>
+                <button
+                    type="button"
+                    onClick={() => setOpen(false)}
+                    className="rounded-md px-2 py-1 text-xs text-ink-muted hover:text-ink"
+                >
+                    Cancel
+                </button>
+            </div>
+        </form>
     );
 }
 
@@ -204,6 +333,9 @@ export function IssueBoard({
     columns,
     editable,
     onDropInColumn,
+    onAdd,
+    addTargets,
+    onTogglePin,
 }: {
     /**
      * Columns arrive with their own cards. The board used to be handed every issue
@@ -219,6 +351,11 @@ export function IssueBoard({
      * business.
      */
     onDropInColumn: (issue: IssueRow, columnName: string, beforeKey: string | null) => void;
+    /** Adding a card straight into a column. Absent where adding makes no sense. */
+    onAdd?: (column: string, title: string, projectId: number) => void;
+    /** Which projects a card added to each column could belong to. */
+    addTargets?: (column: string) => AddTarget[];
+    onTogglePin?: (issue: IssueRow) => void;
 }) {
     const [dragging, setDragging] = useState<IssueRow | null>(null);
     const sensors = useSensors(
@@ -285,6 +422,9 @@ export function IssueBoard({
                         status={status}
                         editable={editable}
                         issues={issues}
+                        addTargets={addTargets?.(name) ?? []}
+                        onAdd={onAdd}
+                        onTogglePin={onTogglePin}
                     />
                 ))}
             </div>

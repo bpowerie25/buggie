@@ -57,12 +57,17 @@ class IssueController extends Controller
     /** @return \Illuminate\Support\Collection<int, array<string, mixed>> */
     private function issues(Request $request, IssueQuery $query, string $layout = 'list'): \Illuminate\Support\Collection
     {
-        $builder = Issue::query()->unless(
+        // Who may see what, before any filter: every query below starts here.
+        $base = fn () => Issue::query()->unless(
             $this->isStaff($request->user()),
             fn (Builder $q) => $q->visibleToClient($request->user()),
         );
 
-        return $this->filter->apply($builder, $query, $request->user())
+        $builder = $layout === 'board'
+            ? $base()->whereIn('issues.id', $this->boardIds($base, $query, $request->user()))
+            : $this->filter->apply($base(), $query, $request->user());
+
+        return $builder
             ->with([
                 'status:id,name,category,color,position',
                 'assignee:id,name',
@@ -87,6 +92,55 @@ class IssueController extends Controller
             ->get()
             ->map($this->summary(...))
             ->values();
+    }
+
+    /**
+     * What the board shows: what the query matches, plus two things a board must not
+     * lose that a list can.
+     *
+     * - Cards closed in the last fortnight, when the query is the default is:open. A
+     *   card dragged to Done used to vanish on the next reload, which reads as the
+     *   drop having failed; a board is where finishing things is supposed to show.
+     * - Pinned cards, whatever the query says — except which project, since a card
+     *   from another project on a project's board is noise — and never past what the
+     *   viewer may see, because every query here starts from $base.
+     *
+     * Collected as ids and loaded once, so each rule stays a plain query of its own.
+     *
+     * @param  \Closure(): Builder<Issue>  $base
+     * @return array<int, int>
+     */
+    private function boardIds(\Closure $base, IssueQuery $query, User $viewer): array
+    {
+        $ids = $this->filter->apply($base(), $query, $viewer)->limit(1000)->pluck('issues.id');
+
+        if ($query->state() === 'open') {
+            $ids = $ids->merge(
+                $this->filter->apply($base(), $query->with('is', 'closed'), $viewer)
+                    ->where('issues.closed_at', '>=', now()->subDays(14))
+                    ->limit(300)
+                    ->pluck('issues.id'),
+            );
+        }
+
+        $projectsOnly = IssueQuery::parse('')->with('is', 'any');
+
+        foreach ($query->all('project') as $project) {
+            $projectsOnly = $projectsOnly->with('project', $project);
+        }
+
+        foreach ($query->all('project', negated: true) as $project) {
+            $projectsOnly = $projectsOnly->with('project', $project, negated: true);
+        }
+
+        $ids = $ids->merge(
+            $this->filter->apply($base(), $projectsOnly, $viewer)
+                ->whereNotNull('issues.board_pinned_at')
+                ->limit(100)
+                ->pluck('issues.id'),
+        );
+
+        return $ids->unique()->values()->all();
     }
 
     private function groupBy(Request $request): string
@@ -133,6 +187,11 @@ class IssueController extends Controller
         // Client visibility is forced inside the action, so every entry point gets
         // it rather than only this one.
         $issue = $action->handle($project, $request->validated(), $request->user());
+
+        // Added from a board column: stay on the board, where the card now is.
+        if ($request->boolean('stay')) {
+            return back()->with('success', "{$issue->key} added.");
+        }
 
         return redirect()
             ->route('issues.show', $issue)
@@ -567,6 +626,7 @@ class IssueController extends Controller
             'labels' => $issue->labels->map->only(['id', 'name', 'color']),
             // The team's cue that a client has answered. Staff only.
             'client_replied' => $this->viewerIsStaff() && $issue->client_replied_at !== null,
+            'pinned' => $issue->board_pinned_at !== null,
             // Null-safe as well as scoped. The scope should mean this never sees a
             // deleted project, and a crash in a list is a bad way to find out it did.
             'project' => $issue->project?->only(['id', 'key', 'name', 'slug']),

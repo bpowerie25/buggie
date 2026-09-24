@@ -128,6 +128,8 @@ export interface IssueRow {
     updated_at: string;
     /** A client has answered and nobody on the team has looked since. Staff only. */
     client_replied?: boolean;
+    /** Always shown on the board, whatever the filter says. */
+    pinned?: boolean;
 }
 
 export interface IssueFilters {

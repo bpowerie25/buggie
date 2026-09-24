@@ -12,6 +12,13 @@ today you are running `main`, which is honest rather than ideal — see
 
 ### Added
 
+- **A board you can work on.** Every status is a column whether or not it has cards,
+  so there is always somewhere to drop the first one; *Add card* at the foot of a
+  column creates an issue straight into that status; cards finished in the last two
+  weeks stay in their column instead of vanishing under `is:open`; and a pinned card
+  stays on the board whatever the filter says (within its project, and never past what
+  the viewer may see). The board has its own entry in the sidebar, and a card's key
+  now opens the issue — it was meant to, and was a hidden link.
 - **A spreadsheet template for importing.** Project settings → Import has a *Download a
   template* link: a CSV with exactly the columns the importer reads, example rows in the
   project's own status names, and the accepted values listed beside it. The example rows

@@ -62,6 +62,9 @@ class UpdateIssue
                     'start_on' => $issue->fill(['start_on' => $value]),
                     'due_on' => $issue->fill(['due_on' => $value]),
                     'version_id' => $this->version($issue, $value === null ? null : (int) $value, $actor),
+                    // Not an event: pinning is how the board is laid out, not news
+                    // about the issue.
+                    'board_pinned' => $issue->board_pinned_at = filter_var($value, FILTER_VALIDATE_BOOL) ? ($issue->board_pinned_at ?? now()) : null,
                     default => null,
                 };
             }
