@@ -8,6 +8,7 @@ use App\Models\Comment;
 use App\Models\Issue;
 use App\Models\Project;
 use App\Models\User;
+use App\Support\Mail\ReplyAddress;
 use App\Support\Tenancy\Tenancy;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\Test;
@@ -136,29 +137,33 @@ class InboundMailTest extends TestCase
     }
 
     #[Test]
-    public function replying_to_a_notification_adds_a_comment(): void
+    public function replying_to_a_notification_adds_a_comment_as_the_person_it_was_sent_to(): void
     {
-        [$workspace] = $this->workspaceWithMember(slug: 'acme');
+        [$workspace, $owner] = $this->workspaceWithMember(slug: 'acme');
 
         [$project, $issue] = app(Tenancy::class)->run($workspace, function () {
             $project = Project::factory()->create(['key' => 'WEB']);
 
-            return [$project, Issue::factory()->create(['project_id' => $project->id])];
+            return [$project, Issue::factory()->clientVisible()->create(['project_id' => $project->id])];
         });
 
+        $client = User::factory()->create(['email' => 'ana@shopper.test']);
+        $workspace->members()->attach($client->id, ['role' => WorkspaceRole::Client->value, 'joined_at' => now()]);
+        $project->clients()->attach($client->id, ['role' => 'client_manager']);
+
         $this->postJson('/api/mail/inbound', $this->signed([
-            'recipient' => "reply+{$issue->key}.{$project->inbound_token}@in.buggie.test",
-            'from' => 'Ana Silva <ana@shopper.test>',
+            'recipient' => ReplyAddress::for($issue, $client),
+            // Whatever the header claims, the address decides who wrote it.
+            'from' => "Somebody Else <{$owner->email}>",
             'stripped-text' => 'Still broken this morning.',
         ]))->assertOk()->assertJson(['issue' => $issue->key]);
 
         $comment = app(Tenancy::class)->run($workspace, fn () => Comment::firstOrFail());
 
         $this->assertSame('Still broken this morning.', trim($comment->body_text));
-        $this->assertSame('ana@shopper.test', $comment->author_email);
-        $this->assertSame('Ana Silva', $comment->author_name);
+        $this->assertSame($client->id, $comment->user_id);
         $this->assertSame('email', $comment->source);
-        // A stranger replying writes in public, never an internal note.
+        // A client replying writes in public, never an internal note.
         $this->assertFalse($comment->is_internal);
     }
 
@@ -167,14 +172,14 @@ class InboundMailTest extends TestCase
     {
         [$workspace, $staff] = $this->workspaceWithMember(WorkspaceRole::Member, 'acme');
 
-        [$project, $issue] = app(Tenancy::class)->run($workspace, function () {
+        $issue = app(Tenancy::class)->run($workspace, function () {
             $project = Project::factory()->create(['key' => 'WEB']);
 
-            return [$project, Issue::factory()->create(['project_id' => $project->id])];
+            return Issue::factory()->create(['project_id' => $project->id]);
         });
 
         $this->postJson('/api/mail/inbound', $this->signed([
-            'recipient' => "reply+{$issue->key}.{$project->inbound_token}@in.buggie.test",
+            'recipient' => ReplyAddress::for($issue, $staff),
             'from' => "{$staff->name} <{$staff->email}>",
             'stripped-text' => 'Looks like the payment adapter again.',
         ]))->assertOk();
@@ -187,25 +192,77 @@ class InboundMailTest extends TestCase
     }
 
     #[Test]
-    public function a_reply_token_cannot_reach_an_issue_in_another_project(): void
+    public function a_reply_address_reaches_only_its_own_issue_and_the_old_shared_ones_nothing(): void
+    {
+        [$workspace, $staff] = $this->workspaceWithMember(WorkspaceRole::Member, 'acme');
+
+        [$project, $mine, $other] = app(Tenancy::class)->run($workspace, function () {
+            $project = Project::factory()->create(['key' => 'WEB']);
+
+            return [
+                $project,
+                Issue::factory()->create(['project_id' => $project->id]),
+                Issue::factory()->create(['project_id' => $project->id]),
+            ];
+        });
+
+        // A real address for one issue, edited to point at another.
+        $forged = str_replace('i'.$mine->id.'.', 'i'.$other->id.'.', ReplyAddress::for($mine, $staff));
+
+        foreach ([$forged, "reply+{$other->key}.{$project->inbound_token}@in.buggie.test"] as $address) {
+            $this->postJson('/api/mail/inbound', $this->signed([
+                'recipient' => $address,
+                'from' => $staff->email,
+                'stripped-text' => 'Trying it on.',
+            ]))->assertOk()->assertJson(['message' => 'Unrecognised reply address; ignored.']);
+        }
+
+        $this->assertDatabaseCount('comments', 0);
+    }
+
+    #[Test]
+    public function a_reply_is_refused_once_its_recipient_can_no_longer_see_the_issue(): void
     {
         [$workspace] = $this->workspaceWithMember(slug: 'acme');
 
-        [$other, $issue] = app(Tenancy::class)->run($workspace, function () {
-            $mine = Project::factory()->create(['key' => 'WEB']);
-            $other = Project::factory()->create(['key' => 'APP']);
+        [$project, $issue] = app(Tenancy::class)->run($workspace, function () {
+            $project = Project::factory()->create(['key' => 'WEB']);
 
-            return [$other, Issue::factory()->create(['project_id' => $mine->id])];
+            return [$project, Issue::factory()->clientVisible()->create(['project_id' => $project->id])];
         });
 
-        // Valid issue key, but paired with a different project's token.
+        $client = User::factory()->create();
+        $workspace->members()->attach($client->id, ['role' => WorkspaceRole::Client->value, 'joined_at' => now()]);
+        $project->clients()->attach($client->id, ['role' => 'client_manager']);
+        $address = ReplyAddress::for($issue, $client);
+
+        // Made internal after the digest went out.
+        app(Tenancy::class)->run($workspace, fn () => $issue->forceFill(['visibility' => IssueVisibility::Internal])->save());
+
         $this->postJson('/api/mail/inbound', $this->signed([
-            'recipient' => "reply+{$issue->key}.{$other->inbound_token}@in.buggie.test",
-            'from' => 'ana@shopper.test',
-            'stripped-text' => 'Trying it on.',
+            'recipient' => $address, 'from' => $client->email, 'stripped-text' => 'Hello?',
         ]))->assertOk()->assertJson(['message' => 'Unknown issue; ignored.']);
 
         $this->assertDatabaseCount('comments', 0);
+    }
+
+    #[Test]
+    public function an_emailed_issue_is_never_attributed_from_the_sender_header(): void
+    {
+        [$workspace, $staff] = $this->workspaceWithMember(WorkspaceRole::Member, 'acme');
+        $project = app(Tenancy::class)->run($workspace, fn () => Project::factory()->create(['key' => 'WEB']));
+
+        $this->postJson('/api/mail/inbound', $this->signed([
+            'recipient' => "bugs+{$project->inbound_token}@in.buggie.test",
+            'from' => "{$staff->name} <{$staff->email}>",
+            'subject' => 'Pretending to be staff',
+            'stripped-text' => 'Share this with every client.',
+        ]))->assertOk();
+
+        $issue = app(Tenancy::class)->run($workspace, fn () => Issue::firstOrFail());
+
+        $this->assertSame(IssueVisibility::Internal, $issue->visibility);
+        $this->assertNotSame($staff->id, $issue->reporter_id);
     }
 
     #[Test]

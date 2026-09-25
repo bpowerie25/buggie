@@ -9,6 +9,8 @@ use App\Support\Registration\Registration;
 use App\Support\TwoFactor\PendingLogin;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -56,11 +58,33 @@ class AuthenticatedSessionController extends Controller
         // not hold a real session while the second factor is still outstanding, and
         // attempt() would give it one — logging back out again would cycle the
         // remember token and knock every other device off with it.
+        /*
+         * Throttled twice: five wrong passwords a minute for one address from one
+         * place, and twenty a minute from one IP whatever the address, so guessing
+         * one password and spraying one password across many accounts both stall.
+         * Counted only on failure; a correct password clears the per-address count.
+         */
+        $account = 'login:'.Str::lower($credentials['email']).'|'.$request->ip();
+        $address = 'login-ip:'.$request->ip();
+
+        foreach ([$account => 5, $address => 20] as $key => $limit) {
+            if (RateLimiter::tooManyAttempts($key, $limit)) {
+                throw ValidationException::withMessages([
+                    'email' => __('auth.throttle', ['seconds' => RateLimiter::availableIn($key), 'minutes' => ceil(RateLimiter::availableIn($key) / 60)]),
+                ]);
+            }
+        }
+
         if (! Auth::validate($credentials)) {
+            RateLimiter::hit($account, 60);
+            RateLimiter::hit($address, 60);
+
             throw ValidationException::withMessages([
                 'email' => __('auth.failed'),
             ]);
         }
+
+        RateLimiter::clear($account);
 
         $user = Auth::getLastAttempted();
 

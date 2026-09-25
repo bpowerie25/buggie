@@ -8,6 +8,8 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreIssueRequest;
 use App\Http\Requests\UpdateIssueRequest;
 use App\Models\Issue;
+use App\Models\Project;
+use App\Support\CustomFields\FieldValues;
 use App\Support\Issues\IssueQuery;
 use App\Support\Issues\IssueQueryFilter;
 use App\Support\Tenancy\Tenancy;
@@ -76,7 +78,8 @@ class IssueApiController extends Controller
     {
         $this->authorize('create', Issue::class);
 
-        $project = \App\Models\Project::findOrFail($request->integer('project_id'));
+        // A project the token's owner can see; for a client, one they hold.
+        $project = Project::visibleTo($request->user())->findOrFail($request->integer('project_id'));
 
         $issue = $action->handle($project, $request->validated(), $request->user());
 
@@ -156,7 +159,7 @@ class IssueApiController extends Controller
             ] : []),
 
             'custom_fields' => collect(
-                app(\App\Support\CustomFields\FieldValues::class)
+                app(FieldValues::class)
                     ->forIssue($issue, clientOnly: ! $this->isStaff(request()))
             )->mapWithKeys(fn (array $field) => [$field['key'] => $field['value']]),
         ];

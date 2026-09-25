@@ -3,18 +3,19 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Http\Middleware\EnsureRegistrationIsOpen;
 use App\Models\User;
 use App\Models\Workspace;
-use App\Http\Middleware\EnsureRegistrationIsOpen;
 use App\Support\Invitations\PendingInvitation;
 use App\Support\Registration\Admission;
 use App\Support\Registration\Registration;
-use Illuminate\Http\Exceptions\HttpResponseException;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Auth\Events\Registered;
+use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rules\Password;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
@@ -51,6 +52,18 @@ class RegisteredUserController extends Controller
 
             if ($admission === null) {
                 throw new HttpResponseException(EnsureRegistrationIsOpen::refusal($request));
+            }
+
+            // Let in because of an invitation: only as the address it was sent to. A
+            // link forwarded to somebody else is not an invitation to them, and on an
+            // install closed to sign-ups it would otherwise be a way in for anyone.
+            $invited = PendingInvitation::invitation($request);
+
+            if ($admission === Admission::Invitation && $invited !== null
+                && strcasecmp(trim($invited->email), $validated['email']) !== 0) {
+                throw ValidationException::withMessages([
+                    'email' => "This invitation was sent to {$invited->email}. Register with that address.",
+                ]);
             }
 
             $user = User::create($validated);

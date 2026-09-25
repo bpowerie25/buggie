@@ -6,6 +6,7 @@ use App\Enums\IssueEventType;
 use App\Models\Attachment;
 use App\Models\Comment;
 use App\Models\Issue;
+use App\Support\Tenancy\Tenancy;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -93,6 +94,15 @@ class AttachmentController extends Controller
         abort_if($issue === null, 404);
 
         $this->authorize('view', $issue);
+
+        // A file on an internal comment is as internal as the comment. Seeing the
+        // issue is not enough, and ids run in sequence, so without this a client
+        // could fetch the team's notes by counting.
+        $attachable = $attachment->attachable;
+        abort_if(
+            $attachable instanceof Comment && $attachable->is_internal && ! $this->viewerIsStaff(),
+            404,
+        );
 
         $disk = Storage::disk($attachment->disk);
 
@@ -188,5 +198,13 @@ class AttachmentController extends Controller
             $attachable instanceof Comment => $attachable->issue,
             default => null,
         };
+    }
+
+    private function viewerIsStaff(): bool
+    {
+        $user = request()->user();
+
+        return $user !== null
+            && ($user->membershipIn(app(Tenancy::class)->currentOrFail())?->isStaff() ?? false);
     }
 }

@@ -33,6 +33,20 @@ class PendingInvitation
         $request->session()->forget(self::KEY);
     }
 
+    /** The live invitation this visitor is carrying, if any. */
+    public static function invitation(Request $request): ?Invitation
+    {
+        $token = $request->session()->get(self::KEY);
+
+        if (! is_string($token) || $token === '') {
+            return null;
+        }
+
+        $invitation = Invitation::withoutGlobalScopes()->where('token', $token)->first();
+
+        return $invitation?->isPending() ? $invitation : null;
+    }
+
     /**
      * Where to send someone who has just authenticated, or null if no invitation is
      * waiting for them.

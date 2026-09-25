@@ -6,7 +6,6 @@ use App\Actions\InviteToWorkspace;
 use App\Models\Invitation;
 use App\Models\User;
 use App\Support\Invitations\PendingInvitation;
-use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -45,6 +44,9 @@ class InvitationController extends Controller
         }
 
         return Inertia::render('invitations/show', [
+            // Said before they press the button, not after.
+            'mismatch' => ! self::addressedTo($invitation, $request->user()),
+            'signedInAs' => $request->user()->email,
             'invitation' => [
                 'token' => $invitation->token,
                 'email' => $invitation->email,
@@ -62,6 +64,14 @@ class InvitationController extends Controller
         abort_unless($invitation->isPending(), 410, 'This invitation is no longer valid.');
         abort_if($request->user() === null, 401);
 
+        // An invitation is for the address it was sent to. Without this a forwarded or
+        // copied link is the role itself, admin or owner included, for whoever opens it.
+        if (! self::addressedTo($invitation, $request->user())) {
+            return back()->withErrors([
+                'invitation' => "This invitation was sent to {$invitation->email}. Sign in with that address to accept it.",
+            ]);
+        }
+
         $action->accept($invitation, $request->user());
 
         PendingInvitation::forget($request);
@@ -71,5 +81,10 @@ class InvitationController extends Controller
         $request->session()->flash('success', "Welcome to {$invitation->workspace->name}.");
 
         return redirect_across_domains(workspace_url($invitation->workspace->slug));
+    }
+
+    private static function addressedTo(Invitation $invitation, User $user): bool
+    {
+        return strcasecmp(trim($invitation->email), trim($user->email)) === 0;
     }
 }

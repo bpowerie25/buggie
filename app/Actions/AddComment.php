@@ -2,15 +2,17 @@
 
 namespace App\Actions;
 
+use App\Enums\NotificationReason;
 use App\Enums\WatchReason;
 use App\Models\Comment;
 use App\Models\Issue;
 use App\Models\User;
-use App\Enums\NotificationReason;
-use App\Support\Notifications\Notifier;
+use App\Support\Chat\ChatNotifications;
 use App\Support\Issues\AuthorLabel;
 use App\Support\Issues\ClientConversation;
+use App\Support\Notifications\Notifier;
 use App\Support\RichText\TiptapDocument;
+use App\Support\Webhooks\Webhooks;
 use Illuminate\Support\Facades\DB;
 
 class AddComment
@@ -48,11 +50,11 @@ class AddComment
             $internal = $comment->is_internal;
             $fromClient = AuthorLabel::role($author, $issue->workspace) === 'client';
 
-            \App\Support\Webhooks\Webhooks::comment($issue, $author->name, $internal);
+            Webhooks::comment($issue, $author->name, $internal);
 
             // Chat hears about internal notes too, but only where somebody has said
             // the channel is the team's own. The text is never sent either way.
-            \App\Support\Chat\ChatNotifications::comment($issue, $author->name, $internal);
+            ChatNotifications::comment($issue, $author->name, $internal);
 
             $conversation = app(ClientConversation::class);
 
@@ -78,7 +80,9 @@ class AddComment
 
             foreach (TiptapDocument::mentionedUserIds($body) as $id) {
                 if ($mentioned = User::find($id)) {
-                    $this->notifier->record($mentioned, $issue, NotificationReason::Mentioned, $author);
+                    // Carries whether the note is internal, so a client mentioned in
+                    // one is not emailed the team's note.
+                    $this->notifier->record($mentioned, $issue, NotificationReason::Mentioned, $author, ['internal' => $internal]);
                 }
             }
 

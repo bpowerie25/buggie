@@ -3,17 +3,19 @@
 namespace App\Http\Controllers\Api;
 
 use App\Actions\AddComment;
-use App\Http\Controllers\Controller;
 use App\Actions\CreateIssue;
 use App\Enums\IssueVisibility;
+use App\Http\Controllers\Controller;
 use App\Models\Issue;
 use App\Models\Project;
 use App\Models\User;
 use App\Support\Mail\EmailBody;
-use App\Support\RichText\TiptapDocument;
+use App\Support\Mail\ReplyAddress;
 use App\Support\Tenancy\Tenancy;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Str;
 
 /**
  * Mailgun inbound route webhook.
@@ -54,7 +56,7 @@ class InboundMailController extends Controller
 
         return $kind === 'bugs'
             ? $this->createIssue($tenancy, $token, $request, $body, $from)
-            : $this->addComment($tenancy, $token, $body, $from);
+            : $this->addComment($tenancy, $token, $body);
     }
 
     private function createIssue(
@@ -70,88 +72,66 @@ class InboundMailController extends Controller
             return response()->json(['message' => 'Unknown project token; ignored.'], 200);
         }
 
-        $email = EmailBody::senderEmail($from);
         $subject = trim((string) $request->input('subject')) ?: 'Emailed report';
 
-        $issue = $tenancy->run($project->workspace, function () use ($project, $subject, $body, $email, $from) {
-            // If the sender has an account here, the issue is properly theirs.
-            $reporter = $email ? User::where('email', $email)->first() : null;
-            $knownMember = $reporter?->belongsToWorkspace($project->workspace) ? $reporter : null;
-
-            $document = $this->document($body, $from);
-
+        $issue = $tenancy->run($project->workspace, function () use ($project, $subject, $body, $from) {
+            // Never attributed from the From: header. The project address is printed on
+            // the project screen and given to clients, and anybody can write any sender
+            // — trusting it let a stranger file an issue as a named member, shared
+            // with every client on the project. So an emailed issue is internal and
+            // nobody's until the team triages it; who sent it is recorded in its text.
             return app(CreateIssue::class)->handle($project, [
-                'title' => \Illuminate\Support\Str::limit($subject, 200, ''),
-                'description' => $document,
-                // From a stranger: keep it internal until someone triages it.
-                'visibility' => $knownMember
-                    ? IssueVisibility::Client->value
-                    : IssueVisibility::Internal->value,
-            ], $knownMember);
+                'title' => Str::limit($subject, 200, ''),
+                'description' => $this->document($body, $from),
+                'visibility' => IssueVisibility::Internal->value,
+            ], null);
         });
 
         return response()->json(['issue' => $issue->key], 200);
     }
 
-    private function addComment(
-        Tenancy $tenancy,
-        string $token,
-        string $body,
-        ?string $from,
-    ): JsonResponse {
-        // reply+{ISSUE-KEY}.{project token}
-        if (! preg_match('/^(?<key>[a-z0-9]+-\d+)\.(?<project>[a-z0-9]+)$/i', $token, $m)) {
-            return response()->json(['message' => 'Malformed reply token; ignored.'], 200);
+    /**
+     * A reply to a digest, posted as the person the digest was sent to.
+     *
+     * The address is signed for one issue and one recipient (ReplyAddress), so the
+     * From: header — which anybody can write — decides nothing. And they must still
+     * be able to open the issue: access taken away after the email went out takes
+     * the reply address with it.
+     */
+    private function addComment(Tenancy $tenancy, string $token, string $body): JsonResponse
+    {
+        $issued = ReplyAddress::verify($token);
+
+        if ($issued === null) {
+            // An address from before replies were signed, or one somebody made up.
+            return response()->json(['message' => 'Unrecognised reply address; ignored.'], 200);
         }
 
-        $project = Project::withoutGlobalScopes()->where('inbound_token', $m['project'])->first();
+        $issue = Issue::acrossAllWorkspaces()->with('workspace')->find($issued['issue']);
+        $user = User::find($issued['user']);
 
-        if ($project === null) {
-            return response()->json(['message' => 'Unknown project token; ignored.'], 200);
+        if ($issue === null || $issue->workspace === null || $user === null) {
+            return response()->json(['message' => 'Unknown issue; ignored.'], 200);
         }
 
-        $email = EmailBody::senderEmail($from);
+        $result = $tenancy->run($issue->workspace, function () use ($issue, $user, $body) {
+            $issue = Issue::find($issue->id);
 
-        $result = $tenancy->run($project->workspace, function () use ($project, $m, $body, $email, $from) {
-            $issue = Issue::where('project_id', $project->id)
-                ->where('key', strtoupper($m['key']))
-                ->first();
-
-            if ($issue === null) {
+            if ($issue === null || ! Gate::forUser($user)->allows('view', $issue)) {
                 return null;
             }
 
-            $user = $email ? User::where('email', $email)->first() : null;
-            $isStaff = $user?->membershipIn($project->workspace)?->isStaff() ?? false;
-            $document = $this->document($body, null);
+            $staff = $user->membershipIn($issue->workspace)?->isStaff() ?? false;
 
-            if ($user && $isStaff) {
-                // Staff replying by email are writing to the team, matching what the
-                // composer defaults to in the app.
-                app(AddComment::class)->handle($issue, [
-                    'body' => $document,
-                    'is_internal' => true,
-                ], $user);
+            // Staff replying by email write to the team, as the composer defaults to in
+            // the app; anybody else writes in public. AddComment routes a client's
+            // comment through ClientConversation, as it does in the app.
+            $comment = app(AddComment::class)->handle($issue, [
+                'body' => $this->document($body, null),
+                'is_internal' => $staff,
+            ], $user);
 
-                return $issue;
-            }
-
-            // Everyone else writes in public, attributed to their address.
-            $comment = $issue->comments()->create([
-                'user_id' => $user?->id,
-                'author_name' => EmailBody::senderName($from),
-                'author_email' => $email,
-                'body' => $document,
-                'body_text' => TiptapDocument::toPlainText($document),
-                'is_internal' => false,
-                'source' => 'email',
-            ]);
-
-            $issue->touch();
-
-            // The client side answering by email: the same rules as in the app.
-            app(\App\Support\Issues\ClientConversation::class)
-                ->clientReplied($issue, $user, $comment->body_text, EmailBody::senderName($from) ?: $email);
+            $comment->forceFill(['source' => 'email'])->save();
 
             return $issue;
         });

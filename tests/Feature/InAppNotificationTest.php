@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Actions\AddComment;
 use App\Actions\UpdateIssue;
+use App\Enums\IssueVisibility;
 use App\Enums\NotificationReason;
 use App\Enums\WatchReason;
 use App\Enums\WorkspaceRole;
@@ -278,15 +279,17 @@ class InAppNotificationTest extends TestCase
             $theirs = Issue::factory()->clientVisible()->create(['project_id' => $granted->id]);
             $someoneElses = Issue::factory()->clientVisible()->create(['project_id' => $other->id]);
 
-            foreach ([$theirs, $someoneElses] as $issue) {
-                $issue->watch($client, WatchReason::Reported);
-
-                app(AddComment::class)->handle($issue, [
-                    'body' => $this->doc('we are on it'), 'is_internal' => false,
-                ], $staff);
-            }
-
             $granted->clients()->attach($client->id, ['role' => 'client']);
+
+            $theirs->watch($client, WatchReason::Reported);
+            app(AddComment::class)->handle($theirs, [
+                'body' => $this->doc('we are on it'), 'is_internal' => false,
+            ], $staff);
+
+            // Recording now refuses to notify somebody about an issue they cannot open,
+            // so this row stands for one written back when they could — access changes
+            // after the fact, and the list must still decide at read time.
+            $this->legacyRow($client, $someoneElses, $staff);
 
             return [$theirs, $someoneElses];
         });
@@ -335,7 +338,7 @@ class InAppNotificationTest extends TestCase
         $this->assertSame(1, $this->visibleCount($workspace, $client));
 
         app(Tenancy::class)->run($workspace, fn () => app(UpdateIssue::class)
-            ->handle($issue, ['visibility' => \App\Enums\IssueVisibility::Internal->value], $staff));
+            ->handle($issue, ['visibility' => IssueVisibility::Internal->value], $staff));
 
         $this->assertSame(0, $this->visibleCount($workspace, $client));
 
@@ -406,12 +409,13 @@ class InAppNotificationTest extends TestCase
             $visible = Issue::factory()->clientVisible()->create(['project_id' => $granted->id]);
             $hidden = Issue::factory()->clientVisible()->create(['project_id' => $other->id]);
 
-            foreach ([$visible, $hidden] as $issue) {
-                $issue->watch($client, WatchReason::Reported);
-                app(AddComment::class)->handle($issue, [
-                    'body' => $this->doc('an update'), 'is_internal' => false,
-                ], $staff);
-            }
+            $visible->watch($client, WatchReason::Reported);
+            app(AddComment::class)->handle($visible, [
+                'body' => $this->doc('an update'), 'is_internal' => false,
+            ], $staff);
+
+            // Written as if from before they lost sight of it; see legacyRow().
+            $this->legacyRow($client, $hidden, $staff);
 
             return $hidden;
         });
@@ -562,5 +566,18 @@ class InAppNotificationTest extends TestCase
                 'content' => [['type' => 'text', 'text' => $text]],
             ]],
         ];
+    }
+
+    /** A notification row as Notifier wrote it before recipients were checked. */
+    private function legacyRow(User $user, Issue $issue, User $actor): void
+    {
+        InAppNotification::create([
+            'user_id' => $user->id,
+            'issue_id' => $issue->id,
+            'actor_id' => $actor->id,
+            'reason' => NotificationReason::Commented->value,
+            'data' => ['excerpt' => 'an update'],
+            'created_at' => now(),
+        ]);
     }
 }

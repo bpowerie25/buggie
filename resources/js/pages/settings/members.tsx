@@ -43,7 +43,8 @@ interface PendingInvitation {
     email: string;
     role: string;
     expires_at: string;
-    url: string;
+    /** Only for whoever may invite: the link is the whole credential. */
+    url: string | null;
 }
 
 export default function Members({
@@ -256,19 +257,21 @@ function InvitationRow({
                 </p>
             </div>
 
-            <button
-                type="button"
-                aria-label="Copy invitation link"
-                title="Copy invitation link"
-                onClick={() => {
-                    navigator.clipboard?.writeText(invitation.url);
-                    setCopied(true);
-                    setTimeout(() => setCopied(false), 1500);
-                }}
-                className="rounded p-1.5 text-ink-subtle transition hover:text-ink"
-            >
-                {copied ? <Check className="size-4 text-success" /> : <Copy className="size-4" />}
-            </button>
+            {invitation.url && (
+                <button
+                    type="button"
+                    aria-label="Copy invitation link"
+                    title="Copy invitation link"
+                    onClick={() => {
+                        navigator.clipboard?.writeText(invitation.url ?? '');
+                        setCopied(true);
+                        setTimeout(() => setCopied(false), 1500);
+                    }}
+                    className="rounded p-1.5 text-ink-subtle transition hover:text-ink"
+                >
+                    {copied ? <Check className="size-4 text-success" /> : <Copy className="size-4" />}
+                </button>
+            )}
 
             {canManage && (
                 <button

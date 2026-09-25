@@ -81,7 +81,7 @@ class SubtaskCreationTest extends TestCase
     }
 
     #[Test]
-    public function a_client_cannot_hang_new_work_under_an_issue(): void
+    public function a_client_cannot_hang_new_work_under_an_issue_and_is_not_told_whether_it_exists(): void
     {
         $parent = $this->issue('Homepage', visibility: 'client');
 
@@ -95,8 +95,11 @@ class SubtaskCreationTest extends TestCase
             ->post($this->workspaceUrl($this->workspace, '/issues'), [
                 'project_id' => $this->project->id, 'title' => 'Mine', 'parent' => $parent->key,
             ])
-            ->assertForbidden();
+            ->assertSessionHasErrors(['parent' => 'No issue with that key in this workspace.']);
 
+        // Refused in exactly the words a made-up key gets: only staff arrange the
+        // hierarchy, and a refusal that differed between real and invented keys
+        // would be a way to list them.
         $this->assertSame($before, $this->tenant(fn () => Issue::count()));
     }
 

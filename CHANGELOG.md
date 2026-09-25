@@ -288,6 +288,30 @@ today you are running `main`, which is honest rather than ideal — see
 
 ### Security
 
+- **Removing a member reached into other workspaces.** It deleted the person's
+  project grants on the whole install, and accepted any user id. Editing a client's
+  projects did the same through `sync()`. Both now touch only this workspace's grants,
+  and removal needs the person to be a member here.
+- **Invitation links could be used by anyone who saw them.** The Members screen
+  showed every pending link, admin and owner invitations included, to all staff, and
+  accepting never checked the address. Links now go only to those who can invite. An
+  invitation, and invite-only sign-up, work only for the address it was sent to.
+- **Clients could file issues into projects they don't hold,** on the web and through
+  the API, and learn those projects' keys. The New issue page could show them another
+  customer's project. Both now use only the projects a person can see. A client's
+  parent key is refused in the same words whether or not the key exists.
+- **Digest emails could reach people who can't open the issue.** This covered
+  mentions in internal notes, internal issues a client once watched, and access removed
+  during the digest delay. Every notification now checks the recipient can open the
+  issue when it's recorded, and again when the digest is sent.
+- **Email-in trusted the sender's `From:` header.** Replies now go to an address
+  signed for one issue and one recipient, and are posted as that person. Old reply
+  addresses stop working. Emailed new issues are no longer attributed from the header:
+  they arrive internal and unassigned for triage.
+- **Sign-in is rate limited:** five wrong passwords a minute per address and IP
+  address, twenty per IP address.
+- **Files on internal comments** can no longer be downloaded by clients.
+
 - **Self-hosted installs no longer let strangers sign up.** Until now anybody could
   register on a self-hosted install and create workspaces of their own — storage,
   outbound mail and a subdomain of somebody else's domain to put content on. It was

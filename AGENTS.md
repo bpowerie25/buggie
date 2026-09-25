@@ -207,6 +207,19 @@ the notification list and survives until `buggie:prune` ages it out. Both are wr
 in one place because that place is the only one that already knows not to tell somebody
 about their own actions and not to tell a client about internal work.
 
+**Nobody is notified about an issue they cannot open.** `Notifier::record` asks
+`IssuePolicy::view` for every non-staff recipient, and refuses anything flagged
+internal, so a new caller cannot forget; `notifications:flush` asks again at send time.
+A mention passes `internal` like a comment does.
+
+**Email replies are signed per issue and per recipient** (`ReplyAddress`). The comment
+is posted as the person the address was issued to; the `From:` header decides nothing,
+here or on emailed new issues, because anybody can write it.
+
+**Project grants live in `project_user`, which has no `workspace_id`.** `detach()` with
+no ids and `sync()` therefore act on every workspace a person belongs to. Always pass
+this workspace's project ids.
+
 **What a notification list shows is decided when it is read.** Membership, project
 grants and an issue's client visibility all change after a row is written, so
 `NotificationController` puts every row through `IssuePolicy` — the way

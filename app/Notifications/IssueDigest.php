@@ -4,6 +4,8 @@ namespace App\Notifications;
 
 use App\Enums\NotificationReason;
 use App\Models\Issue;
+use App\Models\PendingNotification;
+use App\Support\Mail\ReplyAddress;
 use App\Support\Notifications\ActivitySentence;
 use Illuminate\Bus\Queueable;
 use Illuminate\Notifications\Messages\MailMessage;
@@ -17,7 +19,7 @@ class IssueDigest extends Notification
 {
     use Queueable;
 
-    /** @param Collection<int, \App\Models\PendingNotification> $entries */
+    /** @param Collection<int, PendingNotification> $entries */
     public function __construct(
         public Issue $issue,
         public Collection $entries,
@@ -36,7 +38,7 @@ class IssueDigest extends Notification
         $mail = (new MailMessage)
             ->subject("[{$this->issue->key}] {$this->issue->title}")
             // Replies come back to this comment thread rather than to a no-reply void.
-            ->replyTo($this->replyAddress())
+            ->replyTo(ReplyAddress::for($this->issue, $notifiable))
             ->greeting("{$this->issue->key}: {$this->issue->title}");
 
         foreach ($lines as $line) {
@@ -71,11 +73,5 @@ class IssueDigest extends Notification
             ->unique()
             ->values()
             ->all();
-    }
-
-    private function replyAddress(): string
-    {
-        return 'reply+'.$this->issue->key.'.'.$this->issue->project->inbound_token
-            .'@'.config('buggie.inbound_domain');
     }
 }

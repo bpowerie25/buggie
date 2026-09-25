@@ -2,10 +2,13 @@
 
 namespace Tests\Feature;
 
+use App\Actions\CreateProject;
+use App\Actions\InviteToWorkspace;
 use App\Enums\WorkspaceRole;
 use App\Models\Invitation;
 use App\Models\Project;
 use App\Models\User;
+use App\Models\Workspace;
 use App\Notifications\WorkspaceInvitation;
 use App\Support\Tenancy\Tenancy;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -36,7 +39,7 @@ class InvitationTest extends TestCase
 
         Notification::assertSentOnDemand(WorkspaceInvitation::class);
 
-        $newcomer = User::factory()->create();
+        $newcomer = User::factory()->create(['email' => 'new.person@example.com']);
 
         $this->actingAs($newcomer)
             ->post($this->workspaceUrl($workspace, '/invitations/'.$invitation->token))
@@ -172,7 +175,7 @@ class InvitationTest extends TestCase
             'invited_by_id' => $owner->id,
         ]));
 
-        $user = User::factory()->create();
+        $user = User::factory()->create(['email' => 'person@example.com']);
 
         // Accepting always lands in the workspace that issued the token, whatever
         // domain it was presented on.
@@ -324,12 +327,12 @@ class InvitationTest extends TestCase
      * without one is refused — building the journey on a state that cannot exist
      * would be testing nothing.
      */
-    private function inviteTo(\App\Models\Workspace $workspace, User $owner, string $email): Invitation
+    private function inviteTo(Workspace $workspace, User $owner, string $email): Invitation
     {
         return app(Tenancy::class)->run($workspace, function () use ($email, $owner) {
-            $project = app(\App\Actions\CreateProject::class)->handle(['name' => 'Marketing Site']);
+            $project = app(CreateProject::class)->handle(['name' => 'Marketing Site']);
 
-            return app(\App\Actions\InviteToWorkspace::class)
+            return app(InviteToWorkspace::class)
                 ->handle($email, WorkspaceRole::Client, [$project->id], $owner);
         });
     }

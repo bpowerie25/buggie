@@ -3,7 +3,11 @@
 namespace Tests\Feature;
 
 use App\Enums\WorkspaceRole;
+use App\Models\Invitation;
+use App\Models\User;
+use App\Support\Tenancy\Tenancy;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Notification;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -62,7 +66,7 @@ class CrossDomainRedirectTest extends TestCase
     #[Test]
     public function creating_a_workspace_moves_to_its_subdomain(): void
     {
-        $user = \App\Models\User::factory()->operator()->create();
+        $user = User::factory()->operator()->create();
 
         $this->actingAs($user)
             ->withHeader('X-Inertia', 'true')
@@ -74,20 +78,20 @@ class CrossDomainRedirectTest extends TestCase
     #[Test]
     public function accepting_an_invitation_moves_to_the_inviting_workspace(): void
     {
-        \Illuminate\Support\Facades\Notification::fake();
+        Notification::fake();
 
         [$workspace, $owner] = $this->workspaceWithMember(slug: 'acme');
 
-        $invitation = app(\App\Support\Tenancy\Tenancy::class)->run(
+        $invitation = app(Tenancy::class)->run(
             $workspace,
-            fn () => \App\Models\Invitation::create([
+            fn () => Invitation::create([
                 'email' => 'newcomer@example.com',
                 'role' => WorkspaceRole::Member->value,
                 'invited_by_id' => $owner->id,
             ]),
         );
 
-        $newcomer = \App\Models\User::factory()->create();
+        $newcomer = User::factory()->create(['email' => 'newcomer@example.com']);
 
         $this->actingAs($newcomer)
             ->withHeader('X-Inertia', 'true')

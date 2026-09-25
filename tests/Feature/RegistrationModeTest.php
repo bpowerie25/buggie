@@ -247,6 +247,30 @@ class RegistrationModeTest extends TestCase
     }
 
     #[Test]
+    public function an_invitation_lets_in_only_the_address_it_was_sent_to(): void
+    {
+        // A forwarded link is not an invitation to whoever it was forwarded to — on an
+        // install closed to sign-ups it would otherwise be a way in for anyone.
+        Notification::fake();
+        $this->setMode('invite');
+
+        [$workspace, $owner] = $this->workspaceWithMember(slug: 'kennco');
+        $invitation = app(Tenancy::class)->run($workspace, fn () => app(InviteToWorkspace::class)
+            ->handle('new.person@kennco.test', WorkspaceRole::Member, [], $owner));
+
+        $this->get($this->workspaceUrl($workspace, '/invitations/'.$invitation->token));
+
+        $this->post($this->centralUrl('/register'), [
+            'name' => 'Somebody Else',
+            'email' => 'somebody.else@example.com',
+            'password' => 'correct-horse-battery',
+            'password_confirmation' => 'correct-horse-battery',
+        ])->assertSessionHasErrors('email');
+
+        $this->assertDatabaseMissing('users', ['email' => 'somebody.else@example.com']);
+    }
+
+    #[Test]
     public function closing_sign_up_takes_nothing_away_from_existing_members(): void
     {
         [$workspace, $member] = $this->workspaceWithMember(WorkspaceRole::Member, 'kennco');

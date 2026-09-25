@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Actions\CreateIssue;
+use App\Actions\SetParent;
 use App\Actions\UpdateIssue;
 use App\Enums\IssuePriority;
 use App\Enums\IssueType;
@@ -10,6 +11,7 @@ use App\Enums\RelationType;
 use App\Http\Requests\StoreIssueRequest;
 use App\Http\Requests\UpdateIssueRequest;
 use App\Models\Issue;
+use App\Models\IssueRelation;
 use App\Models\Label;
 use App\Models\Phase;
 use App\Models\Project;
@@ -20,6 +22,7 @@ use App\Models\Version;
 use App\Support\CustomFields\FieldValues;
 use App\Support\Issues\Assignable;
 use App\Support\Issues\AuthorLabel;
+use App\Support\Issues\Blockage;
 use App\Support\Issues\ClientAudienceSummary;
 use App\Support\Issues\ClientConversation;
 use App\Support\Issues\IssueQuery;
@@ -32,6 +35,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -85,7 +89,7 @@ class IssueController extends Controller
                 'project:id,key,slug,name',
                 // For the blocked and delaying badges.
                 'relations' => fn ($q) => $q
-                    ->whereIn('type', [\App\Enums\RelationType::Blocks->value, \App\Enums\RelationType::BlockedBy->value])
+                    ->whereIn('type', [RelationType::Blocks->value, RelationType::BlockedBy->value])
                     ->with(['relatedIssue:id,key,status_id,start_on,due_on', 'relatedIssue.status:id,category']),
             ])
             /*
@@ -124,26 +128,26 @@ class IssueController extends Controller
      * - delaying: how much open work it holds up past that work's planned start,
      *   and by how many days at most. Null when it is holding nothing up.
      *
-     * @param  \Illuminate\Support\Collection<int, int>|null  $visible  ids a client may know of; null for staff
+     * @param  Collection<int, int>|null  $visible  ids a client may know of; null for staff
      * @return array<string, mixed>
      */
     private function blockage(Issue $issue, ?Collection $visible): array
     {
-        $open = fn (\App\Models\IssueRelation $r) => $r->relatedIssue !== null
+        $open = fn (IssueRelation $r) => $r->relatedIssue !== null
             && $r->relatedIssue->status->category->isOpen()
             && ($visible === null || $visible->has($r->related_issue_id));
 
         $blockers = $issue->relations
-            ->filter(fn ($r) => $r->type === \App\Enums\RelationType::BlockedBy && $open($r))
+            ->filter(fn ($r) => $r->type === RelationType::BlockedBy && $open($r))
             ->map(fn ($r) => [
                 'key' => $r->relatedIssue->key,
-                'delay_days' => \App\Support\Issues\Blockage::days($r->relatedIssue, $issue),
+                'delay_days' => Blockage::days($r->relatedIssue, $issue),
             ])
             ->values();
 
         $delays = $issue->relations
-            ->filter(fn ($r) => $r->type === \App\Enums\RelationType::Blocks && $open($r))
-            ->map(fn ($r) => \App\Support\Issues\Blockage::days($issue, $r->relatedIssue))
+            ->filter(fn ($r) => $r->type === RelationType::Blocks && $open($r))
+            ->map(fn ($r) => Blockage::days($issue, $r->relatedIssue))
             ->filter();
 
         return [
@@ -214,9 +218,12 @@ class IssueController extends Controller
     {
         $this->authorize('create', Issue::class);
 
+        // Only a project this person can see: for a client, one they hold. Anything
+        // else is somebody else's project, and its name, key and statuses are not
+        // theirs to be shown — nor its existence confirmed by a different error.
         $project = $request->filled('project')
-            ? Project::where('slug', $request->string('project'))->firstOrFail()
-            : Project::active()->orderBy('name')->firstOrFail();
+            ? Project::visibleTo($request->user())->where('slug', $request->string('project'))->firstOrFail()
+            : Project::active()->visibleTo($request->user())->orderBy('name')->firstOrFail();
 
         return Inertia::render('issues/create', [
             'project' => ['id' => $project->id, 'key' => $project->key, 'name' => $project->name, 'slug' => $project->slug],
@@ -240,16 +247,21 @@ class IssueController extends Controller
     {
         $this->authorize('create', Issue::class);
 
-        $project = Project::findOrFail($request->integer('project_id'));
+        // A project this person can see, or no project at all: StoreIssueRequest only
+        // proves it is in the workspace, and a client must not file into, or learn the
+        // key of, another customer's project.
+        $project = Project::visibleTo($request->user())->findOrFail($request->integer('project_id'));
 
         // Created as a subtask: the parent is found in this workspace or not at all,
-        // and the issue is not kept if SetParent refuses the pairing.
-        $parent = $request->filled('parent')
+        // and the issue is not kept if SetParent refuses the pairing. Only staff can
+        // arrange the hierarchy, so for anybody else every key is "no such issue" —
+        // two different answers would tell a client which internal keys exist.
+        $parent = $request->filled('parent') && $this->isStaff($request->user())
             ? Issue::where('key', strtoupper($request->string('parent')->toString()))->first()
             : null;
 
         if ($request->filled('parent') && $parent === null) {
-            throw \Illuminate\Validation\ValidationException::withMessages(['parent' => 'No issue with that key in this workspace.']);
+            throw ValidationException::withMessages(['parent' => 'No issue with that key in this workspace.']);
         }
 
         // Client visibility is forced inside the action, so every entry point gets
@@ -259,7 +271,7 @@ class IssueController extends Controller
 
             if ($parent !== null) {
                 $this->authorize('update', $parent);
-                app(\App\Actions\SetParent::class)->handle($issue, $parent);
+                app(SetParent::class)->handle($issue, $parent);
             }
 
             return $issue;

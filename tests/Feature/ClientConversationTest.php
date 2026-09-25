@@ -17,6 +17,7 @@ use App\Models\Report;
 use App\Models\Status;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Support\Mail\ReplyAddress;
 use App\Support\Tenancy\Tenancy;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -253,7 +254,7 @@ class ClientConversationTest extends TestCase
         config(['buggie.mailgun_signing_key' => 'k']);
         $ts = (string) time();
         $this->postJson('/api/mail/inbound', [
-            'recipient' => "reply+{$this->issue->key}.{$this->kd->fresh()->inbound_token}@in.buggie.test",
+            'recipient' => ReplyAddress::for($this->reload(), $this->jane),
             'from' => "Brian Power <{$this->jane->email}>",
             'stripped-text' => 'Firefox too.',
             'timestamp' => $ts, 'token' => 't1', 'signature' => hash_hmac('sha256', $ts.'t1', 'k'),

@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Models\Workspace;
 use App\Support\Tenancy\Tenancy;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Testing\TestResponse;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -30,7 +31,7 @@ class ApiTest extends TestCase
     }
 
     /** @param array<string, mixed> $data */
-    private function api(string $token, string $method, string $url, array $data = []): \Illuminate\Testing\TestResponse
+    private function api(string $token, string $method, string $url, array $data = []): TestResponse
     {
         // Laravel keeps the resolved user on the guard for the life of the
         // application, and a test makes several requests against one. Without this,
@@ -39,6 +40,27 @@ class ApiTest extends TestCase
 
         return $this->withHeaders(['Authorization' => "Bearer {$token}", 'Accept' => 'application/json'])
             ->json($method, $url, $data);
+    }
+
+    #[Test]
+    public function a_clients_token_cannot_file_into_a_project_they_do_not_hold(): void
+    {
+        [$workspace, $owner] = $this->workspaceWithMember(slug: 'acme');
+        [$mine, $theirs] = app(Tenancy::class)->run($workspace, fn () => [
+            Project::factory()->create(['key' => 'MINE']),
+            Project::factory()->create(['key' => 'GLX']),
+        ]);
+
+        $client = User::factory()->create();
+        $workspace->members()->attach($client->id, ['role' => WorkspaceRole::Client->value, 'joined_at' => now()]);
+        $mine->clients()->attach($client->id, ['role' => 'client_manager']);
+
+        // Minted directly: whether clients may create tokens is a separate question.
+        $token = $this->tokenFor($client, $workspace);
+
+        $this->api($token, 'POST', $this->apiUrl($workspace, 'issues'), ['project_id' => $theirs->id, 'title' => 'Probe'])
+            ->assertNotFound();
+        $this->assertSame(0, app(Tenancy::class)->run($workspace, fn () => Issue::count()));
     }
 
     #[Test]

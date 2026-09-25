@@ -27,6 +27,7 @@ class MemberController extends Controller
         $this->authorize('viewAny', Invitation::class);
 
         $workspace = $this->tenancy->currentOrFail();
+        $canManageInvites = $request->user()->can('create', Invitation::class);
 
         return Inertia::render('settings/members', [
             // projects eager-loaded: every row reads its grants, and strict mode
@@ -60,7 +61,10 @@ class MemberController extends Controller
                     'email' => $invitation->email,
                     'role' => $invitation->role->value,
                     'expires_at' => $invitation->expires_at->toIso8601String(),
-                    'url' => $invitation->url(),
+                    // The link is the whole credential. Only whoever may invite sees
+                    // it: a member copying an admin's invitation would otherwise
+                    // make themselves an admin.
+                    'url' => $canManageInvites ? $invitation->url() : null,
                 ]),
             'projects' => Project::active()->orderBy('name')->get(['id', 'name', 'key']),
             // The list staff are given a discipline from, edited on this screen.
@@ -218,9 +222,12 @@ class MemberController extends Controller
             ];
         }
 
-        // sync, not syncWithoutDetaching: unticking a box has to take access away, or
-        // the screen offers a choice it does not honour.
-        $user->projects()->sync($sync);
+        // Unticking a box has to take access away, or the screen offers a choice it
+        // does not honour — but only within this workspace. sync() would compare
+        // against every project the person holds on the install and detach the other
+        // workspaces' grants too, since the pivot table has no tenant scope.
+        $user->projects()->detach(Project::whereNotIn('id', array_keys($sync))->pluck('id'));
+        $user->projects()->syncWithoutDetaching($sync);
 
         foreach ($sync as $id => $pivot) {
             if (isset($existing[$id]) && $existing[$id] !== $pivot['role']) {
@@ -299,11 +306,18 @@ class MemberController extends Controller
 
         $workspace = $this->tenancy->currentOrFail();
 
+        // Somebody who is not a member here is not somebody this workspace can remove.
+        abort_unless($user->belongsToWorkspace($workspace), 404);
+
         // The owner is the last line of control over a workspace.
         abort_if($user->id === $workspace->owner_id, 403, 'The workspace owner cannot be removed.');
 
         $workspace->members()->detach($user->id);
-        $user->projects()->detach();
+
+        // This workspace's projects only, named by id. detach() with no ids deletes
+        // every project_user row the person has on the install — the grants other
+        // workspaces gave them included — because the pivot table has no tenant scope.
+        $user->projects()->detach(Project::pluck('id'));
 
         return back()->with('success', "{$user->name} removed from the workspace.");
     }

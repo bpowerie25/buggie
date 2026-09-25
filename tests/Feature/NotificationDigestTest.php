@@ -134,9 +134,12 @@ class NotificationDigestTest extends TestCase
         ]);
 
         app(Tenancy::class)->run($workspace, function () use ($staff, $client) {
-            $issue = Issue::factory()->clientVisible()->create([
-                'project_id' => Project::factory()->create()->id,
-            ]);
+            $project = Project::factory()->create();
+            // A client who can see the issue: only such a client is ever emailed about
+            // it, so only such a client makes this test mean anything.
+            $project->clients()->attach($client->id, ['role' => 'client_manager']);
+
+            $issue = Issue::factory()->clientVisible()->create(['project_id' => $project->id]);
             $issue->watch($client, WatchReason::Reported);
 
             app(AddComment::class)->handle($issue, [

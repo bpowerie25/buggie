@@ -7,6 +7,7 @@ use App\Models\InAppNotification;
 use App\Models\Issue;
 use App\Models\PendingNotification;
 use App\Models\User;
+use Illuminate\Support\Facades\Gate;
 
 /**
  * Records that someone should hear about something.
@@ -36,6 +37,16 @@ class Notifier
         }
 
         if (! $recipient->wantsNotification($reason)) {
+            return;
+        }
+
+        // Only somebody who could open the issue hears about it, and a client never
+        // hears about internal activity — asked here, where every notification
+        // passes, rather than trusted to each caller. A mention of somebody who is
+        // not a member, an internal issue a client once watched, a note on an issue
+        // a client can see but the note is internal: all stop at this line.
+        if (! $this->isStaff($recipient, $issue)
+            && (($data['internal'] ?? false) || ! Gate::forUser($recipient)->allows('view', $issue))) {
             return;
         }
 

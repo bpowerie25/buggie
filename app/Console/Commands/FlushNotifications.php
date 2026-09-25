@@ -8,6 +8,7 @@ use App\Notifications\IssueDigest;
 use App\Support\Tenancy\Tenancy;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 
 /**
  * Turns batched activity into one message per person per issue.
@@ -70,7 +71,10 @@ class FlushNotifications extends Command
             $user = $entries->first()->user;
             $issue = $entries->first()->issue;
 
-            if ($user !== null && $issue !== null) {
+            // Asked again at send time. Membership, project grants and whether the issue
+            // is shared all change during the digest delay; a client removed a minute
+            // ago must not be emailed about the work they were removed from.
+            if ($user !== null && $issue !== null && Gate::forUser($user)->allows('view', $issue)) {
                 $user->notify(new IssueDigest($issue, $entries));
             }
 
