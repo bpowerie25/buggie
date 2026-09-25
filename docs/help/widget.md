@@ -89,7 +89,7 @@ window.buggie.q.push(['setRelease', '2026.09.18-a1c3']);
 | | |
 |---|---|
 | **Screenshot** | The viewport, rendered with html2canvas, scaled so the widest edge is at most 1600px, exported as JPEG at quality 0.8. Optional, and always shown to the reporter before sending. |
-| **Console** | The last 50 entries across `log`, `info`, `warn`, `error` and `debug`. Each message is trimmed to 300 characters. The original `console` method is always called through. |
+| **Console** | The last 50 entries across `log`, `info`, `warn`, `error` and `debug`. Each message is trimmed to 300 characters. The original `console` method is always called through. Scripts, stylesheets, images, media and frames that **fail to load** are recorded here too, as `Failed to load script: https://…`. |
 | **Network** | The last 30 `fetch` and `XMLHttpRequest` calls: method, URL, status (or `failed`), and duration in milliseconds. **Headers and bodies are never captured.** |
 | **Errors** | The most recent uncaught error or unhandled promise rejection, with its stack. Message trimmed to 2000 characters, stack to 8000. |
 | **Environment** | Page URL, referrer, page title, user agent, language, time zone, viewport size, screen size, device pixel ratio, release, and the capture time. |
@@ -179,7 +179,7 @@ is unauthenticated by necessity and therefore treated as hostile input:
 - **Rate limits** — 5 reports per minute per IP address per key, and 200 per hour per
   key. Over either, a `429` with `Retry-After`.
 - **Size caps** — title 255 characters, body 5000, at most 50 console entries and 30
-  network entries, error message 2000 and stack 8000.
+  network entries, error message 2000 and stack 8000, and 256KB for the whole report.
 - **Quota** — on the hosted service, a workspace over its monthly report limit gets a
   `402` carrying a message the widget displays to the reporter. The person who hit the
   bug did nothing wrong and should be told something true rather than "could not

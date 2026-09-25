@@ -125,7 +125,7 @@ replace; an unresolvable name matches nothing rather than everything.
 `resources/widget/` builds separately (`npm run build:widget`) to a stable, unhashed
 path, because customers embed the URL. It is vanilla TypeScript with no runtime
 dependencies — html2canvas is fetched from a CDN only when someone opens the reporter,
-which keeps the bundle every visitor downloads at ~7KB gzipped. Keep it that way.
+which keeps the bundle every visitor downloads at ~8KB gzipped. Keep it that way.
 
 Two things that are load-bearing:
 

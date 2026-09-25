@@ -12,6 +12,11 @@ today you are running `main`, which is honest rather than ideal — see
 
 ### Added
 
+- **The widget records files that failed to load.** A script, stylesheet, image,
+  video or frame that 404s or is blocked now appears in the report's console, e.g.
+  "Failed to load script: https://…/app.js". These errors don't reach page scripts
+  the usual way, so the widget listens for them directly. Addresses have secrets
+  stripped, like every URL the widget sends.
 - **Importing is its own page, for all staff.** It moved out of project settings, and
   **Import issues** is now linked from the project page and next to Export on the
   issue list. Any member of staff can import, not only admins; clients still can't.
