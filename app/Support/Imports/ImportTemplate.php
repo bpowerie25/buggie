@@ -21,7 +21,10 @@ final class ImportTemplate
     public const EXAMPLE_PREFIX = 'EXAMPLE-';
 
     /** In the order the columns appear. Named as CsvFormat's generic format reads them. */
-    public const HEADERS = ['Key', 'Title', 'Description', 'Status', 'Priority', 'Type', 'Assignee', 'Created'];
+    public const HEADERS = [
+        'Key', 'Title', 'Description', 'Status', 'Priority', 'Type', 'Assignee',
+        'Start', 'Due', 'Estimate', 'Phase', 'Parent', 'Created',
+    ];
 
     public const PRIORITIES = ['Urgent', 'High', 'Medium', 'Low'];
 
@@ -39,21 +42,28 @@ final class ImportTemplate
         $default = $project->defaultStatus()?->name ?? '';
         $started = $statuses->firstWhere('category', StatusCategory::Started)?->name ?? $default;
         $done = $statuses->firstWhere('category', StatusCategory::Done)?->name ?? $default;
+        // This project's own phases where it has some; otherwise the column is shown
+        // filled in, since a phase named in a row is created by the import.
+        $phases = $project->phases()->pluck('name');
+        $phase = fn (int $i, string $fallback) => $phases[$i] ?? $phases->last() ?? $fallback;
+        $day = fn (int $days) => now()->addDays($days)->toDateString();
 
         return [
             self::HEADERS,
             [
                 self::EXAMPLE_PREFIX.'1', 'Contact form does not send on Safari',
                 'Clicking Send does nothing. Chrome is fine.', $default, 'High', 'Bug',
-                $downloader->email, now()->subDays(3)->toDateString(),
+                $downloader->email, '', $day(7), '2', '', '', now()->subDays(3)->toDateString(),
             ],
             [
                 self::EXAMPLE_PREFIX.'2', 'Add a newsletter sign-up to the footer',
-                '', $started, 'Medium', 'Feature', '', now()->subDays(10)->toDateString(),
+                '', $started, 'Medium', 'Feature', '', $day(14), $day(25), '16', $phase(0, 'Build'), '',
+                now()->subDays(10)->toDateString(),
             ],
             [
                 self::EXAMPLE_PREFIX.'3', 'Renew the SSL certificate',
-                'Expires at the end of the month.', $done, 'Low', 'Task', '', now()->subMonth()->toDateString(),
+                'Expires at the end of the month.', $done, 'Low', 'Task', '', '', $day(20), '0.5',
+                $phase(1, 'Launch'), self::EXAMPLE_PREFIX.'2', now()->subMonth()->toDateString(),
             ],
         ];
     }

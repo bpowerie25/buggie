@@ -320,6 +320,11 @@ Route::domain('{workspace}.'.$host)
             ->name('branding.update');
 
         // Bringing a backlog over from another tracker.
+        // The Import page, per project; with none, it asks which.
+        Route::get('import', [\App\Http\Controllers\ImportController::class, 'index'])
+            ->name('imports.choose');
+        Route::get('projects/{project}/import', [\App\Http\Controllers\ImportController::class, 'index'])
+            ->name('imports.index');
         // Before imports/{import}, or "template" is read as an import id.
         Route::get('projects/{project}/imports/template', [\App\Http\Controllers\ImportController::class, 'template'])
             ->name('imports.template');

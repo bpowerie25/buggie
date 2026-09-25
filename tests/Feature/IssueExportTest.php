@@ -9,6 +9,7 @@ use App\Models\Project;
 use App\Models\User;
 use App\Support\Tenancy\Tenancy;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Testing\TestResponse;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -17,7 +18,7 @@ class IssueExportTest extends TestCase
     use RefreshDatabase;
 
     /** @return array<int, string> */
-    private function csv(\Illuminate\Testing\TestResponse $response): array
+    private function csv(TestResponse $response): array
     {
         \ob_start();
         $response->sendContent();
@@ -73,6 +74,36 @@ class IssueExportTest extends TestCase
     }
 
     #[Test]
+    public function every_value_sits_under_its_own_heading(): void
+    {
+        // The header once listed estimate and time_spent that no row filled in, so
+        // the url, and every custom field after it, landed two columns to the left.
+        [$workspace, $staff] = $this->workspaceWithMember(WorkspaceRole::Member, 'acme');
+
+        app(Tenancy::class)->run($workspace, function () {
+            $project = Project::factory()->create(['key' => 'WEB']);
+            $phase = $project->phases()->create(['name' => 'Build']);
+            $parent = Issue::factory()->create(['project_id' => $project->id, 'title' => 'Parent']);
+
+            Issue::factory()->create([
+                'project_id' => $project->id, 'title' => 'Child', 'start_on' => '2026-10-01', 'due_on' => '2026-10-09',
+                'estimate_minutes' => 150, 'phase_id' => $phase->id, 'parent_id' => $parent->id,
+            ]);
+        });
+
+        $rows = array_map(str_getcsv(...), $this->csv(
+            $this->actingAs($staff)->get($this->workspaceUrl($workspace, '/issues/export?q=child'))->assertOk()
+        ));
+        $row = array_combine(array_map(fn ($h) => trim($h, "\u{FEFF}"), $rows[0]), $rows[1]);
+
+        $this->assertSame(
+            ['2026-10-01', '2026-10-09', '2h 30m', 'Build', 'WEB-1'],
+            [$row['start_on'], $row['due_on'], $row['estimate'], $row['phase'], $row['parent']],
+        );
+        $this->assertStringEndsWith('/issues/WEB-2', $row['url']);
+    }
+
+    #[Test]
     public function a_client_exports_only_what_they_could_already_see(): void
     {
         // An export is a listing, and a listing is the classic way a leak leaves a
@@ -116,6 +147,13 @@ class IssueExportTest extends TestCase
 
         $this->assertStringContainsString('Something they reported', $body);
         $this->assertStringNotContainsString('Internal note about their budget', $body);
+
+        // How long things were expected to take is the team's business.
+        $granted->issues()->update(['estimate_minutes' => 480]);
+        $again = implode("\n", $this->csv(
+            $this->actingAs($client)->get($this->workspaceUrl($workspace, '/issues/export'))->assertOk()
+        ));
+        $this->assertStringNotContainsString('8h', $again);
         $this->assertStringNotContainsString('A different clients problem', $body);
     }
 

@@ -2,7 +2,7 @@ import { Button } from '@/components/button';
 import { AppLayout } from '@/layouts/app-layout';
 import type { ProjectSummary, Status, StatusCategory } from '@/types';
 import { Head, Link } from '@inertiajs/react';
-import { Settings } from 'lucide-react';
+import { Settings, Upload } from 'lucide-react';
 
 interface Category {
     value: StatusCategory;
@@ -23,12 +23,20 @@ export default function ShowProject({
         <AppLayout
             title={project.name}
             actions={
-                <Link href={`/projects/${project.slug}/edit`}>
-                    <Button variant="secondary" size="sm">
-                        <Settings className="size-4" />
-                        Settings
-                    </Button>
-                </Link>
+                <div className="flex gap-2">
+                    <Link href={`/projects/${project.slug}/import`}>
+                        <Button variant="secondary" size="sm">
+                            <Upload className="size-4" />
+                            Import issues
+                        </Button>
+                    </Link>
+                    <Link href={`/projects/${project.slug}/edit`}>
+                        <Button variant="secondary" size="sm">
+                            <Settings className="size-4" />
+                            Settings
+                        </Button>
+                    </Link>
+                </div>
             }
         >
             <Head title={project.name} />

@@ -13,7 +13,9 @@ namespace App\Support\Imports;
 class CsvFormat
 {
     public const JIRA = 'jira';
+
     public const MANTIS = 'mantis';
+
     public const GENERIC = 'generic';
 
     /**
@@ -36,6 +38,7 @@ class CsvFormat
             'reporter' => ['reporter'],
             'created_at' => ['created'],
             'labels' => ['labels'],
+            'due_on' => ['due date', 'due'],
         ],
         self::MANTIS => [
             'source_key' => ['id', 'issue id'],
@@ -48,6 +51,7 @@ class CsvFormat
             'reporter' => ['reporter'],
             'created_at' => ['date submitted', 'submitted'],
             'labels' => ['tags'],
+            'due_on' => ['due date'],
         ],
         self::GENERIC => [
             'source_key' => ['id', 'key', 'ref', 'reference'],
@@ -60,6 +64,12 @@ class CsvFormat
             'reporter' => ['reporter', 'author', 'raised by'],
             'created_at' => ['created', 'created at', 'date', 'opened'],
             'labels' => ['labels', 'tags'],
+            // The planning columns: when, how long, which stage, part of what.
+            'start_on' => ['start', 'start date', 'starts', 'start on'],
+            'due_on' => ['due', 'due date', 'deadline', 'due on'],
+            'estimate' => ['estimate', 'estimate (hours)', 'estimated hours', 'hours'],
+            'phase' => ['phase', 'stage'],
+            'parent' => ['parent', 'parent key', 'part of'],
         ],
     ];
 
@@ -119,6 +129,8 @@ class CsvFormat
     {
         // Jira repeats column names for multi-valued fields ("Comment", "Comment"),
         // and exports often carry a byte-order mark on the first one.
-        return trim(mb_strtolower(preg_replace('/\s+/', ' ', trim($header, "\u{FEFF} \t\n\r"))));
+        // Underscores read as spaces, so a file exported from Buggie ("due_on") comes
+        // back in under the same names a person would type ("due on").
+        return trim(mb_strtolower(preg_replace('/[\s_]+/', ' ', trim($header, "\u{FEFF} \t\n\r"))));
     }
 }

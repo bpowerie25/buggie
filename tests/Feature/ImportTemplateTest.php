@@ -8,6 +8,7 @@ use App\Enums\IssueType;
 use App\Enums\WorkspaceRole;
 use App\Models\Import;
 use App\Models\Issue;
+use App\Models\Phase;
 use App\Models\Project;
 use App\Models\User;
 use App\Models\Workspace;
@@ -56,7 +57,10 @@ class ImportTemplateTest extends TestCase
         $this->assertStringStartsWith("\xEF\xBB\xBF", $csv, 'Without a BOM, Excel mangles accented names.');
 
         $rows = array_map('str_getcsv', array_filter(explode("\n", substr($csv, 3))));
-        $this->assertSame(['Key', 'Title', 'Description', 'Status', 'Priority', 'Type', 'Assignee', 'Created'], $rows[0]);
+        $this->assertSame([
+            'Key', 'Title', 'Description', 'Status', 'Priority', 'Type', 'Assignee',
+            'Start', 'Due', 'Estimate', 'Phase', 'Parent', 'Created',
+        ], $rows[0]);
         $this->assertCount(4, $rows);
 
         // "Scoped", "Building" and "Live" are this template's names, not generic ones.
@@ -65,14 +69,19 @@ class ImportTemplateTest extends TestCase
     }
 
     #[Test]
-    public function only_those_who_can_import_can_download_it(): void
+    public function any_member_of_staff_can_download_it_and_a_client_cannot(): void
     {
-        foreach ([WorkspaceRole::Member, WorkspaceRole::Client] as $role) {
-            $user = User::factory()->create();
-            $this->workspace->members()->attach($user->id, ['role' => $role->value, 'joined_at' => now()]);
+        // Importing is day-to-day work, not project setup: a developer or designer
+        // bringing a client's spreadsheet in should not need an admin to do it.
+        $member = User::factory()->create();
+        $this->workspace->members()->attach($member->id, ['role' => WorkspaceRole::Member->value, 'joined_at' => now()]);
+        $this->actingAs($member)->get($this->url('/imports/template'))->assertOk();
+        $this->actingAs($member)->get($this->url('/import'))->assertOk();
 
-            $this->actingAs($user)->get($this->url('/imports/template'))->assertForbidden();
-        }
+        $client = User::factory()->create();
+        $this->workspace->members()->attach($client->id, ['role' => WorkspaceRole::Client->value, 'joined_at' => now()]);
+        $this->actingAs($client)->get($this->url('/imports/template'))->assertForbidden();
+        $this->actingAs($client)->get($this->workspaceUrl($this->workspace, '/import'))->assertNotFound();
     }
 
     #[Test]
@@ -102,7 +111,8 @@ class ImportTemplateTest extends TestCase
         Storage::fake('local');
 
         $csv = $this->actingAs($this->owner)->get($this->url('/imports/template'))->getContent()
-            .'KEN-7,Menu overlaps logo on mobile,Only below 400px,Building,Urgent,Bug,'.$this->owner->email.",2026-08-01\n";
+            .'KEN-7,Menu overlaps logo on mobile,Only below 400px,Building,Urgent,Bug,'.$this->owner->email
+            .",14/10/2026,2026-10-20,6,Design,,2026-08-01\n";
 
         $import = $this->upload($csv);
         $this->start($import);
@@ -117,6 +127,9 @@ class ImportTemplateTest extends TestCase
         $this->assertSame($this->owner->id, $issue->assignee_id);
         $this->assertSame('2026-08-01', $issue->created_at->toDateString());
         $this->assertSame('KEN-7', $issue->source_key);
+        // The planning columns, with a day-first date read as the 14th of October.
+        $this->assertSame(['2026-10-14', '2026-10-20', 360], [$issue->start_on->toDateString(), $issue->due_on->toDateString(), $issue->estimate_minutes]);
+        $this->assertSame('Design', Phase::withoutGlobalScopes()->find($issue->phase_id)->name);
     }
 
     private function upload(string $csv): Import

@@ -2,11 +2,15 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\CustomField;
 use App\Models\Issue;
 use App\Support\Issues\IssueQuery;
 use App\Support\Issues\IssueQueryFilter;
+use App\Support\Tenancy\Tenancy;
+use App\Support\Time\Duration;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
@@ -20,13 +24,14 @@ class IssueExportController extends Controller
 {
     public function __construct(
         private IssueQueryFilter $filter,
-        private \App\Support\Tenancy\Tenancy $tenancy,
+        private Tenancy $tenancy,
     ) {}
 
     private const COLUMNS = [
         'key', 'title', 'status', 'state', 'type', 'priority', 'project',
         'assignee', 'reporter', 'labels', 'visible_to_client', 'occurrences',
-        'created_at', 'updated_at', 'closed_at', 'due_on', 'estimate', 'time_spent', 'url',
+        'created_at', 'updated_at', 'closed_at', 'start_on', 'due_on', 'estimate', 'time_spent',
+        'phase', 'parent', 'url',
     ];
 
     public function __invoke(Request $request): StreamedResponse
@@ -53,7 +58,7 @@ class IssueExportController extends Controller
          * "browser" share one column instead of producing two half-empty ones. The
          * export can span projects; the header cannot depend on the first row.
          */
-        $fields = \App\Models\CustomField::query()
+        $fields = CustomField::query()
             ->unless($staff, fn (Builder $q) => $q->where('visible_to_client', true))
             ->inOrder()
             ->get()
@@ -67,6 +72,8 @@ class IssueExportController extends Controller
                 'reporter:id,name',
                 'labels:id,name',
                 'project:id,key,slug,name',
+                'phase:id,name',
+                'parent:id,key',
                 // Constrained rather than filtered afterwards: an internal field's
                 // value must not be read into memory on a client's export at all.
                 'customFieldValues' => fn ($q) => $q->whereIn('custom_field_id', $fields->pluck('id')),
@@ -116,7 +123,7 @@ class IssueExportController extends Controller
     }
 
     /** @return array<int, string|int|null> */
-    private function row(Issue $issue, bool $staff, string $slug, \Illuminate\Support\Collection $fields): array
+    private function row(Issue $issue, bool $staff, string $slug, Collection $fields): array
     {
         $values = $issue->customFieldValues->keyBy(fn ($value) => $value->field?->key);
 
@@ -138,7 +145,15 @@ class IssueExportController extends Controller
             $issue->created_at?->toIso8601String(),
             $issue->updated_at?->toIso8601String(),
             $issue->closed_at?->toIso8601String(),
+            $issue->start_on?->toDateString(),
             $issue->due_on?->toDateString(),
+            // How long things were expected to take and did take is the team's
+            // business, as it is everywhere else a client looks.
+            $staff && $issue->estimate_minutes ? Duration::format($issue->estimate_minutes) : '',
+            $staff && $issue->time_spent_minutes ? Duration::format((int) $issue->time_spent_minutes) : '',
+            $this->safe($issue->phase?->name),
+            // A parent can be internal work, and its key says it exists.
+            $staff ? $issue->parent?->key : '',
             workspace_url($slug, "issues/{$issue->key}"),
             // Through safe() like every other free-text column: a custom field value
             // is typed by a person, and "=1+1" in a spreadsheet is a formula.

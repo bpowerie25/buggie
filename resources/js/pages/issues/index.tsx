@@ -23,6 +23,7 @@ import {
     Bookmark,
     ChevronRight,
     Download,
+    Upload,
     LayoutGrid,
     List,
     Plus,
@@ -484,6 +485,18 @@ export default function IssuesIndex({
                     <Download className="size-3.5" />
                     Export
                 </a>
+
+                {/* Into the project being looked at, or asks which. Staff only. */}
+                {editable && (
+                    <Link
+                        href={query.include.project?.length === 1 ? `/projects/${query.include.project[0]}/import` : '/import'}
+                        title="Create or update issues from a spreadsheet"
+                        className="flex items-center gap-1.5 rounded-lg border border-border px-2 py-1 text-xs text-ink-muted transition hover:text-ink"
+                    >
+                        <Upload className="size-3.5" />
+                        Import
+                    </Link>
+                )}
 
                 <span className="text-xs text-ink-subtle">
                     {rows.length} issue{rows.length === 1 ? '' : 's'}

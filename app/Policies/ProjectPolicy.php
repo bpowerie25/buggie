@@ -2,6 +2,7 @@
 
 namespace App\Policies;
 
+use App\Enums\WorkspaceRole;
 use App\Models\Project;
 use App\Models\User;
 use App\Support\Tenancy\Tenancy;
@@ -42,12 +43,23 @@ class ProjectPolicy
         return $this->create($user);
     }
 
+    /**
+     * Bringing issues in from a spreadsheet or another tracker, or updating them from
+     * one. Day-to-day work rather than project setup, so anybody on the staff who can
+     * see the project — not only whoever manages it. Never a client: an import writes
+     * many issues at once, internal ones included.
+     */
+    public function import(User $user, Project $project): bool
+    {
+        return ($this->role($user)?->isStaff() ?? false) && $this->view($user, $project);
+    }
+
     public function delete(User $user, Project $project): bool
     {
         return $this->role($user)?->canManageWorkspace() ?? false;
     }
 
-    private function role(User $user): ?\App\Enums\WorkspaceRole
+    private function role(User $user): ?WorkspaceRole
     {
         $workspace = $this->tenancy->current();
 

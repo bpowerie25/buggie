@@ -12,6 +12,20 @@ today you are running `main`, which is honest rather than ideal — see
 
 ### Added
 
+- **Importing is its own page, for all staff.** It moved out of project settings, and
+  **Import issues** is now linked from the project page and next to Export on the
+  issue list. Any member of staff can import, not only admins; clients still can't.
+- **Imports can update.** Rows whose Key is an existing issue (`WEB-12`), or an
+  earlier import's key, can update that issue instead of being skipped. You choose on
+  the preview, which shows what each matching row would change. Only filled-in cells
+  count, and changes appear in the issue's activity. Buggie's own CSV export imports
+  straight back, so a filtered list can be exported, edited and re-imported.
+- **More columns in and out.**
+  - The template and importer read Start, Due, Estimate (hours), Phase (a new name
+    creates the phase) and Parent (an issue key, or another row in the same file).
+  - Dates written `14/10/2026` are read day first.
+  - The CSV export adds start_on, phase and parent.
+
 - **Holidays and leave on Workload.**
   - A *Time off* panel: staff book their own leave, and admins book anybody's and add
     public holidays.
@@ -200,6 +214,11 @@ today you are running `main`, which is honest rather than ideal — see
   unless the workspace chooses to show its staff.
 
 ### Fixed
+
+- **CSV export columns were misaligned.** The header listed `estimate` and
+  `time_spent`, but rows never filled them in, so `url` and every custom field sat two
+  columns to the left of their headings. Both now have values. A client's export
+  leaves them, and parent keys, blank.
 
 - **A client could open a project and see how the team works.** The project page showed
   every status in the workflow with its work-in-progress limit, the project's total issue
