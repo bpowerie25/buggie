@@ -141,6 +141,26 @@ class ImportUpdateTest extends TestCase
     }
 
     #[Test]
+    public function a_title_the_export_guarded_comes_back_unchanged(): void
+    {
+        // Exported as '-5% off banner so a spreadsheet does not run it as a formula.
+        $guarded = $this->issue('-5% off banner is misaligned');
+        $plain = $this->issue("Don't show the banner twice");
+
+        $csv = $this->actingAs($this->dev)
+            ->get($this->workspaceUrl($this->workspace, '/issues/export?q=project:web'))
+            ->streamedContent();
+
+        $this->assertStringContainsString("'-5% off banner", $csv);
+
+        $import = $this->import($csv, update: true);
+
+        $this->assertSame([0, 0, 2], [$import->imported, $import->updated, $import->skipped], 'An untouched export changed something.');
+        $this->assertSame('-5% off banner is misaligned', $this->reload($guarded)->title);
+        $this->assertSame("Don't show the banner twice", $this->reload($plain)->title);
+    }
+
+    #[Test]
     public function the_preview_says_which_rows_are_new_and_what_each_match_would_change(): void
     {
         $this->issue('Menu overlaps logo');

@@ -83,6 +83,20 @@ The preview shows, for the first few matching rows, which fields would change.
 it, edit the CSV, and import it back with *Update them from the file*. The export's
 columns are read back under the same names, and only what you edited changes.
 
+A few things to know when editing an export:
+
+- **Keep it as CSV.** In Excel, *Save As → CSV UTF-8*. An `.xlsx` file can't be
+  imported.
+- **Titles starting with `=`, `+`, `-` or `@`** are exported with an apostrophe in
+  front, so the spreadsheet doesn't run them as formulas. The import removes it again,
+  so leave it there.
+- **Columns that aren't read back:** labels, reporter, visible-to-client and custom
+  fields. Editing them changes nothing, and the preview lists them under "Columns not
+  used". Change those on the issues, or in bulk from the issue list.
+- **Dates with slashes are read day first.** A spreadsheet set to US format writes
+  `10/09/2026` for 9 October, which would be read as 10 September. Keep dates as
+  `2026-10-09` if in doubt.
+
 ## Running it twice
 
 Safe, unless you choose to update. Each issue remembers the key it came from, so a

@@ -68,7 +68,7 @@ class RowMapper
 
         return [
             'attributes' => [
-                'title' => mb_substr($row['title'] ?? '', 0, 250),
+                'title' => mb_substr(self::unguard($row['title'] ?? ''), 0, 250),
                 'description' => $this->description($row['description'] ?? ''),
                 'status_id' => $status,
                 'priority' => $priority,
@@ -80,7 +80,7 @@ class RowMapper
                 'due_on' => $this->day($row['due_on'] ?? '', 'Due', $notes),
                 'estimate_minutes' => $this->estimate($row['estimate'] ?? '', $notes),
                 // By name; one that does not exist yet is created by the import.
-                'phase' => trim($row['phase'] ?? '') === '' ? null : mb_substr(trim($row['phase']), 0, 60),
+                'phase' => trim($row['phase'] ?? '') === '' ? null : mb_substr(self::unguard(trim($row['phase'])), 0, 60),
                 // A Buggie key or another row's own key; resolved after every row is in.
                 'parent' => trim($row['parent'] ?? '') === '' ? null : mb_substr(trim($row['parent']), 0, 60),
             ],
@@ -156,6 +156,20 @@ class RowMapper
         }
 
         return $changes;
+    }
+
+    /**
+     * Undo the export's formula guard.
+     *
+     * Buggie's export puts an apostrophe before any text starting with = + - or @,
+     * so a spreadsheet shows "-5% off banner" instead of running it. Read back
+     * as-is, every such title would come in with the apostrophe attached and count
+     * as changed. Only that exact prefix is removed; an apostrophe before anything
+     * else is somebody's own text.
+     */
+    public static function unguard(string $value): string
+    {
+        return preg_match("/^'[=+\-@\t\r]/", $value) ? substr($value, 1) : $value;
     }
 
     /** An existing phase of this project by name, ignoring case, or null. */
