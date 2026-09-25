@@ -14,6 +14,7 @@ use App\Support\Mail\ReplyAddress;
 use App\Support\Tenancy\Tenancy;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 
@@ -189,9 +190,13 @@ class InboundMailController extends Controller
             return false;
         }
 
-        return hash_equals(
-            hash_hmac('sha256', $timestamp.$token, $key),
-            $signature,
-        );
+        if (! hash_equals(hash_hmac('sha256', $timestamp.$token, $key), $signature)) {
+            return false;
+        }
+
+        // And each signed delivery once. The timestamp alone lets a captured request
+        // be sent again for five minutes; Mailgun's token is unique per delivery, so
+        // having seen it before is a replay.
+        return Cache::add('mailgun-token:'.hash('sha256', $token), true, 600);
     }
 }

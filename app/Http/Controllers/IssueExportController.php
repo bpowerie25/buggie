@@ -4,6 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Models\CustomField;
 use App\Models\Issue;
+use App\Models\Project;
+use App\Models\Workspace;
+use App\Support\Issues\AuthorLabel;
 use App\Support\Issues\IssueQuery;
 use App\Support\Issues\IssueQueryFilter;
 use App\Support\Tenancy\Tenancy;
@@ -59,7 +62,10 @@ class IssueExportController extends Controller
          * export can span projects; the header cannot depend on the first row.
          */
         $fields = CustomField::query()
-            ->unless($staff, fn (Builder $q) => $q->where('visible_to_client', true))
+            // A client's header lists only fields from projects they hold: a field key
+            // from another customer's project names something about that customer.
+            ->unless($staff, fn (Builder $q) => $q->where('visible_to_client', true)
+                ->whereIn('project_id', Project::visibleTo($user)->select('id')))
             ->inOrder()
             ->get()
             ->unique('key')
@@ -91,9 +97,10 @@ class IssueExportController extends Controller
         // and touching $issue->workspace inside the loop is both an N+1 and a lazy
         // loading violation, which strict mode turns into an exception mid-stream —
         // after the headers have gone, so it surfaces as a truncated file.
-        $slug = $this->tenancy->currentOrFail()->slug;
+        $workspace = $this->tenancy->currentOrFail();
+        $slug = $workspace->slug;
 
-        return response()->streamDownload(function () use ($builder, $staff, $slug, $fields) {
+        return response()->streamDownload(function () use ($builder, $staff, $slug, $fields, $workspace) {
             $out = fopen('php://output', 'w');
 
             // Excel reads a file without this as Latin-1 and mangles every accented
@@ -109,9 +116,9 @@ class IssueExportController extends Controller
 
             // Chunked, so exporting a workspace with fifty thousand issues does not
             // load fifty thousand models into memory to write them out one at a time.
-            $builder->chunk(500, function ($issues) use ($out, $staff, $slug, $fields) {
+            $builder->chunk(500, function ($issues) use ($out, $staff, $slug, $fields, $workspace) {
                 foreach ($issues as $issue) {
-                    fputcsv($out, $this->row($issue, $staff, $slug, $fields));
+                    fputcsv($out, $this->row($issue, $staff, $slug, $fields, $workspace));
                 }
             });
 
@@ -123,21 +130,24 @@ class IssueExportController extends Controller
     }
 
     /** @return array<int, string|int|null> */
-    private function row(Issue $issue, bool $staff, string $slug, Collection $fields): array
+    private function row(Issue $issue, bool $staff, string $slug, Collection $fields, Workspace $workspace): array
     {
         $values = $issue->customFieldValues->keyBy(fn ($value) => $value->field?->key);
 
         return [
             $issue->key,
             $this->safe($issue->title),
-            $issue->status->name,
+            $this->safe($issue->status->name),
             $issue->status->category->value,
             $issue->type->value,
             $issue->priority->label(),
-            $issue->project->name,
-            $issue->assignee?->name,
-            $issue->reporter?->name,
-            $issue->labels->pluck('name')->implode(', '),
+            $this->safe($issue->project->name),
+            // The team as the workspace to a client, as on every screen they see. And
+            // through safe(): names are typed by their owners, and "=HYPERLINK(…)" is
+            // a name somebody can choose.
+            $this->safe($issue->assignee ? AuthorLabel::for($issue->assignee, $workspace, readerIsStaff: $staff) : null),
+            $this->safe($issue->reporter ? AuthorLabel::for($issue->reporter, $workspace, readerIsStaff: $staff) : null),
+            $this->safe($issue->labels->pluck('name')->implode(', ')),
             // Meaningless to a client — everything they can export is visible to them
             // by definition — and useful to staff, who are deciding what to share.
             $staff ? ($issue->visibility->value === 'client' ? 'yes' : 'no') : '',

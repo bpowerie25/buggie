@@ -133,6 +133,14 @@ return [
         'notifications' => (int) env('RETAIN_NOTIFICATION_DAYS', 90),
     ],
 
+    /*
+     * Whether an email address must be confirmed before it can create a workspace.
+     * On for the hosted service, where anybody may sign up and type any address;
+     * off for self-hosted installs, where nobody signs up without an invitation or
+     * the first run. Needs working outgoing mail when on.
+     */
+    'require_verified_email' => (bool) env('BUGGIE_REQUIRE_VERIFIED_EMAIL', (bool) env('BUGGIE_HOSTED', false)),
+
     'operators' => array_values(array_filter(array_map(
         'trim',
         explode(',', (string) env('BUGGIE_OPERATORS', '')),

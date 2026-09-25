@@ -5,6 +5,8 @@ namespace App\Notifications;
 use App\Enums\NotificationReason;
 use App\Models\Issue;
 use App\Models\PendingNotification;
+use App\Models\User;
+use App\Support\Issues\AuthorLabel;
 use App\Support\Mail\ReplyAddress;
 use App\Support\Notifications\ActivitySentence;
 use Illuminate\Bus\Queueable;
@@ -33,7 +35,7 @@ class IssueDigest extends Notification
 
     public function toMail(object $notifiable): MailMessage
     {
-        $lines = $this->lines();
+        $lines = $this->lines($notifiable);
 
         $mail = (new MailMessage)
             ->subject("[{$this->issue->key}] {$this->issue->title}")
@@ -57,17 +59,22 @@ class IssueDigest extends Notification
             'issue_key' => $this->issue->key,
             'issue_title' => $this->issue->title,
             'reasons' => $this->entries->pluck('reason')->unique()->values()->all(),
-            'lines' => $this->lines(),
+            'lines' => $this->lines($notifiable),
         ];
     }
 
     /** @return array<int, string> */
-    private function lines(): array
+    private function lines(object $notifiable): array
     {
+        // A client reads the team as the workspace, as on every screen they see,
+        // unless the workspace chooses to show its staff by name.
+        $workspace = $this->issue->workspace;
+        $staff = $notifiable instanceof User && ($notifiable->membershipIn($workspace)?->isStaff() ?? false);
+
         return $this->entries
             ->map(fn ($entry): string => ActivitySentence::for(
                 NotificationReason::from($entry->reason),
-                $entry->actor?->name,
+                $entry->actor ? AuthorLabel::for($entry->actor, $workspace, readerIsStaff: $staff) : null,
                 $entry->data ?? [],
             ))
             ->unique()

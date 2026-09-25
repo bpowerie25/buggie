@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Actions\MarkDuplicate;
 use App\Actions\RelateIssues;
 use App\Enums\RelationType;
 use App\Models\Issue;
@@ -52,7 +53,7 @@ class IssueRelationController extends Controller
      * Close this issue as a duplicate of another. Staff only: it closes the issue and
      * moves its followers, which is changing state.
      */
-    public function duplicate(Request $request, Issue $issue, \App\Actions\MarkDuplicate $action): RedirectResponse
+    public function duplicate(Request $request, Issue $issue, MarkDuplicate $action): RedirectResponse
     {
         $this->authorize('update', $issue);
 
@@ -67,6 +68,12 @@ class IssueRelationController extends Controller
 
         $action->handle($issue, $original, $request->user());
 
-        return back()->with('success', "{$issue->key} closed as a duplicate of {$original->key}. Its followers now follow {$original->key}.");
+        $leftOut = $action->leftOut === []
+            ? ''
+            : ' '.implode(', ', $action->leftOut)." cannot see {$original->key}, so "
+                .(count($action->leftOut) === 1 ? 'was' : 'were')
+                .' not added as a watcher. Share it with them from its sidebar if they should follow it.';
+
+        return back()->with('success', "{$issue->key} closed as a duplicate of {$original->key}. Its followers now follow {$original->key}.{$leftOut}");
     }
 }

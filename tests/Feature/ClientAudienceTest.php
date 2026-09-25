@@ -350,10 +350,12 @@ class ClientAudienceTest extends TestCase
 
         // Signed out first, or Sanctum takes the session user and never reads the token.
         $this->app['auth']->forgetGuards();
+        // Tokens are for staff: one minted for a client is refused outright, whatever
+        // it asks for, so the API is never a second route to the same issues.
         $token = $client->createTokenForWorkspace($this->workspace, 'test')->plainTextToken;
         $this->withHeaders(['Authorization' => "Bearer {$token}", 'Accept' => 'application/json'])
             ->get($this->workspaceUrl($this->workspace, '/api/v1/issues'))
-            ->{$see}($issue->key, false);
+            ->assertForbidden();
         $this->app['auth']->forgetGuards();
 
         $notified = $this->tenant(function () use ($client, $issue) {

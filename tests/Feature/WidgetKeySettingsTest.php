@@ -97,7 +97,7 @@ class WidgetKeySettingsTest extends TestCase
     {
         $client = $this->as(WorkspaceRole::Client);
 
-        $this->actingAs($client)->patch($this->url($this->key->public_key), $this->settings(['is_active' => false]))->assertForbidden();
+        $this->actingAs($client)->patch($this->url($this->key->public_key), $this->settings(['is_active' => false]))->assertNotFound();
         $this->actingAs($client)->delete($this->url($this->key->public_key))->assertForbidden();
 
         $this->assertTrue($this->key->fresh()->is_active);

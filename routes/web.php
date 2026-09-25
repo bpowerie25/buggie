@@ -1,28 +1,65 @@
 <?php
 
+use App\Http\Controllers\AccessRequestController;
+use App\Http\Controllers\ApiTokenController;
+use App\Http\Controllers\AttachmentController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
+use App\Http\Controllers\Auth\EmailVerificationController;
 use App\Http\Controllers\Auth\NewPasswordController;
 use App\Http\Controllers\Auth\PasswordResetLinkController;
 use App\Http\Controllers\Auth\RegisteredUserController;
-use App\Http\Controllers\AttachmentController;
+use App\Http\Controllers\Auth\TwoFactorChallengeController;
 use App\Http\Controllers\BillingController;
+use App\Http\Controllers\BrandingController;
+use App\Http\Controllers\ChatIntegrationController;
 use App\Http\Controllers\CommentController;
+use App\Http\Controllers\CustomFieldController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\DisciplineController;
+use App\Http\Controllers\DocsController;
 use App\Http\Controllers\HomeController;
+use App\Http\Controllers\ImportController;
+use App\Http\Controllers\InsightsController;
+use App\Http\Controllers\InstanceAccessRequestController;
+use App\Http\Controllers\InstanceSettingsController;
 use App\Http\Controllers\InvitationController;
-use App\Http\Controllers\MemberController;
 use App\Http\Controllers\IssueController;
+use App\Http\Controllers\IssueExportController;
+use App\Http\Controllers\IssueLookupController;
+use App\Http\Controllers\IssueParentController;
+use App\Http\Controllers\IssueRankController;
 use App\Http\Controllers\IssueRelationController;
+use App\Http\Controllers\IssueReporterController;
+use App\Http\Controllers\IssueScheduleController;
+use App\Http\Controllers\IssueTrashController;
+use App\Http\Controllers\IssueWatchController;
 use App\Http\Controllers\LabelController;
+use App\Http\Controllers\MemberController;
+use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\NotificationPreferenceController;
+use App\Http\Controllers\PhaseController;
 use App\Http\Controllers\PortalController;
 use App\Http\Controllers\ProjectController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\SavedViewController;
 use App\Http\Controllers\StatusController;
+use App\Http\Controllers\TimeEntryController;
+use App\Http\Controllers\TimelineController;
+use App\Http\Controllers\TimeOffController;
+use App\Http\Controllers\TimerController;
+use App\Http\Controllers\TimeReportController;
+use App\Http\Controllers\TwoFactorController;
+use App\Http\Controllers\VersionController;
+use App\Http\Controllers\WebhookController;
 use App\Http\Controllers\WidgetKeyController;
 use App\Http\Controllers\WidgetScriptController;
-use App\Http\Controllers\WorkspaceSettingsController;
+use App\Http\Controllers\WorkloadController;
+use App\Http\Controllers\WorkspaceAccessRequestController;
 use App\Http\Controllers\WorkspaceController;
+use App\Http\Controllers\WorkspaceSettingsController;
+use App\Http\Middleware\EnsureEmailIsVerifiedWhereRequired;
+use App\Models\WidgetKey;
+use App\Support\Tenancy\Tenancy;
 use Illuminate\Support\Facades\Route;
 
 $host = config('buggie.host');
@@ -48,13 +85,13 @@ Route::domain($host)->group(function () {
     // The parameter must be constrained: the default [^/]+ is greedy and swallows
     // the .js suffix, leaving nothing for the literal to match.
     // Documentation, rendered from the same Markdown that ships in the repository.
-    Route::get('docs/{page?}', \App\Http\Controllers\DocsController::class)
+    Route::get('docs/{page?}', DocsController::class)
         ->where('page', '[a-z0-9-]+')
         ->name('docs');
 
     // Served from the central domain because the portal is, and a reporter has no
     // workspace context — only a token.
-    Route::get('brand/{project}/logo', [\App\Http\Controllers\BrandingController::class, 'logo'])
+    Route::get('brand/{project}/logo', [BrandingController::class, 'logo'])
         ->whereNumber('project')
         ->name('brand.logo');
 
@@ -63,9 +100,9 @@ Route::domain($host)->group(function () {
         ->name('widget.script');
 
     // Asking for a workspace that does not exist yet. Only in `request` mode.
-    Route::get('request-access', [\App\Http\Controllers\AccessRequestController::class, 'create'])
+    Route::get('request-access', [AccessRequestController::class, 'create'])
         ->name('access-requests.create');
-    Route::post('request-access', [\App\Http\Controllers\AccessRequestController::class, 'store'])
+    Route::post('request-access', [AccessRequestController::class, 'store'])
         ->name('access-requests.store');
 
     Route::middleware('guest')->group(function () {
@@ -91,8 +128,21 @@ Route::domain($host)->group(function () {
 
     Route::middleware('auth')->group(function () {
         Route::get('workspaces', [WorkspaceController::class, 'index'])->name('workspaces.index');
-        Route::get('workspaces/create', [WorkspaceController::class, 'create'])->name('workspaces.create');
-        Route::post('workspaces', [WorkspaceController::class, 'store'])->name('workspaces.store');
+        // A workspace is made by somebody whose address is confirmed, where this
+        // install asks for that: see EnsureEmailIsVerifiedWhereRequired.
+        Route::middleware(EnsureEmailIsVerifiedWhereRequired::class)->group(function () {
+            Route::get('workspaces/create', [WorkspaceController::class, 'create'])->name('workspaces.create');
+            Route::post('workspaces', [WorkspaceController::class, 'store'])->name('workspaces.store');
+        });
+
+        Route::get('email/verify', [EmailVerificationController::class, 'notice'])
+            ->name('verification.notice');
+        Route::get('email/verify/{id}/{hash}', [EmailVerificationController::class, 'verify'])
+            ->middleware(['signed', 'throttle:6,1'])
+            ->name('verification.verify');
+        Route::post('email/verification-notification', [EmailVerificationController::class, 'send'])
+            ->middleware('throttle:6,1')
+            ->name('verification.send');
 
         Route::post('logout', [AuthenticatedSessionController::class, 'destroy'])->name('logout');
     });
@@ -109,7 +159,7 @@ Route::domain($host)->group(function () {
 
 if (! app()->isProduction()) {
     Route::domain($host)->get('widget-demo', function () {
-        $key = \App\Models\WidgetKey::withoutGlobalScopes()->where('is_active', true)->first();
+        $key = WidgetKey::withoutGlobalScopes()->where('is_active', true)->first();
 
         abort_if($key === null, 404, 'Seed the database first: ./bin/art migrate:fresh --seed');
 
@@ -131,7 +181,7 @@ if (! app()->isProduction()) {
          * on the next `migrate --seed`, and looked exactly like a broken widget
          * rather than a stale fixture.
          */
-        $key = \App\Models\WidgetKey::withoutGlobalScopes()
+        $key = WidgetKey::withoutGlobalScopes()
             ->where('is_active', true)
             ->value('public_key');
 
@@ -171,13 +221,13 @@ Route::domain('{workspace}.'.$host)->group(function () {
     // Signing in happens on the central domain, but people type the address they
     // know. Sent on with the workspace attached, so the page can offer to ask it.
     Route::get('login', fn () => redirect_across_domains(
-        central_url('login?workspace='.app(\App\Support\Tenancy\Tenancy::class)->currentOrFail()->slug),
+        central_url('login?workspace='.app(Tenancy::class)->currentOrFail()->slug),
     ))->name('workspace.login');
 
     // Asking this workspace to be let in. Only in `request` mode.
-    Route::get('request-access', [\App\Http\Controllers\AccessRequestController::class, 'create'])
+    Route::get('request-access', [AccessRequestController::class, 'create'])
         ->name('workspace.access-requests.create');
-    Route::post('request-access', [\App\Http\Controllers\AccessRequestController::class, 'store'])
+    Route::post('request-access', [AccessRequestController::class, 'store'])
         ->name('workspace.access-requests.store');
 });
 
@@ -194,16 +244,16 @@ Route::domain('{workspace}.'.$host)
         Route::patch('issues/bulk', [IssueController::class, 'bulk'])->name('issues.bulk');
 
         // Before the resource route, or /issues/export resolves as /issues/{issue}.
-        Route::get('issues/export', \App\Http\Controllers\IssueExportController::class)
+        Route::get('issues/export', IssueExportController::class)
             ->name('issues.export');
 
         // Before the resource route, for the same reason as export above: /issues/trash
         // would otherwise resolve as /issues/{issue} with a key of "trash" and 404.
-        Route::get('issues/trash', [\App\Http\Controllers\IssueTrashController::class, 'index'])
+        Route::get('issues/trash', [IssueTrashController::class, 'index'])
             ->name('issues.trash');
-        Route::post('issues/trash/{key}/restore', [\App\Http\Controllers\IssueTrashController::class, 'restore'])
+        Route::post('issues/trash/{key}/restore', [IssueTrashController::class, 'restore'])
             ->name('issues.restore');
-        Route::delete('issues/trash/{key}', [\App\Http\Controllers\IssueTrashController::class, 'forceDelete'])
+        Route::delete('issues/trash/{key}', [IssueTrashController::class, 'forceDelete'])
             ->name('issues.force-delete');
 
         Route::resource('issues', IssueController::class)->except('edit');
@@ -219,7 +269,7 @@ Route::domain('{workspace}.'.$host)
             ->name('comments.store');
         Route::post('issues/{issue}/await-client', [CommentController::class, 'await'])
             ->name('comments.await');
-        Route::post('issues/{issue}/reporter', \App\Http\Controllers\IssueReporterController::class)
+        Route::post('issues/{issue}/reporter', IssueReporterController::class)
             ->name('issues.reporter');
         Route::patch('comments/{comment}', [CommentController::class, 'update'])
             ->name('comments.update');
@@ -228,13 +278,13 @@ Route::domain('{workspace}.'.$host)
 
         // Watching is a view-level thing, not an edit: a client following their own
         // issue is not editing it.
-        Route::post('issues/{issue}/watch', [\App\Http\Controllers\IssueWatchController::class, 'store'])
+        Route::post('issues/{issue}/watch', [IssueWatchController::class, 'store'])
             ->name('issues.watch');
-        Route::delete('issues/{issue}/watch', [\App\Http\Controllers\IssueWatchController::class, 'destroy'])
+        Route::delete('issues/{issue}/watch', [IssueWatchController::class, 'destroy'])
             ->name('issues.unwatch');
 
         // The issue picker's suggestions, as JSON. Staff only; see the controller.
-        Route::get('issues-lookup', \App\Http\Controllers\IssueLookupController::class)
+        Route::get('issues-lookup', IssueLookupController::class)
             ->name('issues.lookup');
         Route::post('issues/{issue}/relations', [IssueRelationController::class, 'store'])
             ->name('relations.store');
@@ -279,161 +329,161 @@ Route::domain('{workspace}.'.$host)
         // Marking read is a POST, including the one that happens by opening an
         // entry. A GET that changes something is a GET that a link prefetcher will
         // fire on somebody's behalf.
-        Route::get('notifications', [\App\Http\Controllers\NotificationController::class, 'index'])
+        Route::get('notifications', [NotificationController::class, 'index'])
             ->name('notifications.index');
-        Route::post('notifications/read', [\App\Http\Controllers\NotificationController::class, 'readAll'])
+        Route::post('notifications/read', [NotificationController::class, 'readAll'])
             ->name('notifications.read-all');
-        Route::post('notifications/{notification}/read', [\App\Http\Controllers\NotificationController::class, 'read'])
+        Route::post('notifications/{notification}/read', [NotificationController::class, 'read'])
             ->whereNumber('notification')
             ->name('notifications.read');
 
-        Route::get('settings/notifications', [\App\Http\Controllers\NotificationPreferenceController::class, 'edit'])
+        Route::get('settings/notifications', [NotificationPreferenceController::class, 'edit'])
             ->name('notifications.edit');
-        Route::patch('settings/notifications', [\App\Http\Controllers\NotificationPreferenceController::class, 'update'])
+        Route::patch('settings/notifications', [NotificationPreferenceController::class, 'update'])
             ->name('notifications.update');
         // --- end notifications ------------------------------------------------
 
         // The whole install, not this workspace: mail, and whatever else an operator
         // needs to change without editing .env and redeploying.
         // Webhooks belong to the workspace; each may watch one project or all of them.
-        Route::post('settings/webhooks', [\App\Http\Controllers\WebhookController::class, 'store'])
+        Route::post('settings/webhooks', [WebhookController::class, 'store'])
             ->name('webhooks.store');
-        Route::patch('settings/webhooks/{webhook}', [\App\Http\Controllers\WebhookController::class, 'update'])
+        Route::patch('settings/webhooks/{webhook}', [WebhookController::class, 'update'])
             ->name('webhooks.update');
-        Route::delete('settings/webhooks/{webhook}', [\App\Http\Controllers\WebhookController::class, 'destroy'])
+        Route::delete('settings/webhooks/{webhook}', [WebhookController::class, 'destroy'])
             ->name('webhooks.destroy');
-        Route::post('settings/webhooks/{webhook}/test', [\App\Http\Controllers\WebhookController::class, 'test'])
+        Route::post('settings/webhooks/{webhook}/test', [WebhookController::class, 'test'])
             ->name('webhooks.test');
 
         // Slack and Teams channels. A webhook by another name, except the URL is the
         // credential rather than carrying one, so it is never sent back to the page.
-        Route::post('settings/chat', [\App\Http\Controllers\ChatIntegrationController::class, 'store'])
+        Route::post('settings/chat', [ChatIntegrationController::class, 'store'])
             ->name('chat.store');
-        Route::patch('settings/chat/{chatIntegration}', [\App\Http\Controllers\ChatIntegrationController::class, 'update'])
+        Route::patch('settings/chat/{chatIntegration}', [ChatIntegrationController::class, 'update'])
             ->name('chat.update');
-        Route::delete('settings/chat/{chatIntegration}', [\App\Http\Controllers\ChatIntegrationController::class, 'destroy'])
+        Route::delete('settings/chat/{chatIntegration}', [ChatIntegrationController::class, 'destroy'])
             ->name('chat.destroy');
-        Route::post('settings/chat/{chatIntegration}/test', [\App\Http\Controllers\ChatIntegrationController::class, 'test'])
+        Route::post('settings/chat/{chatIntegration}/test', [ChatIntegrationController::class, 'test'])
             ->name('chat.test');
 
-        Route::post('projects/{project}/branding', [\App\Http\Controllers\BrandingController::class, 'update'])
+        Route::post('projects/{project}/branding', [BrandingController::class, 'update'])
             ->name('branding.update');
 
         // Bringing a backlog over from another tracker.
         // The Import page, per project; with none, it asks which.
-        Route::get('import', [\App\Http\Controllers\ImportController::class, 'index'])
+        Route::get('import', [ImportController::class, 'index'])
             ->name('imports.choose');
-        Route::get('projects/{project}/import', [\App\Http\Controllers\ImportController::class, 'index'])
+        Route::get('projects/{project}/import', [ImportController::class, 'index'])
             ->name('imports.index');
         // Before imports/{import}, or "template" is read as an import id.
-        Route::get('projects/{project}/imports/template', [\App\Http\Controllers\ImportController::class, 'template'])
+        Route::get('projects/{project}/imports/template', [ImportController::class, 'template'])
             ->name('imports.template');
-        Route::post('projects/{project}/imports', [\App\Http\Controllers\ImportController::class, 'store'])
+        Route::post('projects/{project}/imports', [ImportController::class, 'store'])
             ->name('imports.store');
-        Route::get('projects/{project}/imports/{import}', [\App\Http\Controllers\ImportController::class, 'show'])
+        Route::get('projects/{project}/imports/{import}', [ImportController::class, 'show'])
             ->name('imports.show');
-        Route::patch('projects/{project}/imports/{import}', [\App\Http\Controllers\ImportController::class, 'update'])
+        Route::patch('projects/{project}/imports/{import}', [ImportController::class, 'update'])
             ->name('imports.update');
-        Route::delete('projects/{project}/imports/{import}', [\App\Http\Controllers\ImportController::class, 'destroy'])
+        Route::delete('projects/{project}/imports/{import}', [ImportController::class, 'destroy'])
             ->name('imports.destroy');
 
         // Releases live under their project: "2.4.1" means nothing on its own.
-        Route::get('projects/{project}/versions/{version}', [\App\Http\Controllers\VersionController::class, 'show'])
+        Route::get('projects/{project}/versions/{version}', [VersionController::class, 'show'])
             ->name('versions.show');
-        Route::post('projects/{project}/versions', [\App\Http\Controllers\VersionController::class, 'store'])
+        Route::post('projects/{project}/versions', [VersionController::class, 'store'])
             ->name('versions.store');
-        Route::patch('projects/{project}/versions/{version}', [\App\Http\Controllers\VersionController::class, 'update'])
+        Route::patch('projects/{project}/versions/{version}', [VersionController::class, 'update'])
             ->name('versions.update');
-        Route::delete('projects/{project}/versions/{version}', [\App\Http\Controllers\VersionController::class, 'destroy'])
+        Route::delete('projects/{project}/versions/{version}', [VersionController::class, 'destroy'])
             ->name('versions.destroy');
-        Route::post('projects/{project}/phases', [\App\Http\Controllers\PhaseController::class, 'store'])
+        Route::post('projects/{project}/phases', [PhaseController::class, 'store'])
             ->name('phases.store');
         // Before {phase}, so "order" is not read as a phase id.
-        Route::put('projects/{project}/phases/order', [\App\Http\Controllers\PhaseController::class, 'reorder'])
+        Route::put('projects/{project}/phases/order', [PhaseController::class, 'reorder'])
             ->name('phases.reorder');
-        Route::patch('projects/{project}/phases/{phase}', [\App\Http\Controllers\PhaseController::class, 'update'])
+        Route::patch('projects/{project}/phases/{phase}', [PhaseController::class, 'update'])
             ->name('phases.update');
-        Route::delete('projects/{project}/phases/{phase}', [\App\Http\Controllers\PhaseController::class, 'destroy'])
+        Route::delete('projects/{project}/phases/{phase}', [PhaseController::class, 'destroy'])
             ->name('phases.destroy');
 
-        Route::patch('issues/{issue}/parent', \App\Http\Controllers\IssueParentController::class)
+        Route::patch('issues/{issue}/parent', IssueParentController::class)
             ->name('issues.parent');
-        Route::patch('issues/{issue}/rank', \App\Http\Controllers\IssueRankController::class)
+        Route::patch('issues/{issue}/rank', IssueRankController::class)
             ->name('issues.rank');
         // --- the optional timer ---
-        Route::post('issues/{issue}/timer', [\App\Http\Controllers\TimerController::class, 'start'])
+        Route::post('issues/{issue}/timer', [TimerController::class, 'start'])
             ->name('timer.start');
-        Route::post('timer/stop', [\App\Http\Controllers\TimerController::class, 'stop'])
+        Route::post('timer/stop', [TimerController::class, 'stop'])
             ->name('timer.stop');
-        Route::delete('timer', [\App\Http\Controllers\TimerController::class, 'discard'])
+        Route::delete('timer', [TimerController::class, 'discard'])
             ->name('timer.discard');
         // --- end ---
 
-        Route::post('issues/{issue}/time', [\App\Http\Controllers\TimeEntryController::class, 'store'])
+        Route::post('issues/{issue}/time', [TimeEntryController::class, 'store'])
             ->name('time.store');
-        Route::delete('time/{entry}', [\App\Http\Controllers\TimeEntryController::class, 'destroy'])
+        Route::delete('time/{entry}', [TimeEntryController::class, 'destroy'])
             ->name('time.destroy');
-        Route::patch('issues/{issue}/estimate', [\App\Http\Controllers\TimeEntryController::class, 'estimate'])
+        Route::patch('issues/{issue}/estimate', [TimeEntryController::class, 'estimate'])
             ->name('time.estimate');
-        Route::get('insights', \App\Http\Controllers\InsightsController::class)
+        Route::get('insights', InsightsController::class)
             ->name('insights');
-        Route::get('workload', \App\Http\Controllers\WorkloadController::class)
+        Route::get('workload', WorkloadController::class)
             ->name('workload');
-        Route::post('time-off', [\App\Http\Controllers\TimeOffController::class, 'store'])
+        Route::post('time-off', [TimeOffController::class, 'store'])
             ->name('time-off.store');
-        Route::delete('time-off/{timeOff}', [\App\Http\Controllers\TimeOffController::class, 'destroy'])
+        Route::delete('time-off/{timeOff}', [TimeOffController::class, 'destroy'])
             ->name('time-off.destroy');
 
         // --- timeline ---------------------------------------------------------
         // Issues as bars on a date axis. Staff only, enforced in the controller
         // rather than by a middleware, so the check sits beside the reason for it.
-        Route::get('timeline', \App\Http\Controllers\TimelineController::class)
+        Route::get('timeline', TimelineController::class)
             ->name('timeline');
         // Dragging on the timeline. Refused if the issue changed since it was loaded.
-        Route::patch('issues/{issue}/schedule', \App\Http\Controllers\IssueScheduleController::class)
+        Route::patch('issues/{issue}/schedule', IssueScheduleController::class)
             ->name('issues.schedule');
         // --- end timeline -----------------------------------------------------
-        Route::get('time', [\App\Http\Controllers\TimeReportController::class, 'index'])
+        Route::get('time', [TimeReportController::class, 'index'])
             ->name('time.index');
-        Route::get('time/export', [\App\Http\Controllers\TimeReportController::class, 'export'])
+        Route::get('time/export', [TimeReportController::class, 'export'])
             ->name('time.export');
 
-        Route::post('projects/{project}/fields', [\App\Http\Controllers\CustomFieldController::class, 'store'])
+        Route::post('projects/{project}/fields', [CustomFieldController::class, 'store'])
             ->name('fields.store');
-        Route::patch('projects/{project}/fields/{field}', [\App\Http\Controllers\CustomFieldController::class, 'update'])
+        Route::patch('projects/{project}/fields/{field}', [CustomFieldController::class, 'update'])
             ->name('fields.update');
-        Route::delete('projects/{project}/fields/{field}', [\App\Http\Controllers\CustomFieldController::class, 'destroy'])
+        Route::delete('projects/{project}/fields/{field}', [CustomFieldController::class, 'destroy'])
             ->name('fields.destroy');
 
-        Route::get('settings/instance', [\App\Http\Controllers\InstanceSettingsController::class, 'edit'])
+        Route::get('settings/instance', [InstanceSettingsController::class, 'edit'])
             ->name('instance.edit');
-        Route::patch('settings/instance', [\App\Http\Controllers\InstanceSettingsController::class, 'update'])
+        Route::patch('settings/instance', [InstanceSettingsController::class, 'update'])
             ->name('instance.update');
-        Route::post('settings/instance/test-mail', [\App\Http\Controllers\InstanceSettingsController::class, 'test'])
+        Route::post('settings/instance/test-mail', [InstanceSettingsController::class, 'test'])
             ->name('instance.test-mail');
-        Route::patch('settings/instance/registration', [\App\Http\Controllers\InstanceSettingsController::class, 'registration'])
+        Route::patch('settings/instance/registration', [InstanceSettingsController::class, 'registration'])
             ->name('instance.registration');
         // By id rather than bound: the tenant scope would hide every request that is
         // not for the workspace the operator happens to be standing in.
-        Route::post('settings/instance/access-requests/{id}/approve', [\App\Http\Controllers\InstanceAccessRequestController::class, 'approve'])
+        Route::post('settings/instance/access-requests/{id}/approve', [InstanceAccessRequestController::class, 'approve'])
             ->whereNumber('id')
             ->name('instance.access-requests.approve');
-        Route::post('settings/instance/access-requests/{id}/decline', [\App\Http\Controllers\InstanceAccessRequestController::class, 'decline'])
+        Route::post('settings/instance/access-requests/{id}/decline', [InstanceAccessRequestController::class, 'decline'])
             ->whereNumber('id')
             ->name('instance.access-requests.decline');
 
         // This workspace's own requests, for the people who can invite to it.
-        Route::get('settings/access-requests', [\App\Http\Controllers\WorkspaceAccessRequestController::class, 'index'])
+        Route::get('settings/access-requests', [WorkspaceAccessRequestController::class, 'index'])
             ->name('access-requests.index');
-        Route::post('settings/access-requests/{accessRequest}/approve', [\App\Http\Controllers\WorkspaceAccessRequestController::class, 'approve'])
+        Route::post('settings/access-requests/{accessRequest}/approve', [WorkspaceAccessRequestController::class, 'approve'])
             ->name('access-requests.approve');
-        Route::post('settings/access-requests/{accessRequest}/decline', [\App\Http\Controllers\WorkspaceAccessRequestController::class, 'decline'])
+        Route::post('settings/access-requests/{accessRequest}/decline', [WorkspaceAccessRequestController::class, 'decline'])
             ->name('access-requests.decline');
 
         // API tokens. Created and revoked here; the API itself lives in routes/api.php.
-        Route::post('settings/tokens', [\App\Http\Controllers\ApiTokenController::class, 'store'])
+        Route::post('settings/tokens', [ApiTokenController::class, 'store'])
             ->name('tokens.store');
-        Route::delete('settings/tokens/{apiToken}', [\App\Http\Controllers\ApiTokenController::class, 'destroy'])
+        Route::delete('settings/tokens/{apiToken}', [ApiTokenController::class, 'destroy'])
             ->name('tokens.destroy');
 
         Route::get('settings/workspace', [WorkspaceSettingsController::class, 'edit'])
@@ -466,13 +516,13 @@ Route::domain('{workspace}.'.$host)
             ->name('members.tier');
         Route::patch('settings/members/{user}/capacity', [MemberController::class, 'capacity'])
             ->name('members.capacity');
-        Route::post('settings/disciplines', [\App\Http\Controllers\DisciplineController::class, 'store'])
+        Route::post('settings/disciplines', [DisciplineController::class, 'store'])
             ->name('disciplines.store');
-        Route::patch('settings/disciplines', [\App\Http\Controllers\DisciplineController::class, 'update'])
+        Route::patch('settings/disciplines', [DisciplineController::class, 'update'])
             ->name('disciplines.update');
-        Route::put('settings/disciplines/order', [\App\Http\Controllers\DisciplineController::class, 'reorder'])
+        Route::put('settings/disciplines/order', [DisciplineController::class, 'reorder'])
             ->name('disciplines.reorder');
-        Route::delete('settings/disciplines', [\App\Http\Controllers\DisciplineController::class, 'destroy'])
+        Route::delete('settings/disciplines', [DisciplineController::class, 'destroy'])
             ->name('disciplines.destroy');
         Route::delete('settings/members/{user}', [MemberController::class, 'remove'])
             ->name('members.remove');
@@ -498,22 +548,22 @@ Route::domain('{workspace}.'.$host)
 */
 
 Route::domain($host)->middleware('guest')->group(function () {
-    Route::get('two-factor', [\App\Http\Controllers\Auth\TwoFactorChallengeController::class, 'create'])
+    Route::get('two-factor', [TwoFactorChallengeController::class, 'create'])
         ->name('two-factor.challenge');
-    Route::post('two-factor', [\App\Http\Controllers\Auth\TwoFactorChallengeController::class, 'store']);
+    Route::post('two-factor', [TwoFactorChallengeController::class, 'store']);
 });
 
 Route::domain('{workspace}.'.$host)
     ->middleware(['auth', 'workspace'])
     ->group(function () {
-        Route::get('settings/two-factor', [\App\Http\Controllers\TwoFactorController::class, 'edit'])
+        Route::get('settings/two-factor', [TwoFactorController::class, 'edit'])
             ->name('two-factor.edit');
-        Route::post('settings/two-factor', [\App\Http\Controllers\TwoFactorController::class, 'store'])
+        Route::post('settings/two-factor', [TwoFactorController::class, 'store'])
             ->name('two-factor.store');
-        Route::post('settings/two-factor/confirm', [\App\Http\Controllers\TwoFactorController::class, 'confirm'])
+        Route::post('settings/two-factor/confirm', [TwoFactorController::class, 'confirm'])
             ->name('two-factor.confirm');
-        Route::post('settings/two-factor/recovery-codes', [\App\Http\Controllers\TwoFactorController::class, 'recoveryCodes'])
+        Route::post('settings/two-factor/recovery-codes', [TwoFactorController::class, 'recoveryCodes'])
             ->name('two-factor.recovery-codes');
-        Route::delete('settings/two-factor', [\App\Http\Controllers\TwoFactorController::class, 'destroy'])
+        Route::delete('settings/two-factor', [TwoFactorController::class, 'destroy'])
             ->name('two-factor.destroy');
     });

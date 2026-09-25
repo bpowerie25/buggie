@@ -88,6 +88,8 @@ class DeliverWebhook implements ShouldQueue
                     // Left to us, not the receiver: a redirect is how an endpoint
                     // that passed the safety check sends us somewhere that would not.
                     ->withoutRedirecting()
+                    // To the address just checked, not a fresh lookup of the name.
+                    ->withOptions(SafeUrl::pinned($webhook->url))
                     ->post($webhook->url);
 
                 $this->record($webhook, $response->status(), null, $started);

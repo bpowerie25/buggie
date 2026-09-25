@@ -216,6 +216,15 @@ A mention passes `internal` like a comment does.
 is posted as the person the address was issued to; the `From:` header decides nothing,
 here or on emailed new issues, because anybody can write it.
 
+**Sessions end when the password changes** (`App\Http\Middleware\AuthenticateSession`,
+a wrapper that skips token requests). Every sign-in forgets the remembered hash
+(`AppServiceProvider`), or a second person signing in on the same browser session would
+be measured against the first person's password and signed straight out.
+
+**Verified email is required only where an address grants something:** creating a
+workspace when `buggie.require_verified_email` is on (the hosted default), and being
+named in `BUGGIE_OPERATORS`. Accepting an invitation verifies. It needs working mail.
+
 **Project grants live in `project_user`, which has no `workspace_id`.** `detach()` with
 no ids and `sync()` therefore act on every workspace a person belongs to. Always pass
 this workspace's project ids.

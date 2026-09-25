@@ -142,7 +142,7 @@ Every line marked `CHANGE ME`. Generate the secrets on the spot:
 
 ```sh
 openssl rand -base64 32   # DB_PASSWORD
-openssl rand -hex 32      # MAIL_INBOUND_SECRET
+openssl rand -hex 32      # MAILGUN_SIGNING_KEY
 ```
 
 `CLOUDFLARE_API_TOKEN` and `ACME_EMAIL` come from §2. `BUGGIE_OPERATORS` is your own
@@ -161,6 +161,12 @@ the image, so give it a few minutes.
 
 An unset `APP_KEY` produces a bare "Server Error" with nothing in the log to explain
 it. `deploy.sh` refuses to run without one rather than let you find that out live.
+
+**Keep a copy of `APP_KEY` somewhere other than this server,** in a password manager.
+The backups hold the database but not `.env`, on purpose, and the key decrypts the
+encrypted columns: two-factor secrets, widget and webhook secrets, chat URLs. Lose
+the server without a copy of the key and a restored database comes back with those
+unreadable.
 
 ---
 

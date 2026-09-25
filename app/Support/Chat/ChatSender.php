@@ -49,6 +49,8 @@ class ChatSender
                 // Redirects are not followed: a redirect is how an address that
                 // passed the safety check sends us somewhere that would not.
                 ->withoutRedirecting()
+                // To the address just checked, not a fresh lookup of the name.
+                ->withOptions(SafeUrl::pinned($endpoint))
                 ->post($endpoint, $body);
         } catch (Throwable $e) {
             $this->record($integration, $event, null, $e->getMessage(), $attempt, $started);

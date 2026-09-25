@@ -1,9 +1,22 @@
 <?php
 
+use App\Http\Middleware\AuthenticateSession;
+use App\Http\Middleware\EnsureRegistrationIsOpen;
+use App\Http\Middleware\EnsureWorkspaceMember;
+use App\Http\Middleware\HandleInertiaRequests;
+use App\Http\Middleware\RequireHostedMode;
+use App\Http\Middleware\ResolveWorkspace;
+use App\Http\Middleware\SecurityHeaders;
+use App\Support\Tenancy\Tenancy;
+use Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets;
 use Illuminate\Http\Request;
+use Laravel\Sanctum\Http\Middleware\CheckAbilities;
+use Laravel\Sanctum\Http\Middleware\CheckForAnyAbility;
+use Sentry\Laravel\Integration;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -16,9 +29,14 @@ return Application::configure(basePath: dirname(__DIR__))
         // Runs on every web request: binds the tenant and turns on strict mode,
         // so a tenant query with no workspace resolved throws instead of leaking.
         $middleware->web(append: [
-            \App\Http\Middleware\ResolveWorkspace::class,
-            \App\Http\Middleware\HandleInertiaRequests::class,
-            \Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets::class,
+            // Remembers the password hash in each session and ends any session whose
+            // hash no longer matches: resetting a password signs out every other
+            // browser, including one somebody else was using.
+            SecurityHeaders::class,
+            AuthenticateSession::class,
+            ResolveWorkspace::class,
+            HandleInertiaRequests::class,
+            AddLinkHeadersForPreloadedAssets::class,
         ]);
 
         // An authenticated visitor hitting /login or /register is sent to the central
@@ -33,7 +51,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // page can offer to ask it for access. The tenant is already resolved: see
         // the priority list below.
         $middleware->redirectGuestsTo(function () {
-            $workspace = app(\App\Support\Tenancy\Tenancy::class)->current();
+            $workspace = app(Tenancy::class)->current();
 
             return central_url($workspace ? 'login?workspace='.$workspace->slug : 'login');
         });
@@ -54,28 +72,28 @@ return Application::configure(basePath: dirname(__DIR__))
         ))));
 
         $middleware->alias([
-            'workspace' => \App\Http\Middleware\EnsureWorkspaceMember::class,
-            'hosted' => \App\Http\Middleware\RequireHostedMode::class,
-            'registration' => \App\Http\Middleware\EnsureRegistrationIsOpen::class,
+            'workspace' => EnsureWorkspaceMember::class,
+            'hosted' => RequireHostedMode::class,
+            'registration' => EnsureRegistrationIsOpen::class,
 
             // Sanctum ships these but registers no aliases, so the API's
             // `abilities:read` would otherwise resolve as a class name.
-            'abilities' => \Laravel\Sanctum\Http\Middleware\CheckAbilities::class,
-            'ability' => \Laravel\Sanctum\Http\Middleware\CheckForAnyAbility::class,
+            'abilities' => CheckAbilities::class,
+            'ability' => CheckForAnyAbility::class,
         ]);
 
         // The tenant must resolve before auth (an unknown subdomain is a 404, not a
         // redirect to login) and before SubstituteBindings (ResolveWorkspace drops the
         // {workspace} domain parameter so controllers never have to accept it).
         $middleware->prependToPriorityList(
-            before: \Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests::class,
-            prepend: \App\Http\Middleware\ResolveWorkspace::class,
+            before: AuthenticatesRequests::class,
+            prepend: ResolveWorkspace::class,
         );
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         // Opt-in: with no SENTRY_LARAVEL_DSN set this does nothing, so a self-hosted
         // install never reports anything to anybody.
-        \Sentry\Laravel\Integration::handles($exceptions);
+        Integration::handles($exceptions);
 
         $exceptions->shouldRenderJsonWhen(
             fn (Request $request) => $request->is('api/*') || $request->expectsJson(),

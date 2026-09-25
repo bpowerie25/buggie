@@ -2,9 +2,12 @@
 
 namespace App\Models;
 
+use App\Enums\NotificationReason;
 use App\Enums\WorkspaceRole;
 use App\Models\Concerns\HasTwoFactorAuthentication;
+use App\Notifications\VerifyEmailAddress;
 use Database\Factories\UserFactory;
+use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -13,6 +16,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
+use Laravel\Sanctum\NewAccessToken;
 
 /**
  * Users are global, not workspace-owned: one account can belong to several
@@ -26,7 +30,7 @@ use Laravel\Sanctum\HasApiTokens;
 // leaks into a serialised user — page props, an API payload, a log line — is a
 // second factor somebody else also holds.
 #[Hidden(['password', 'remember_token', 'two_factor_secret', 'two_factor_recovery_codes'])]
-class User extends Authenticatable
+class User extends Authenticatable implements MustVerifyEmail
 {
     /** @use HasFactory<UserFactory> */
     use HasApiTokens, HasFactory, HasTwoFactorAuthentication, Notifiable;
@@ -93,7 +97,7 @@ class User extends Authenticatable
     }
 
     /** Opt-out rather than opt-in: silence should be chosen, not the default. */
-    public function wantsNotification(\App\Enums\NotificationReason $reason): bool
+    public function wantsNotification(NotificationReason $reason): bool
     {
         return (bool) ($this->notification_settings[$reason->value] ?? $reason->defaultEnabled());
     }
@@ -112,7 +116,7 @@ class User extends Authenticatable
         string $name,
         array $abilities = ['read'],
         ?\DateTimeInterface $expiresAt = null,
-    ): \Laravel\Sanctum\NewAccessToken {
+    ): NewAccessToken {
         $plainTextToken = $this->generateTokenString();
 
         $token = $this->tokens()->create([
@@ -123,7 +127,7 @@ class User extends Authenticatable
             'expires_at' => $expiresAt,
         ]);
 
-        return new \Laravel\Sanctum\NewAccessToken($token, $token->getKey().'|'.$plainTextToken);
+        return new NewAccessToken($token, $token->getKey().'|'.$plainTextToken);
     }
 
     public function initials(): string
@@ -133,5 +137,14 @@ class User extends Authenticatable
         return strtoupper(collect($parts)->take(2)->map(
             fn (string $p) => mb_substr($p, 0, 1)
         )->implode(''));
+    }
+
+    /**
+     * Queued, so a mail server that is down or not set up yet cannot make
+     * registering fail. The link can be sent again from the verification page.
+     */
+    public function sendEmailVerificationNotification(): void
+    {
+        $this->notify(new VerifyEmailAddress);
     }
 }

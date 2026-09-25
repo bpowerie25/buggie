@@ -279,7 +279,7 @@ class ReporterIdentityTest extends TestCase
     #[Test]
     public function only_staff_who_manage_the_project_can_rotate(): void
     {
-        $this->actingAs($this->kennco)->post($this->workspaceUrl($this->workspace, "/widget-keys/{$this->key->public_key}/secret"))->assertForbidden();
+        $this->actingAs($this->kennco)->post($this->workspaceUrl($this->workspace, "/widget-keys/{$this->key->public_key}/secret"))->assertNotFound();
     }
 
     // --- rate limits --------------------------------------------------------------

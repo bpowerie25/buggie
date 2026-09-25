@@ -23,7 +23,11 @@ BACKUP_DIR="${BUGGIE_BACKUP_DIR:-/srv/backups}"
 KEEP_DAYS=14
 
 cd "$APP_DIR"
+# The dumps are the whole database, users and client data included: readable by
+# this account only, not by everybody on the box.
+umask 077
 mkdir -p "$BACKUP_DIR"
+chmod 700 "$BACKUP_DIR"
 
 stamp="$(date +%Y%m%d-%H%M%S)"
 db="$BACKUP_DIR/db-$stamp.sql.gz"

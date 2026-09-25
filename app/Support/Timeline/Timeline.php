@@ -6,6 +6,7 @@ use App\Enums\RelationType;
 use App\Enums\StatusCategory;
 use App\Models\Issue;
 use App\Models\Phase;
+use App\Models\Project;
 use App\Models\User;
 use App\Support\Issues\AuthorLabel;
 use App\Support\Issues\IssueQuery;
@@ -172,7 +173,7 @@ class Timeline
      *
      * @return array{rows: array<int, array<string, mixed>>, unscheduled: array<int, string>}
      */
-    public function phaseSummary(\App\Models\Project $project): array
+    public function phaseSummary(Project $project): array
     {
         $rows = [];
         $unscheduled = [];
@@ -734,11 +735,16 @@ class Timeline
     {
         return [
             'key' => $issue->key,
-            'version' => $issue->scheduleVersion(),
+            // A client cannot drag, so has no use for it.
+            'version' => $this->forClient ? null : $issue->scheduleVersion(),
             'title' => $issue->title,
             'project' => $issue->project->name,
             'status' => $issue->status->name,
-            'assignee' => $issue->assignee?->name,
+            // Named as forClientRow names a bar's assignee: the team as the workspace.
+            'assignee' => $issue->assignee === null ? null
+                : ($this->forClient
+                    ? AuthorLabel::for($issue->assignee, app(Tenancy::class)->currentOrFail(), readerIsStaff: false)
+                    : $issue->assignee->name),
             'open' => $issue->status->category->isOpen(),
             'phase' => $issue->phase?->name,
         ];

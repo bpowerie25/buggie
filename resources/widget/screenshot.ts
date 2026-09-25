@@ -10,6 +10,10 @@ import { maskForCapture } from './redact';
 
 const HTML2CANVAS_SRC =
     'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+// Pinned: the script runs inside our customers' pages, so a changed file on the CDN
+// must fail to load rather than run. Matches the hash cdnjs publishes for 1.4.1.
+const HTML2CANVAS_INTEGRITY =
+    'sha512-BNaRQnYJYiPSqHHDb58B0yaPfCu+Wgds8Gp/gU33kqBtgNS4tSPHuGibyoeqMV/TJlSKda6FXzoEyYGjTe+vXA==';
 
 const MAX_WIDTH = 1600;
 
@@ -31,6 +35,7 @@ function load(): Promise<Html2Canvas | null> {
 
             const script = document.createElement('script');
             script.src = HTML2CANVAS_SRC;
+            script.integrity = HTML2CANVAS_INTEGRITY;
             script.crossOrigin = 'anonymous';
             script.onload = () => {
                 clearTimeout(timer);

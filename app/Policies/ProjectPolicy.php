@@ -6,6 +6,7 @@ use App\Enums\WorkspaceRole;
 use App\Models\Project;
 use App\Models\User;
 use App\Support\Tenancy\Tenancy;
+use Illuminate\Auth\Access\Response;
 
 /**
  * Tenancy is already enforced by WorkspaceScope — a project from another workspace
@@ -20,7 +21,7 @@ class ProjectPolicy
         return $this->role($user) !== null;
     }
 
-    public function view(User $user, Project $project): bool
+    public function view(User $user, Project $project): bool|Response
     {
         $role = $this->role($user);
 
@@ -28,9 +29,12 @@ class ProjectPolicy
             return false;
         }
 
-        // Staff reach every project; clients only the ones they were granted.
-        return $role->isStaff()
-            || $project->clients()->whereKey($user->id)->exists();
+        // Staff reach every project; clients only the ones they were granted. For a
+        // client the refusal is a 404: a 403 would confirm that a project with that
+        // name exists, and project names are customer names.
+        return $role->isStaff() || $project->clients()->whereKey($user->id)->exists()
+            ? true
+            : Response::denyAsNotFound();
     }
 
     public function create(User $user): bool
@@ -38,8 +42,13 @@ class ProjectPolicy
         return $this->role($user)?->canManageProjects() ?? false;
     }
 
-    public function update(User $user, Project $project): bool
+    public function update(User $user, Project $project): bool|Response
     {
+        // A client is never told a project's settings page exists: 404, as above.
+        if ($this->role($user) === WorkspaceRole::Client) {
+            return Response::denyAsNotFound();
+        }
+
         return $this->create($user);
     }
 

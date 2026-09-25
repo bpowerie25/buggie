@@ -53,6 +53,55 @@ class SafeUrl
         '240.0.0.0/4',      // reserved
     ];
 
+    /**
+     * IPv6 ranges that reach IPv4 or private space by another name. PHP's filter
+     * flags know the obvious ones; these are the translation and tunnelling forms a
+     * gateway may quietly route to an internal IPv4 address.
+     */
+    private const BLOCKED6 = [
+        '::ffff:0:0/96',    // IPv4-mapped
+        '64:ff9b::/96',     // NAT64
+        '64:ff9b:1::/48',   // local NAT64
+        '2002::/16',        // 6to4
+        'fc00::/7',         // unique local
+        'fe80::/10',        // link-local
+    ];
+
+    /**
+     * Options that make the HTTP client connect to exactly the address check() just
+     * approved.
+     *
+     * Checking a name and then letting the client resolve it again leaves a gap: a
+     * name with a short TTL can answer with a public address for the check and an
+     * internal one a moment later for the request. Pinning closes it — the request
+     * goes to the address that was checked, whatever DNS says by then. Call it only
+     * after check() has passed.
+     *
+     * @return array<string, mixed>
+     */
+    public static function pinned(string $url): array
+    {
+        $parts = parse_url($url);
+        $host = $parts['host'] ?? null;
+
+        if ($host === null || filter_var(trim($host, '[]'), FILTER_VALIDATE_IP)) {
+            return [];
+        }
+
+        $address = self::resolve($host)[0] ?? null;
+
+        if ($address === null || self::isPrivate($address)) {
+            // Changed between the check and now. Point it nowhere rather than let
+            // the client look it up again.
+            $address = '0.0.0.0';
+        }
+
+        $port = $parts['port'] ?? (strtolower($parts['scheme'] ?? 'https') === 'http' ? 80 : 443);
+        $target = str_contains($address, ':') ? "[{$address}]" : $address;
+
+        return ['curl' => [CURLOPT_RESOLVE => ["{$host}:{$port}:{$target}"]]];
+    }
+
     /** @return array{0: bool, 1: string|null} ok, and why not */
     public static function check(string $url): array
     {
@@ -134,7 +183,40 @@ class SafeUrl
             }
         }
 
+        foreach (self::BLOCKED6 as $range) {
+            if (self::inRange6($address, $range)) {
+                return true;
+            }
+        }
+
         return false;
+    }
+
+    private static function inRange6(string $address, string $cidr): bool
+    {
+        [$subnet, $bits] = explode('/', $cidr);
+
+        $ip = @inet_pton($address);
+        $net = @inet_pton($subnet);
+
+        if ($ip === false || $net === false || strlen($ip) !== 16 || strlen($net) !== 16) {
+            return false;
+        }
+
+        $bytes = intdiv((int) $bits, 8);
+        $rest = (int) $bits % 8;
+
+        if (substr($ip, 0, $bytes) !== substr($net, 0, $bytes)) {
+            return false;
+        }
+
+        if ($rest === 0) {
+            return true;
+        }
+
+        $mask = (0xFF << (8 - $rest)) & 0xFF;
+
+        return (ord($ip[$bytes]) & $mask) === (ord($net[$bytes]) & $mask);
     }
 
     private static function inRange(string $address, string $cidr): bool

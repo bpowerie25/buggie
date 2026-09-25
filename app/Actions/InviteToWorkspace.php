@@ -2,6 +2,7 @@
 
 namespace App\Actions;
 
+use App\Enums\ProjectRole;
 use App\Enums\WorkspaceRole;
 use App\Models\Invitation;
 use App\Models\Project;
@@ -37,7 +38,7 @@ class InviteToWorkspace
         // Only for projects actually granted, and only tiers that mean something.
         $projectRoles = collect($projectRoles)
             ->only($projectIds)
-            ->filter(fn ($tier) => in_array($tier, array_column(\App\Enums\ProjectRole::grantable(), 'value'), true))
+            ->filter(fn ($tier) => in_array($tier, array_column(ProjectRole::grantable(), 'value'), true))
             ->all();
 
         return DB::transaction(function () use ($email, $role, $projectIds, $invitedBy, $projectRoles) {
@@ -97,12 +98,18 @@ class InviteToWorkspace
 
                 foreach ($projects as $project) {
                     $project->clients()->syncWithoutDetaching([$user->id => [
-                        'role' => $invitation->project_roles[$project->id] ?? \App\Enums\ProjectRole::Client->value,
+                        'role' => $invitation->project_roles[$project->id] ?? ProjectRole::Client->value,
                     ]]);
                 }
             }
 
             $invitation->forceFill(['accepted_at' => now()])->save();
+
+            // The invitation went to this address and is only accepted by it, so
+            // following the link proves the address as well as a verification link.
+            if (! $user->hasVerifiedEmail()) {
+                $user->markEmailAsVerified();
+            }
 
             $user->forceFill(['last_workspace_id' => $workspace->id])->save();
         });

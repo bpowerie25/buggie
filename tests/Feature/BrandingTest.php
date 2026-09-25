@@ -180,6 +180,6 @@ class BrandingTest extends TestCase
             ->post($this->workspaceUrl($workspace, "/projects/{$project->slug}/branding"), [
                 'brand_name' => 'Mine now',
             ])
-            ->assertForbidden();
+            ->assertNotFound(); // 404 to a client: not even told the settings exist
     }
 }

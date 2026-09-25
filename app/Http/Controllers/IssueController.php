@@ -465,7 +465,9 @@ class IssueController extends Controller
 
             // The releases this issue could belong to: its own project's, and the
             // unreleased ones first, because that is what anybody is choosing between.
-            'versions' => Version::where('project_id', $issue->project_id)
+            // Staff only: it feeds the release picker, and unreleased version names
+            // are plans a client has not been told about.
+            'versions' => ! $staff ? [] : Version::where('project_id', $issue->project_id)
                 ->inWorkingOrder()
                 ->get()
                 ->map(fn (Version $v) => [

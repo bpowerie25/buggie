@@ -2,9 +2,10 @@
 
 namespace App\Http\Controllers;
 
-use App\Enums\IssueVisibility;
 use App\Models\Comment;
 use App\Models\PortalToken;
+use App\Support\Issues\AuthorLabel;
+use App\Support\Issues\ClientConversation;
 use App\Support\RichText\TiptapDocument;
 use App\Support\Tenancy\Tenancy;
 use Illuminate\Http\RedirectResponse;
@@ -47,7 +48,6 @@ class PortalController extends Controller
                     // Category, not the customer's status name: "Won't Fix" needs
                     // explaining to a reporter, "closed" does not.
                     'state' => $issue->status->category->isOpen() ? 'open' : 'closed',
-                    'status' => $issue->status->name,
                     'created_at' => $issue->created_at->toIso8601String(),
                 ],
                 'comments' => $issue->comments()
@@ -57,7 +57,11 @@ class PortalController extends Controller
                     ->map(fn (Comment $comment) => [
                         'id' => $comment->id,
                         'body' => $comment->body,
-                        'author' => $comment->displayName(),
+                        // The team as the workspace, as everywhere a client looks; the
+                        // reporter's own words under their own address.
+                        'author' => $comment->author
+                            ? AuthorLabel::for($comment->author, $portal->workspace, readerIsStaff: false)
+                            : $comment->displayName(),
                         'is_you' => $comment->author_email === $portal->email,
                         'created_at' => $comment->created_at->toIso8601String(),
                     ]),
@@ -111,16 +115,16 @@ class PortalController extends Controller
                 'source' => 'portal',
             ]);
 
-            // Someone replying to their own report expects to be kept informed.
-            if ($issue->visibility !== IssueVisibility::Client) {
-                $issue->forceFill(['visibility' => IssueVisibility::Client->value])->save();
-            }
+            // The issue's visibility is left alone. The portal reaches this issue
+            // through its token whatever the visibility, so the reporter loses
+            // nothing; switching it to client-visible here used to show an issue the
+            // team had kept internal to every client holding the project.
 
             $issue->touch();
 
             // A reporter without an account is still the client side of the
             // conversation, and their answer counts the same as a client's.
-            app(\App\Support\Issues\ClientConversation::class)
+            app(ClientConversation::class)
                 ->clientReplied($issue, null, $comment->body_text, $portal->email);
         });
 

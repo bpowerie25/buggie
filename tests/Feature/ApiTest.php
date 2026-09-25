@@ -2,7 +2,6 @@
 
 namespace Tests\Feature;
 
-use App\Enums\IssueVisibility;
 use App\Enums\WorkspaceRole;
 use App\Models\ApiToken;
 use App\Models\Issue;
@@ -58,8 +57,9 @@ class ApiTest extends TestCase
         // Minted directly: whether clients may create tokens is a separate question.
         $token = $this->tokenFor($client, $workspace);
 
+        // Refused before it gets that far: tokens are for staff.
         $this->api($token, 'POST', $this->apiUrl($workspace, 'issues'), ['project_id' => $theirs->id, 'title' => 'Probe'])
-            ->assertNotFound();
+            ->assertForbidden();
         $this->assertSame(0, app(Tenancy::class)->run($workspace, fn () => Issue::count()));
     }
 
@@ -162,45 +162,23 @@ class ApiTest extends TestCase
     }
 
     #[Test]
-    public function a_clients_token_sees_only_what_they_could_see_in_the_app(): void
+    public function a_token_stops_working_when_its_owner_becomes_a_client(): void
     {
-        // The API reuses the same scopes and policies precisely so this holds without
-        // being implemented a second time — but "precisely so" is not evidence.
+        // Only staff can make a token, so a client holding one was staff when it was
+        // made. Moved to a client role, they keep nothing: the token is refused on
+        // every request rather than trusted to be scoped correctly.
         [$workspace, $staff] = $this->workspaceWithMember(WorkspaceRole::Member, 'acme');
+        app(Tenancy::class)->run($workspace, fn () => Issue::factory()->create([
+            'project_id' => Project::factory()->create()->id,
+        ]));
 
-        $client = User::factory()->create();
-        $workspace->members()->attach($client->id, [
-            'role' => WorkspaceRole::Client->value,
-            'joined_at' => now(),
-        ]);
+        $token = $this->tokenFor($staff, $workspace, ['read']);
+        $this->api($token, 'GET', $this->apiUrl($workspace, 'issues'))->assertOk();
 
-        $granted = app(Tenancy::class)->run($workspace, function () {
-            $granted = Project::factory()->create(['key' => 'MINE', 'name' => 'Their site']);
-            $other = Project::factory()->create(['key' => 'OTHER', 'name' => 'Another client']);
+        $workspace->members()->updateExistingPivot($staff->id, ['role' => WorkspaceRole::Client->value]);
 
-            Issue::factory()->clientVisible()->create(['project_id' => $granted->id, 'title' => 'Theirs']);
-            Issue::factory()->create([
-                'project_id' => $granted->id,
-                'title' => 'Internal only',
-                'visibility' => IssueVisibility::Internal,
-            ]);
-            Issue::factory()->clientVisible()->create(['project_id' => $other->id, 'title' => 'Somebody elses']);
-
-            return $granted;
-        });
-
-        $granted->clients()->attach($client->id, ['role' => 'client_manager']);
-
-        $token = $this->tokenFor($client, $workspace, ['read']);
-
-        $issues = $this->api($token, 'GET', $this->apiUrl($workspace, 'issues'))->assertOk();
-
-        $issues->assertJsonCount(1, 'data')->assertJsonPath('data.0.title', 'Theirs');
-
-        // And the project list does not name the agency's other clients.
-        $projects = $this->api($token, 'GET', $this->apiUrl($workspace, 'projects'))->assertOk();
-
-        $projects->assertJsonCount(1, 'data')->assertJsonPath('data.0.name', 'Their site');
+        $this->api($token, 'GET', $this->apiUrl($workspace, 'issues'))->assertForbidden();
+        $this->api($token, 'GET', $this->apiUrl($workspace, 'projects'))->assertForbidden();
     }
 
     #[Test]

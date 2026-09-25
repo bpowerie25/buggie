@@ -125,7 +125,7 @@ class CustomFieldTest extends TestCase
             ->post($this->workspaceUrl($workspace, "/projects/{$project->slug}/fields"), [
                 'name' => 'Sneaky', 'type' => 'text',
             ])
-            ->assertForbidden();
+            ->assertNotFound(); // 404 to a client, not 403
     }
 
     // ------------------------------------------------------------------ values

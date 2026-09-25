@@ -34,6 +34,10 @@ class EnsureTokenMatchesWorkspace
 
         abort_unless($request->user()->belongsToWorkspace($workspace), 404);
 
+        // Tokens are for staff, and only staff can make one. Checked on every use as
+        // well, so somebody moved to a client role cannot keep a staff-era token.
+        abort_unless($request->user()->membershipIn($workspace)?->isStaff() ?? false, 403, 'API tokens are for members of staff.');
+
         return $next($request);
     }
 }

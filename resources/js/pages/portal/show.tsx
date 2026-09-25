@@ -35,7 +35,6 @@ export default function PortalShow({
         description: JSONContent | null;
         project: string;
         state: 'open' | 'closed';
-        status: string;
         created_at: string;
     };
     comments: PortalComment[];

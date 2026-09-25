@@ -12,6 +12,7 @@ use App\Models\Status;
 use App\Models\User;
 use App\Support\RichText\TiptapDocument;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -35,8 +36,13 @@ class MarkDuplicate
         private UpdateIssue $updates,
     ) {}
 
+    /** @var array<int, string> who could not be moved onto the original, from the last call */
+    public array $leftOut = [];
+
     public function handle(Issue $duplicate, Issue $original, User $actor): Issue
     {
+        $this->leftOut = [];
+
         $original = $this->canonical($original);
 
         if ($original->is($duplicate)) {
@@ -56,15 +62,26 @@ class MarkDuplicate
             $duplicate->loadMissing(['watchers', 'reporter']);
 
             foreach (collect($duplicate->watchers)->push($duplicate->reporter)->filter()->unique('id') as $person) {
-                $original->watch($person, WatchReason::Duplicate);
+                // Only somebody who can already open the original. Watching an issue is
+                // itself a way in for a client, so adding one who cannot would hand a
+                // client-tier user another client's issue — its thread, their name.
+                // The team is told who was left out, and can share it on purpose.
+                if (Gate::forUser($person)->allows('view', $original)) {
+                    $original->watch($person, WatchReason::Duplicate);
+                } else {
+                    $this->leftOut[] = $person->name;
+                }
             }
 
             // Said in the thread, in public when a client can see the issue: it is
             // the answer to "what happened to my report?". The original is named only
             // where a client of this project could open it — an internal issue, or
             // one in another project, is not something to tell them the key of.
+            // And never to a client who cannot open it: its key and title in a public
+            // comment would be another client's work described to them.
             $nameable = $original->visibility === IssueVisibility::Client
-                && $original->project_id === $duplicate->project_id;
+                && $original->project_id === $duplicate->project_id
+                && $this->leftOut === [];
 
             $text = $nameable
                 ? "Closed as a duplicate of {$original->key} ({$original->title}). Follow {$original->key} for progress."

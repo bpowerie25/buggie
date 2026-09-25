@@ -3,6 +3,7 @@
 namespace App\Support\Issues;
 
 use App\Enums\IssuePriority;
+use App\Enums\RelationType;
 use App\Models\CustomField;
 use App\Models\Issue;
 use App\Models\User;
@@ -42,8 +43,8 @@ class IssueQueryFilter
         $this->version($query, $parsed);
         $this->phase($query, $parsed);
         $this->customFields($query, $parsed, $viewer);
-        $this->parent($query, $parsed);
-        $this->absence($query, $parsed);
+        $this->parent($query, $parsed, $viewer);
+        $this->absence($query, $parsed, $viewer);
         $this->overdue($query, $parsed);
         $this->blocking($query, $parsed, $viewer);
 
@@ -90,7 +91,7 @@ class IssueQueryFilter
 
         $other = fn (Builder $q) => $q->open()->unless($staff, fn (Builder $q) => $q->visibleToClient($viewer));
 
-        foreach (['blocked' => \App\Enums\RelationType::BlockedBy, 'blocking' => \App\Enums\RelationType::Blocks] as $value => $type) {
+        foreach (['blocked' => RelationType::BlockedBy, 'blocking' => RelationType::Blocks] as $value => $type) {
             $constraint = fn (Builder $r) => $r->where('type', $type->value)->whereHas('relatedIssue', $other);
 
             if ($parsed->has('is', $value)) {
@@ -104,7 +105,7 @@ class IssueQueryFilter
 
         // `is:delaying`: an open blocker that work waiting on it cannot start on time
         // because of. Blockage has the rule; this is the same rule in SQL.
-        $delaying = fn (Builder $r) => $r->where('type', \App\Enums\RelationType::Blocks->value)
+        $delaying = fn (Builder $r) => $r->where('type', RelationType::Blocks->value)
             ->whereHas('relatedIssue', fn (Builder $q) => Blockage::sql($other($q)));
 
         if ($parsed->has('is', 'delaying')) {
@@ -159,8 +160,12 @@ class IssueQueryFilter
             return (int) $value;
         }
 
-        // Match on name, so assignee:sam works without knowing ids.
+        // Match on name, so assignee:sam works without knowing ids — among this
+        // workspace's members only, or the filter guesses at names from other ones.
+        $workspace = app(Tenancy::class)->current();
+
         return User::query()
+            ->when($workspace, fn (Builder $q) => $q->whereHas('workspaces', fn (Builder $w) => $w->whereKey($workspace->id)))
             ->whereRaw('lower(name) like ?', [strtolower($value).'%'])
             ->value('id');
     }
@@ -245,15 +250,27 @@ class IssueQueryFilter
      * part of anything — which is the useful half, because a backlog full of orphans
      * is what a planning board looks like before somebody groups it.
      */
-    private function parent(Builder $query, IssueQuery $parsed): void
+    private function parent(Builder $query, IssueQuery $parsed, User $viewer): void
     {
+        // For a client, a parent they cannot open is no parent at all. Matching it
+        // anyway would let them try parent:WEB-1, WEB-2… against their own subtask
+        // and learn the key of the internal work above it.
+        $visible = fn (Builder $q) => $this->isStaff($viewer) ? $q : $q->visibleToClient($viewer);
+
         foreach ($parsed->all('parent') as $key) {
-            $query->whereHas('parent', fn (Builder $q) => $q->where('key', strtoupper(trim($key))));
+            $query->whereHas('parent', fn (Builder $q) => $visible($q)->where('key', strtoupper(trim($key))));
         }
 
         foreach ($parsed->all('parent', negated: true) as $key) {
-            $query->whereDoesntHave('parent', fn (Builder $q) => $q->where('key', strtoupper(trim($key))));
+            $query->whereDoesntHave('parent', fn (Builder $q) => $visible($q)->where('key', strtoupper(trim($key))));
         }
+    }
+
+    private function isStaff(User $viewer): bool
+    {
+        $workspace = app(Tenancy::class)->current();
+
+        return $workspace !== null && ($viewer->membershipIn($workspace)?->isStaff() ?? false);
     }
 
     private function type(Builder $query, IssueQuery $parsed): void
@@ -329,8 +346,10 @@ class IssueQueryFilter
     }
 
     /** no:assignee, no:label, no:description — the "needs attention" filters. */
-    private function absence(Builder $query, IssueQuery $parsed): void
+    private function absence(Builder $query, IssueQuery $parsed, User $viewer): void
     {
+        $staff = $this->isStaff($viewer);
+
         foreach ($parsed->all('no') as $what) {
             match ($what) {
                 'assignee' => $query->whereNull('assignee_id'),
@@ -345,12 +364,16 @@ class IssueQueryFilter
                 // Work not yet placed in a stage of the job.
                 'phase' => $query->whereNull('phase_id'),
                 // The holes the workload screen cannot put in a week.
-                'estimate' => $query->whereNull('estimate_minutes'),
+                // Estimates are the team's; whether one is set is not a client's to ask.
+                'estimate' => $staff ? $query->whereNull('estimate_minutes') : null,
                 'dates' => $query->whereNull('start_on')->whereNull('due_on'),
                 // Work that is not part of anything. The useful half of the parent
                 // filter: a backlog of orphans is what a planning board looks like
                 // before somebody groups it.
-                'parent' => $query->whereNull('parent_id'),
+                // A parent a client cannot open counts as none, for the reason above.
+                'parent' => $staff
+                    ? $query->whereNull('parent_id')
+                    : $query->whereDoesntHave('parent', fn (Builder $q) => $q->visibleToClient($viewer)),
                 default => null,
             };
         }

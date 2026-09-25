@@ -133,9 +133,11 @@ class PortalTest extends TestCase
             'user_id' => null,
         ]);
 
-        // Replying to your own report should not then hide it from you.
+        // An anonymous reply does not share an internal issue with every client on the
+        // project; the reporter keeps it through their link regardless.
         $issue = app(Tenancy::class)->run($workspace, fn () => $token->issue->fresh());
-        $this->assertSame(IssueVisibility::Client, $issue->visibility);
+        $this->assertSame(IssueVisibility::Internal, $issue->visibility);
+        $this->get(central_url('portal/'.$token->token))->assertOk()->assertSee('Still happening this morning.', false);
     }
 
     #[Test]

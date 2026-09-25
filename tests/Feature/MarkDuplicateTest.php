@@ -66,18 +66,35 @@ class MarkDuplicateTest extends TestCase
         $this->assertTrue($duplicate->relations()->where('related_issue_id', $original->id)->where('type', RelationType::Duplicates->value)->exists());
 
         $comment = $duplicate->comments()->latest('id')->first();
-        $this->assertStringContainsString("duplicate of {$original->key}", $comment->body_text);
         $this->assertFalse($comment->is_internal, 'Ann should be told why her issue closed.');
 
-        $this->assertTrue($this->reload($original)->watchers()->whereKey($this->ann->id)->exists());
-
-        // And the "own issues" rule now lets her follow the original.
-        $this->actingAs($this->ann)->get($this->url($original))->assertOk();
+        // Ann sees only her own issues, and the original is somebody else's, so she
+        // is not made a watcher — watching would be a way in — and the comment does
+        // not name it. The team is told, and can share it with her on purpose.
+        $this->assertFalse($this->reload($original)->watchers()->whereKey($this->ann->id)->exists());
+        $this->assertStringNotContainsString($original->key, $comment->body_text);
+        $this->assertStringContainsString('Ann cannot see', session('success'));
+        $this->actingAs($this->ann)->get($this->url($original))->assertNotFound();
 
         $this->actingAs($this->ann)->get($this->url($duplicate))
             ->assertInertia(fn ($page) => $page
-                ->where('issue.duplicate_of.key', $original->key)
+                ->where('issue.duplicate_of', null)
                 ->where('events', fn ($events) => collect($events)->contains('type', IssueEventType::MarkedDuplicate->value)));
+    }
+
+    #[Test]
+    public function a_reporter_who_can_already_see_the_original_follows_it(): void
+    {
+        // Shared with the whole project, so Ann can open it before anything happens.
+        $original = $this->issue('Checkout fails on Safari', $this->owner, 'client');
+        $this->tenant(fn () => $original->forceFill(['client_audience' => 'project'])->save());
+        $duplicate = $this->issue('Cannot pay on my iPhone', $this->ann);
+
+        $this->actingAs($this->owner)->post($this->url($duplicate, '/duplicate'), ['key' => $original->key])
+            ->assertSessionHasNoErrors();
+
+        $this->assertTrue($this->reload($original)->watchers()->whereKey($this->ann->id)->exists());
+        $this->assertStringContainsString("duplicate of {$original->key}", $this->reload($duplicate)->comments()->latest('id')->first()->body_text);
     }
 
     #[Test]

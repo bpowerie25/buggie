@@ -2,19 +2,21 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Enums\ReporterIdentity;
+use App\Enums\WidgetMode;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\IngestReportRequest;
 use App\Jobs\ProcessIncomingReport;
 use App\Models\Report;
-use App\Support\Reports\Fingerprint;
-use App\Models\Workspace;
 use App\Models\WidgetKey;
+use App\Models\Workspace;
+use App\Support\Chat\ChatNotifications;
+use App\Support\Reports\Fingerprint;
+use App\Support\Reports\ReporterIdentityCheck;
 use App\Support\Tenancy\Tenancy;
+use App\Support\Webhooks\Webhooks;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use App\Enums\ReporterIdentity;
-use App\Enums\WidgetMode;
-use App\Support\Reports\ReporterIdentityCheck;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
@@ -116,9 +118,11 @@ class IngestController extends Controller
             // An unmetered duplicate keeps what makes it an occurrence — the error,
             // the page, who hit it — and drops the bulk. The console and network of
             // the sixth identical report tell nobody anything the first five did not.
-            'console' => $metered ? array_slice((array) $request->input('console', []), -50) : [],
-            'network' => $metered ? array_slice((array) $request->input('network', []), -30) : [],
-            'error' => $request->input('error') ?: null,
+            // Only the fields the widget sends, each bounded: the endpoint cannot
+            // assume the payload came from the widget.
+            'console' => $metered ? self::entries($request->input('console', []), 50, ['level', 'message', 'at']) : [],
+            'network' => $metered ? self::entries($request->input('network', []), 30, ['method', 'url', 'status', 'duration', 'at']) : [],
+            'error' => self::bounded($request->input('error'), 8000) ?: null,
             'ip_hash' => $ipHash,
         ]));
 
@@ -133,8 +137,8 @@ class IngestController extends Controller
         app(Tenancy::class)->run($key->project->workspace, function () use ($report) {
             $report->load('project');
 
-            \App\Support\Webhooks\Webhooks::report($report);
-            \App\Support\Chat\ChatNotifications::report($report);
+            Webhooks::report($report);
+            ChatNotifications::report($report);
         });
 
         return response()->json([
@@ -260,12 +264,14 @@ class IngestController extends Controller
 
         // Defence in depth: the widget already strips these, but the endpoint cannot
         // assume the payload came from the widget.
-        if (isset($environment['url'])) {
-            $environment['url'] = self::stripSecrets((string) $environment['url']);
-        }
-
-        if (isset($environment['referrer'])) {
-            $environment['referrer'] = self::stripSecrets((string) $environment['referrer']);
+        // A page address is shown to the team as a link, so only http(s) is kept:
+        // anything else from an anonymous caller is at best noise and at worst a
+        // javascript: URL waiting for somebody to click it.
+        foreach (['url', 'referrer'] as $field) {
+            if (isset($environment[$field])) {
+                $value = (string) $environment[$field];
+                $environment[$field] = preg_match('#^https?://#i', $value) ? self::stripSecrets($value) : null;
+            }
         }
 
         // The identity hash is a credential, checked once and never kept — wherever
@@ -274,7 +280,48 @@ class IngestController extends Controller
             unset($environment['identity']['user_hash']);
         }
 
-        return $environment;
+        return self::bounded($environment, 2048);
+    }
+
+    /**
+     * Arbitrary JSON from the internet, made safe to keep: two levels deep, strings
+     * cut to a length, at most a hundred keys a level.
+     *
+     * @return array<string, mixed>
+     */
+    private static function bounded(mixed $value, int $stringLength, int $depth = 0): array
+    {
+        if (! is_array($value)) {
+            return [];
+        }
+
+        $out = [];
+
+        foreach (array_slice($value, 0, 100, true) as $key => $item) {
+            $out[$key] = match (true) {
+                is_string($item) => mb_substr($item, 0, $stringLength),
+                is_int($item), is_float($item), is_bool($item), $item === null => $item,
+                is_array($item) && $depth < 1 => self::bounded($item, $stringLength, $depth + 1),
+                default => null,
+            };
+        }
+
+        return $out;
+    }
+
+    /**
+     * The last $limit entries, each with only the named fields, strings bounded.
+     *
+     * @param  array<int, string>  $fields
+     * @return array<int, array<string, mixed>>
+     */
+    private static function entries(mixed $entries, int $limit, array $fields): array
+    {
+        return collect(is_array($entries) ? array_slice($entries, -$limit) : [])
+            ->filter(fn ($entry) => is_array($entry))
+            ->map(fn (array $entry) => self::bounded(array_intersect_key($entry, array_flip($fields)), 2048))
+            ->values()
+            ->all();
     }
 
     /** Remove query parameters that look like credentials. */

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Project;
 use App\Models\TimeEntry;
 use App\Models\User;
+use App\Support\Tenancy\Tenancy;
 use App\Support\Time\Duration;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -102,8 +103,9 @@ class TimeReportController extends Controller
                 foreach ($entries as $entry) {
                     fputcsv($out, [
                         $entry->spent_on->toDateString(),
-                        $entry->user?->name ?? 'Someone who has left',
-                        $entry->issue?->project?->name,
+                        // Names are typed by their owners, so guarded like titles are.
+                        $this->safe($entry->user?->name ?? 'Someone who has left'),
+                        $this->safe($entry->issue?->project?->name),
                         $entry->issue?->key,
                         $this->safe($entry->issue?->title),
                         $entry->minutes,
@@ -195,7 +197,7 @@ class TimeReportController extends Controller
 
     private function workspaceId(): int
     {
-        return app(\App\Support\Tenancy\Tenancy::class)->currentOrFail()->id;
+        return app(Tenancy::class)->currentOrFail()->id;
     }
 
     /** A note or title beginning =, + or @ is a formula when a spreadsheet opens it. */

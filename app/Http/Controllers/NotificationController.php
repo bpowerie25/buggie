@@ -4,7 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Enums\NotificationReason;
 use App\Models\InAppNotification;
+use App\Support\Issues\AuthorLabel;
 use App\Support\Notifications\ActivitySentence;
+use App\Support\Tenancy\Tenancy;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -131,14 +133,20 @@ class NotificationController extends Controller
      */
     private function serialise(Collection $entries): array
     {
-        return $entries->map(function (InAppNotification $entry): array {
+        $workspace = app(Tenancy::class)->currentOrFail();
+        $staff = request()->user()->membershipIn($workspace)?->isStaff() ?? false;
+
+        return $entries->map(function (InAppNotification $entry) use ($workspace, $staff): array {
             $reason = NotificationReason::from($entry->reason);
+            // Named as the reader would see them anywhere else: the team as the
+            // workspace to a client.
+            $actor = $entry->actor ? AuthorLabel::for($entry->actor, $workspace, readerIsStaff: $staff) : null;
 
             return [
                 'id' => $entry->id,
                 'reason' => $reason->value,
                 'label' => $reason->label(),
-                'sentence' => ActivitySentence::for($reason, $entry->actor?->name, $entry->data ?? []),
+                'sentence' => ActivitySentence::for($reason, $actor, $entry->data ?? []),
                 'issue' => [
                     'key' => $entry->issue->key,
                     'title' => $entry->issue->title,

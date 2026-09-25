@@ -6,17 +6,21 @@ use App\Models\Issue;
 use App\Models\Project;
 use App\Models\User;
 use App\Support\Tenancy\Tenancy;
+use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class DashboardController extends Controller
 {
-    public function __invoke(\Illuminate\Http\Request $request, Tenancy $tenancy): Response
+    public function __invoke(Request $request, Tenancy $tenancy): Response
     {
         return Inertia::render('dashboard', [
             'workspace' => [
                 'name' => $tenancy->currentOrFail()->name,
-                'trial_ends_at' => $tenancy->currentOrFail()->trial_ends_at?->toDateString(),
+                // The agency's billing, not its clients' business.
+                'trial_ends_at' => ($request->user()->membershipIn($tenancy->currentOrFail())?->isStaff() ?? false)
+                    ? $tenancy->currentOrFail()->trial_ends_at?->toDateString()
+                    : null,
             ],
             'projects' => Project::active()->visibleTo($request->user())
                 ->withCount('statuses')

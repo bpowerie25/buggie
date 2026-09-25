@@ -32,6 +32,14 @@ class TwoFactorChallengeController extends Controller
 
     private const DECAY_SECONDS = 60;
 
+    /**
+     * And twenty wrong codes in a day stops the challenge for a day. Five a minute
+     * on its own still allows seven thousand guesses a day — even odds of finding a
+     * code within a month once somebody has the password. Twenty a day is a person
+     * fumbling, never a script.
+     */
+    private const DAILY_ATTEMPTS = 20;
+
     public function create(Request $request): SymfonyResponse
     {
         if (! PendingLogin::user($request)) {
@@ -59,6 +67,13 @@ class TwoFactorChallengeController extends Controller
         // to change and the account is not, and locking somebody out this way needs
         // their password first — so there is no stranger who can do it to them.
         $key = 'two-factor:'.$user->getKey();
+        $daily = 'two-factor-day:'.$user->getKey();
+
+        if (RateLimiter::tooManyAttempts($daily, self::DAILY_ATTEMPTS)) {
+            throw ValidationException::withMessages([
+                'code' => 'Too many wrong codes today. Try again tomorrow, or use a recovery code once the wait is over.',
+            ]);
+        }
 
         if (RateLimiter::tooManyAttempts($key, self::ATTEMPTS)) {
             throw ValidationException::withMessages([
@@ -72,6 +87,7 @@ class TwoFactorChallengeController extends Controller
         // taxi should not have to find a second form to say so.
         if (! $user->acceptTwoFactorCode($code) && ! $user->consumeRecoveryCode($code)) {
             RateLimiter::hit($key, self::DECAY_SECONDS);
+            RateLimiter::hit($daily, 86_400);
 
             throw ValidationException::withMessages([
                 'code' => 'That code is not right, or has already been used.',

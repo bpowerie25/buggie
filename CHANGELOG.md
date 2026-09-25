@@ -288,6 +288,50 @@ today you are running `main`, which is honest rather than ideal — see
 
 ### Security
 
+- **Email addresses are verified.** New accounts get a confirmation link, sent from the
+  queue so mail trouble can't break sign-up. A confirmed address is required to create
+  a workspace on the hosted service (`BUGGIE_REQUIRE_VERIFIED_EMAIL`, on when hosted),
+  and to be an operator through `BUGGIE_OPERATORS`. Accepting an invitation confirms
+  the address. Existing accounts count as confirmed.
+- **Changing a password signs out every other session.**
+- **Two-factor lockout:** after twenty wrong codes in a day, the challenge stops for a
+  day. The five-a-minute limit stays.
+- **Webhooks and chat messages connect to the address that was checked,** so a DNS
+  answer changed in between can't point them at an internal service. IPv6 forms of
+  internal addresses (NAT64, 6to4, IPv4-mapped, unique-local) are refused too.
+- **Widget reports:**
+  - capped at 256KB;
+  - only the fields the widget sends are kept, each bounded in size;
+  - page addresses that aren't http(s) are dropped.
+- **Inbound email:** each signed delivery is accepted once.
+- **Clients can no longer use filters to learn about work they can't see.**
+  - `parent:` and `no:parent` treat an internal parent as no parent.
+  - `no:estimate` is staff-only.
+  - `assignee:` matches only this workspace's members.
+- **Marking a duplicate** only moves watchers who can already open the original. The
+  comment names the original only when nobody is left out, and the team is told who
+  wasn't added.
+- **A portal reply no longer makes an internal issue client-visible.** The portal
+  data carries the status category but not the team's status name, and shows staff
+  as the workspace.
+- **Staff are named as the workspace to clients** in digest emails, the notification
+  list, the CSV export and the timeline's "No dates" list.
+- **Nothing else sent to clients about the workspace:** no trial date, no unreleased
+  version names.
+- **Small restrictions:**
+  - clients' saved views stay private;
+  - a client's API token is refused;
+  - project settings pages answer clients with 404, not 403;
+  - the export's header lists only fields from projects the client holds.
+- **Security headers on every page:** HSTS over HTTPS, a content security policy that
+  bars framing, `<base>` and plugins, `nosniff`, and a referrer policy.
+- **The widget's screenshot library** loads with an integrity hash.
+- **More CSV columns are protected against spreadsheet formulas.**
+- **Backups** are readable only by the account that makes them.
+- **The self-host example** marks the session cookie HTTPS-only.
+- **The production example and runbook** use the right name for the email-in signing
+  key.
+
 - **Removing a member reached into other workspaces.** It deleted the person's
   project grants on the whole install, and accepted any user id. Editing a client's
   projects did the same through `sync()`. Both now touch only this workspace's grants,

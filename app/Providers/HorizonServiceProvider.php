@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Models\User;
 use Illuminate\Support\Facades\Gate;
 use Laravel\Horizon\Horizon;
 use Laravel\Horizon\HorizonApplicationServiceProvider;
@@ -42,17 +43,20 @@ class HorizonServiceProvider extends HorizonApplicationServiceProvider
         //
         // This used to be "the lowest user id" whenever nobody was named, worked out
         // on every check. Deleting that account would have promoted the next one.
-        Gate::define('operate', function (?\App\Models\User $user = null) {
+        Gate::define('operate', function (?User $user = null) {
             if ($user === null) {
                 return false;
             }
 
+            // Named by address only once the address is confirmed: anybody can register
+            // an address that is not theirs, and on an install where the operator
+            // listed has not signed up yet that would make them the operator.
             return $user->is_operator
-                || in_array(
+                || ($user->hasVerifiedEmail() && in_array(
                     strtolower($user->email),
                     array_map('strtolower', (array) config('buggie.operators')),
                     true,
-                );
+                ));
         });
 
         Gate::define('viewHorizon', function ($user = null) {
@@ -61,6 +65,7 @@ class HorizonServiceProvider extends HorizonApplicationServiceProvider
             // No operators configured means nobody gets in, rather than everybody.
             return $user !== null
                 && $operators !== []
+                && $user->hasVerifiedEmail()
                 && in_array(strtolower($user->email), array_map('strtolower', $operators), true);
         });
     }

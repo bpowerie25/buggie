@@ -342,6 +342,39 @@ class TwoFactorTest extends TestCase
     }
 
     #[Test]
+    public function twenty_wrong_codes_in_a_day_stop_the_challenge_for_a_day(): void
+    {
+        // Five a minute alone still allows thousands of guesses a day.
+        [$workspace] = $this->workspaceWithMember(slug: 'acme');
+        [$user, $secret] = $this->withTwoFactor();
+        $this->join($workspace, $user);
+
+        for ($round = 0; $round < 4; $round++) {
+            $this->signOut();
+            $this->signInWithPassword($user);
+
+            for ($attempt = 0; $attempt < 5; $attempt++) {
+                $this->post($this->centralUrl('/two-factor'), ['code' => $this->wrongCode($secret)]);
+            }
+
+            $this->travel(61)->seconds();
+        }
+
+        $this->signOut();
+        $this->signInWithPassword($user);
+        $this->post($this->centralUrl('/two-factor'), ['code' => $this->codeFor($secret)])
+            ->assertSessionHasErrors('code');
+        $this->assertStringContainsString('today', session('errors')->first('code'));
+        $this->assertGuest();
+
+        $this->travel(1)->days();
+        $this->signOut();
+        $this->signInWithPassword($user);
+        $this->post($this->centralUrl('/two-factor'), ['code' => $this->codeFor($secret)])->assertRedirect();
+        $this->assertAuthenticatedAs($user->fresh());
+    }
+
+    #[Test]
     public function the_challenge_page_is_nothing_without_a_password_first(): void
     {
         $this->get($this->centralUrl('/two-factor'))->assertRedirect(central_url('/login'));

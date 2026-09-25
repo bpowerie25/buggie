@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\SavedView;
 use App\Support\Issues\IssueQuery;
+use App\Support\Tenancy\Tenancy;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -18,12 +19,16 @@ class SavedViewController extends Controller
 
         $view = SavedView::create([
             ...$data,
-            'user_id' => $request->boolean('shared') ? null : $request->user()->id,
+            // Shared views belong to the team and sit in every staff sidebar; a client
+            // saving one keeps it to themselves.
+            'user_id' => $request->boolean('shared') && ($request->user()->membershipIn(app(Tenancy::class)->currentOrFail())?->isStaff() ?? false)
+                ? null
+                : $request->user()->id,
             'created_by_id' => $request->user()->id,
             'position' => (int) SavedView::max('position') + 1,
         ]);
 
-        return redirect("/issues?q=".urlencode($view->query))
+        return redirect('/issues?q='.urlencode($view->query))
             ->with('success', "View “{$view->name}” saved.");
     }
 

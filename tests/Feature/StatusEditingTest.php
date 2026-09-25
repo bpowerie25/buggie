@@ -311,7 +311,7 @@ class StatusEditingTest extends TestCase
                     'name' => 'Renamed by someone who should not',
                     'color' => '#ffffff',
                 ])
-                ->assertForbidden();
+                ->assertStatus($role === WorkspaceRole::Client ? 404 : 403); // a client is not told it exists
         }
 
         $this->assertNotSame('Renamed by someone who should not', $status->fresh()->name);
