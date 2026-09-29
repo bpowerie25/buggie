@@ -42,7 +42,7 @@ jobs:
 
       - name: Tags and labels
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: ghcr.io/${{ github.repository }}
           # 0.1.0, 0.1 and latest. A pre-release tag (v0.2.0-rc.1) gets its own tag
