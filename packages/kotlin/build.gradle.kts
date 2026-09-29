@@ -1,6 +1,6 @@
 plugins {
     kotlin("jvm") version "2.2.10" apply false
-    id("com.android.library") version "9.3.0" apply false
+    id("com.android.library") version "9.4.1" apply false
 }
 
 // The coordinates an app asks for. Nothing is published to a repository yet, so an
