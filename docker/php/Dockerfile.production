@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
 # ── Frontend build ────────────────────────────────────────────────────────────
-FROM node:22-alpine AS assets
+FROM node:26-alpine AS assets
 
 WORKDIR /build
 
@@ -43,7 +43,7 @@ RUN composer dump-autoload --optimize --classmap-authoritative --no-dev --no-scr
 
 
 # ── Runtime ───────────────────────────────────────────────────────────────────
-FROM php:8.4-fpm-alpine AS runtime
+FROM php:8.5-fpm-alpine AS runtime
 
 RUN apk add --no-cache \
       libpng libjpeg-turbo freetype libwebp libzip icu-libs oniguruma \
