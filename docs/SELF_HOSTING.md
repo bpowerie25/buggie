@@ -200,6 +200,10 @@ docker run --rm -v buggie_storage:/data -v "$PWD":/backup alpine \
 Redis holds only cache, sessions and the queue. Losing it logs everyone out and drops
 pending jobs; it is not worth backing up.
 
+Running Buggie on the host rather than in Docker? `deploy/native/` has a backup and
+restore pair for that layout, with off-site copies and the same in-app warning when
+backups stop.
+
 ## Upgrading
 
 Take a database backup first. Then, running the published image:
