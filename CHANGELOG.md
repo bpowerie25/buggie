@@ -12,6 +12,13 @@ today you are running `main`, which is honest rather than ideal — see
 
 ### Added
 
+- **Backups for installs without Docker.** `deploy/native/backup.sh` backs up the
+  database, uploads and `.env` every 15 minutes to an encrypted restic repository, and
+  writes the same status file as `deploy/backup.sh`, so operators get the in-app
+  warning when backups fail. `deploy/native/restore.sh` lists the backups, loads one
+  into a scratch database to compare with the live data, and restores it after
+  saving the current state. Setup, including an S3 bucket the server cannot destroy,
+  is in `deploy/native/README.md`.
 - **buggie.eu runs this repository, and nothing else.** The private repository the
   hosted service used to deploy from is retired; its one addition, the read-only
   operator console at `/operator`, is now here behind the `hosted` middleware and the
