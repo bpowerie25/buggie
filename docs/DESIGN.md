@@ -1732,3 +1732,221 @@ whole address rather than an org slug.
 
 Not done: the iOS and Android SDKs send no Sentry ids yet. Sentry's Cocoa and Android
 SDKs expose the same three, so it is the same change on each.
+
+---
+
+## 31. Contractors: a third party, confined to some projects
+
+**Status: design, not built.** Written before the code because the obvious
+implementations fail open, and this is the kind of change where that matters.
+
+### The problem
+
+An agency brings in an outside developer for one client's site. Today there are two
+roles to give them and neither fits:
+
+- **Member/admin** is staff, and staff see every project in the workspace — every
+  customer's name, every internal note, Insights, time reports, the member list.
+- **Client** is confined to granted projects, but sees only issues marked
+  `visibility = client`, cannot see internal comments, cannot triage, assign or change
+  state, and (correctly) sees the team as one anonymous "workspace".
+
+A contractor needs the opposite combination: **staff powers over some projects, and no
+existence at all for the rest.** Section 20 built the second half (`project_user`,
+`Project::visibleTo()`, the leak tests). It is only wired to the client side of the
+fork.
+
+### Options considered
+
+| | Approach | Verdict |
+|---|---|---|
+| A | New workspace role `contractor`, not staff, opted in to specific abilities | **Chosen** |
+| B | A "restricted" flag on an ordinary member | Rejected: fails open |
+| C | A project-scoped API token and nothing else | Not enough alone: no UI |
+
+**Why not B**, which looks smaller. `isStaff()` is checked in 46 places across
+policies, controllers, scopes, the notifier and the API. With a flag on a member, every
+one of those keeps answering "yes, staff" for a restricted person, so the safety of the
+feature rests on finding and patching every query that lists projects or issues
+without going through a scope — and the one that was missed is a leak of a customer's
+name. Section 20 found three such leaks in a codebase that was already trying.
+
+**Why A**, with the same 46 sites. A new role is *not* `isStaff()`, so every existing
+check treats a contractor as a client until told otherwise. The failure mode of a missed
+site is that a contractor cannot do something, which is a bug report, instead of seeing
+something, which is an incident. The work is then a list of places that deliberately
+opt contractors in, each reviewed on its own, and the list is short enough to write down
+(below).
+
+Option C is worth shipping anyway for a contractor's CI and tooling, but it inherits
+whatever the user behind it can do, so it does not remove the need for A.
+
+### The model
+
+A contractor reaches an issue only if **all three** hold, mirroring section 20:
+
+| Gate | |
+|---|---|
+| Workspace membership | role `contractor` |
+| Project grant | a row in `project_user` — the same table clients use |
+| Issue | any issue in a granted project, internal or client-visible |
+
+The third differs from a client on purpose: **a contractor sees internal issues in
+their projects**, because the backlog *is* the internal issues. They never see
+anything in a project they hold no grant on, and a project without a grant does not
+exist for them — not a filtered list, no knowledge of the name. Everything already
+built on `Project::visibleTo()` (the new sidebar scope, the dashboard, facets, the
+timeline's project list, the API) therefore works for them unchanged.
+
+`ProjectRole` stays what it is: tiers for clients. A contractor's grant is the
+presence of the row; there is no tier. Putting contractor behaviour on `ProjectRole`
+would mean `client_manager` and a contractor could be confused in `visibleToClient`.
+
+### What a contractor can do
+
+Within granted projects:
+
+| Can | Cannot |
+|---|---|
+| See, filter and search issues, internal included | See any other project, or its name |
+| Create issues, edit fields, change status | Triage the inbox (reports are pre-issue; v1) |
+| Be assigned issues, and assign them to other contractors/staff on that project | Delete, restore from trash, import, export |
+| Comment, **internally only** | Post anything a client can see |
+| Attach files, watch, link/relate issues | Manage labels, statuses, workflow, versions, phases |
+| Use the sidebar project scope, saved views of their own | See shared saved views |
+| Use an API token limited to the same projects | See Insights, Workload, Time, the member list, billing, settings |
+
+Two of those need a reason.
+
+**Comments are internal only.** A contractor sees the whole conversation on an issue
+but cannot write to a client. An agency may not want a third party talking to its
+customer, and "internal only" fails safe: `ClientConversation`, the portal, email-in
+and `Mentions::forClients()` never encounter a contractor as an author, so none of the
+client-facing rewriting needs to learn a new kind of person. A per-grant "may reply to
+the client" switch is a later addition, only if asked for twice.
+
+**Internal comments are visible to them.** An earlier suggestion was to hide them by
+default. That does not survive contact with the product: the discussion on an issue
+they have to fix *is* the internal comments. The protection is the project boundary. If
+there is something to keep from the contractor, it belongs in a project they have no
+grant on. Finer control (a "staff only" comment level above "internal") is the obvious
+extension and is not built.
+
+### Where the code changes
+
+Opt-ins, one decision each. `isStaff()` is deliberately left meaning "the agency's own
+people"; the new `WorkspaceRole::worksOnIssues()` (staff **or** contractor) is what the
+sites below ask instead.
+
+**Access to issues**
+- `IssuePolicy`: `view` allows a contractor when the issue's project is in
+  `Project::visibleTo()`, answered by one query as `visibleToClient` is, and denied as
+  **404, not 403**. `update`, `comment` and `commentInternally` follow `view`.
+  `delete` stays staff.
+- `IssueQueryFilter` and `IssueController`/`IssueApiController`/`IssueExportController`:
+  the base query for a contractor is `whereIn project_id (granted)`, in addition to —
+  not instead of — the client branch's absence. One new scope, `Issue::visibleToContractor()`,
+  next to `visibleToClient`, used everywhere that today does `unless($staff, visibleToClient)`.
+  Anything that forgets it falls to the client branch, which is stricter.
+- `Project::scopeVisibleTo` already returns granted projects for any non-staff.
+
+**People**
+- `Assignable::roles()` includes `contractor`; `Assignable::rule()` additionally
+  requires a grant on the issue's project, checked in the request and the action as
+  everything else about the assignee is. The assignee list a contractor receives is
+  limited to people on that project.
+- `Mentions::candidates` offers contractors in internal notes only, and only on
+  projects they hold.
+- Member list: a contractor sees nobody by name except assignees and authors on issues
+  they can open, resolved the way `AuthorLabel` resolves names for clients.
+
+**Notifications** (`Notifier`, `NotificationController`, `InAppNotification::visibleTo`)
+- Today `Notifier::record` asks `IssuePolicy::view` for every non-staff recipient and
+  refuses anything `internal`. For a contractor the policy question stays, and the
+  `internal` refusal becomes "unless the recipient is a contractor on that project".
+  `notifications:flush` asks again at send time, and the list asks again when read,
+  exactly as for clients — a grant removed after a row was written must hide it.
+
+**Staff-only, unchanged and tested to stay that way**
+- `ReportPolicy` (triage), `LabelPolicy` write paths, `SavedViewPolicy` shared views,
+  `TimeEntryPolicy`, `InvitationPolicy`, `ProjectPolicy` management, Insights, Workload,
+  Time off, `ApiTokenController` for other people's tokens, billing and workspace
+  settings. These stay on `isStaff()`.
+
+**Invitations and members**
+- `InvitationController` and `MemberController` offer the role and, as for a client,
+  **require at least one project** at invitation. Changing grants reuses the existing
+  paths and inherits the existing warning: `project_user` has no `workspace_id`, so
+  `detach()`/`sync()` must always be given this workspace's project ids.
+- A contractor invited to a second workspace is a contractor only in the one they were
+  invited to; the role is on the membership, not the user.
+
+**API**
+- `EnsureTokenMatchesWorkspace` already ties a token to a workspace; a contractor's
+  token resolves through the same policies, so it is confined without extra code.
+  The OpenAPI test must be extended where a response shape differs.
+
+### Offboarding
+
+The most important property of a contractor is that they stop. Removing the
+membership ends everything; removing a single grant ends that project. Both must also
+end:
+
+- **Sessions** (already true on password change; membership removal must do the same).
+- **API tokens** for that workspace.
+- **Watching and pending notifications**: the flush re-check handles delivery, but
+  `watchers` rows should be dropped so a stale row cannot be the thing that grants
+  access later.
+
+**Expiry** is worth building with the role rather than after it: contractors are
+engaged for a period, and "remember to remove them" is how access outlives the
+contract. A nullable `project_user.expires_at`, honoured inside `Project::visibleTo()`
+and `Issue::visibleToContractor()` (not by a scheduled job that has to run first), so an
+expired grant is invisible the moment it passes. The job that tidies the rows is
+housekeeping, never the control.
+
+### Tests
+
+The tests carry more of the design than the code does.
+
+1. **`ContractorAccessTest`**: builds the agency shape from `MultiClientAccessTest`
+   (two client projects plus an internal one), grants a contractor one, and asserts
+   over HTTP that the serialised props contain no other customer's name, key or issue
+   title anywhere — dashboard, issue list, board, facets, timeline, notifications, API.
+2. **The fail-closed sweep.** Request every named route as a contractor and assert the
+   answer is 403/404 unless the route is on an explicit allowlist. A new route added
+   later is then denied to contractors by default, and the test failing is what makes
+   someone decide. This is the test that makes option A pay off.
+3. **Internal never reaches a client** with a contractor in the conversation: they
+   author only internal comments, and a client's payload, portal page and digest never
+   contain them (extend `ClientVisibilityTest`).
+4. **Offboarding**: after removal or expiry, the same requests return 404 within the
+   same minute, with an unexpired session and with a token.
+5. `TenancyIsolationTest` is unaffected; `SelfHostedTest` gains one assertion that the
+   role is available with no limits, as everything is on a self-hosted install.
+
+### Pricing
+
+Contractors, like clients, are not metered: the plan limits count reports (see
+`config/plans.php`) and charging for people who are not the customer would repeat the
+seat-pricing mistake that file explains. `Workspace::usage()['members']` counts
+everyone today and stays a display figure.
+
+### Build order
+
+1. **Role, grants, read/write on issues, internal comments, assignment.** Policies,
+   `visibleToContractor`, invitation and member screens, the fail-closed sweep and the
+   isolation test. Everything above except expiry and time.
+2. **Expiry and offboarding hygiene** (sessions, tokens, watchers).
+3. **Only if asked:** time tracking for contractors on granted issues, a per-grant
+   "may reply to the client", a "staff only" comment level, triage for a granted project.
+
+### Open decisions
+
+- **Internal comments:** visible within a granted project (recommended, above), or a
+  separate level so the agency can talk about a contractor without them reading it.
+- **Time tracking:** a contractor billing the agency by the hour is a likely request.
+  Left out of the first build because `TimeEntryPolicy` is staff-only and entries feed
+  the workspace-wide reports; it needs its own answer on who sees whose entries.
+- **Name:** "Contractor" describes the relationship. "Collaborator" is warmer and
+  reads better to the person invited. The role value is internal either way.
