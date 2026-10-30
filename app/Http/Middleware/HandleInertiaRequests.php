@@ -6,6 +6,7 @@ use App\Models\InAppNotification;
 use App\Models\Report;
 use App\Models\SavedView;
 use App\Support\Mail\Deliverability;
+use App\Support\Tenancy\ProjectScope;
 use App\Support\Tenancy\Tenancy;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
@@ -86,8 +87,12 @@ class HandleInertiaRequests extends Middleware
             // Reports, plus issues clients filed that nobody has looked at yet: both
             // are listed on the Triage screen, so both are what the badge counts.
             'inboxCount' => fn () => $user && $workspace && $user->can('viewAny', Report::class)
-                ? Report::awaitingTriage()->count() + \App\Models\Issue::forTriage()->count()
+                ? $this->triageCount()
                 : 0,
+
+            // The sidebar's project choice, and the projects it can be switched between.
+            // Only offered with more than one to choose from.
+            'projectScope' => fn () => $user && $workspace ? $this->projectScope($user) : null,
 
             // A client's Timeline link, shown only when a project they hold shares one.
             'clientTimeline' => fn () => $user && $workspace
@@ -217,6 +222,31 @@ class HandleInertiaRequests extends Middleware
             // Said by the server rather than worked out in the browser, so a clock
             // left running over a weekend is flagged even if the tab was never open.
             'forgotten' => $timer->wasForgotten(),
+        ];
+    }
+
+    /**
+     * Follows the project choice, so the badge matches the list it leads to.
+     * Nothing outside the choice is counted, which is what a scope means — but the
+     * reports and client issues elsewhere are still there, and the Triage page says so.
+     */
+    private function triageCount(): int
+    {
+        $slug = app(ProjectScope::class)->current()?->slug;
+        $inProject = fn ($q) => $q->whereHas('project', fn ($p) => $p->where('slug', $slug));
+
+        return Report::awaitingTriage()->when($slug, $inProject)->count()
+            + \App\Models\Issue::forTriage()->when($slug, $inProject)->count();
+    }
+
+    /** @return array{current: ?string, projects: array<int, array{name: string, key: string, slug: string}>}|null */
+    private function projectScope(\App\Models\User $user): ?array
+    {
+        $projects = \App\Models\Project::active()->visibleTo($user)->orderBy('name')->get(['name', 'key', 'slug']);
+
+        return $projects->count() < 2 ? null : [
+            'current' => app(ProjectScope::class)->current()?->slug,
+            'projects' => $projects->map->only(['name', 'key', 'slug'])->values()->all(),
         ];
     }
 }

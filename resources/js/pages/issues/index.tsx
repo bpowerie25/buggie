@@ -54,6 +54,7 @@ export default function IssuesIndex({
     groupBy,
     facets,
     views,
+    scopedTo,
 }: {
     issues: IssueRow[];
     query: ParsedQuery;
@@ -61,6 +62,8 @@ export default function IssuesIndex({
     groupBy: GroupBy;
     facets?: Facets;
     views: SavedView[];
+    /** The sidebar's project choice, when it is narrowing this list. */
+    scopedTo?: { name: string; slug: string } | null;
 }) {
     const { auth } = usePage<SharedProps>().props;
     const editable = auth.role !== 'client';
@@ -153,13 +156,13 @@ export default function IssuesIndex({
      * drop the first card into.
      */
     const boardProjects = useMemo(() => {
-        const include = query.include.project ?? [];
+        const include = scopedTo ? [scopedTo.slug] : (query.include.project ?? []);
         const exclude = query.exclude.project ?? [];
 
         return (facets?.projects ?? []).filter(
             (p) => (include.length === 0 || include.includes(p.slug)) && !exclude.includes(p.slug),
         );
-    }, [facets, query]);
+    }, [facets, query, scopedTo]);
 
     const workflow = useMemo(() => {
         if (groupBy !== 'status') return [];
@@ -468,6 +471,21 @@ export default function IssuesIndex({
     return (
         <AppLayout title="Issues" actions={actions} views={views} activeQuery={query.query}>
             <Head title="Issues" />
+
+            {scopedTo && (
+                <div className="flex items-center gap-2 border-b border-border bg-accent-soft px-4 py-1.5 text-xs text-accent">
+                    <span>
+                        Showing <strong>{scopedTo.name}</strong> only.
+                    </span>
+                    <button
+                        type="button"
+                        className="underline"
+                        onClick={() => router.put('/project-scope', { project: '' }, { preserveScroll: true })}
+                    >
+                        Show all projects
+                    </button>
+                </div>
+            )}
 
             <QueryBar ref={searchRef} query={query} facets={facets} onChange={navigate}>
                 <SaveViewButton query={query.query} layout={layout} groupBy={groupBy} />

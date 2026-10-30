@@ -10,6 +10,7 @@ use App\Models\Issue;
 use App\Models\Project;
 use App\Models\Report;
 use App\Support\Reports\SentryLinks;
+use App\Support\Tenancy\ProjectScope;
 use App\Support\Tenancy\Tenancy;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -23,15 +24,28 @@ class ReportController extends Controller
 {
     public function __construct(private Tenancy $tenancy) {}
 
+    /** Resolved per call: a controller may outlive the request it was built for. */
+    private function scope(): ProjectScope
+    {
+        return app(ProjectScope::class);
+    }
+
     public function index(Request $request): Response
     {
         $this->authorize('viewAny', Report::class);
 
+        // The sidebar's project choice, unless the page was asked for one explicitly;
+        // "all" is the page's own way of saying every project despite it.
+        $slug = $request->filled('project')
+            ? $request->string('project')->toString()
+            : $this->scope()->current()?->slug;
+        $slug = $slug === 'all' ? null : $slug;
+
         $reports = Report::awaitingTriage()
             ->with('project:id,key,name,slug,settings')
             ->when(
-                $request->filled('project'),
-                fn ($q) => $q->whereHas('project', fn ($p) => $p->where('slug', $request->string('project'))),
+                $slug,
+                fn ($q) => $q->whereHas('project', fn ($p) => $p->where('slug', $slug)),
             )
             ->oldest()
             ->limit(200)
@@ -47,7 +61,7 @@ class ReportController extends Controller
         return Inertia::render('reports/index', [
             'reports' => $grouped,
             'projects' => Project::active()->orderBy('name')->get(['id', 'name', 'key', 'slug']),
-            'filters' => ['project' => $request->string('project')->toString() ?: null],
+            'filters' => ['project' => $slug ?: null],
             'priorities' => IssuePriority::options(),
             'types' => IssueType::options(),
             'members' => $this->tenancy->currentOrFail()->members()
@@ -60,8 +74,8 @@ class ReportController extends Controller
             'clientIssues' => Issue::forTriage()
                 ->with(['project:id,key,name,slug', 'reporter:id,name', 'status:id,name,color,category'])
                 ->when(
-                    $request->filled('project'),
-                    fn ($q) => $q->whereHas('project', fn ($p) => $p->where('slug', $request->string('project'))),
+                    $slug,
+                    fn ($q) => $q->whereHas('project', fn ($p) => $p->where('slug', $slug)),
                 )
                 ->oldest()
                 ->limit(100)

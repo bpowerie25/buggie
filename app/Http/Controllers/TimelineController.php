@@ -57,7 +57,9 @@ class TimelineController extends Controller
                 ->filter(fn (Project $project) => $project->showsTimelineToClients())
                 ->values();
 
-        if (! $staff) {
+        if ($staff) {
+            $query = app(\App\Support\Tenancy\ProjectScope::class)->applyTo($query);
+        } else {
             abort_if($projects->isEmpty(), 404);
 
             $asked = $query->first('project');

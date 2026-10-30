@@ -124,7 +124,7 @@ export default function ReportsIndex({
                                 selected={!filters.project}
                                 onSelect={() => {
                                     close();
-                                    router.get('/inbox');
+                                    router.get('/inbox', { project: 'all' });
                                 }}
                             >
                                 All projects

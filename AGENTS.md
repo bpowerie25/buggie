@@ -99,6 +99,19 @@ second and the order becomes arbitrary. Serialise with `format('Y-m-d\TH:i:s.uP'
 Events are typed, not diffed. Add a case to `IssueEventType`, write it from
 `UpdateIssue`, and render it in `eventSentence()` in `pages/issues/show.tsx`.
 
+## The sidebar's project scope
+
+`App\Support\Tenancy\ProjectScope` holds the "which site am I on" choice, in the session
+per workspace. It is a **view filter and grants nothing**: it is re-checked against
+`Project::visibleTo()` on every read, so a lost grant just stops it applying. It narrows the
+issue list and board (by injecting `project:slug` into the parsed query, so the query string
+stays the whole filter state), Triage and its badge, the dashboard, the timeline and
+insights. An explicit `project:` in the query beats it, and `?project=all` / `project_id=`
+on Triage and Insights mean "every project" despite it. Saved views ignore it.
+
+Resolve it with `app(ProjectScope::class)` inside the method, never in a controller
+constructor: it holds the `Request`, and the router can reuse a controller across requests.
+
 ## Client visibility
 
 A client sees an issue only when `visibility = client` **and** they hold the project.

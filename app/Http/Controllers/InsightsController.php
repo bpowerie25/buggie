@@ -39,7 +39,11 @@ class InsightsController extends Controller
 
         [$from, $to] = $this->range($request);
 
-        $projectId = $request->integer('project_id') ?: null;
+        // An explicit project_id, including the empty one the page's own "All projects"
+        // sends, beats the sidebar's choice.
+        $projectId = $request->has('project_id')
+            ? ($request->integer('project_id') ?: null)
+            : app(\App\Support\Tenancy\ProjectScope::class)->current()?->getKey();
 
         $insights = new Insights($from, $to, $projectId);
 

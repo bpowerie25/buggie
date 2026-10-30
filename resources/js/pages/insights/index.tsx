@@ -104,6 +104,9 @@ export default function InsightsPage({
             if (value !== null && value !== '') next[key] = String(value);
         });
 
+        // Sent even when empty: absent means "follow the sidebar's project", empty means every one.
+        next.project_id ??= '';
+
         router.get('/insights', next, { preserveState: true, preserveScroll: true });
     }
 

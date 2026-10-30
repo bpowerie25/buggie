@@ -41,6 +41,7 @@ use App\Http\Controllers\Operator\ConsoleController as OperatorConsoleController
 use App\Http\Controllers\PhaseController;
 use App\Http\Controllers\PortalController;
 use App\Http\Controllers\ProjectController;
+use App\Http\Controllers\ProjectScopeController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\SavedViewController;
 use App\Http\Controllers\StatusController;
@@ -340,6 +341,9 @@ Route::domain('{workspace}.'.$host)
             ->name('widget-keys.rotate');
         Route::delete('widget-keys/{widgetKey}', [WidgetKeyController::class, 'destroy'])
             ->name('widget-keys.destroy');
+
+        Route::put('project-scope', [ProjectScopeController::class, 'update'])
+            ->name('project-scope.update');
 
         // --- notifications ----------------------------------------------------
         // The list belongs to the workspace you are in — what happened here, to you.

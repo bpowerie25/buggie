@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Issue;
 use App\Models\Project;
 use App\Models\User;
+use App\Support\Tenancy\ProjectScope;
 use App\Support\Tenancy\Tenancy;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -12,7 +13,7 @@ use Inertia\Response;
 
 class DashboardController extends Controller
 {
-    public function __invoke(Request $request, Tenancy $tenancy): Response
+    public function __invoke(Request $request, Tenancy $tenancy, ProjectScope $scope): Response
     {
         return Inertia::render('dashboard', [
             'workspace' => [
@@ -23,6 +24,7 @@ class DashboardController extends Controller
                     : null,
             ],
             'projects' => Project::active()->visibleTo($request->user())
+                ->when($scope->current(), fn ($q, $project) => $q->whereKey($project->getKey()))
                 ->withCount('statuses')
                 ->orderBy('name')
                 ->get()
@@ -37,16 +39,17 @@ class DashboardController extends Controller
             // client, what the team has replied to and is waiting on them for — the
             // awaiting-client status, never the assignee, which is always staff. A
             // client who signs in should see what they owe without the query language.
-            'waitingOnYou' => $this->waitingOn($request->user()),
+            'waitingOnYou' => $this->waitingOn($request->user(), $scope),
         ]);
     }
 
     /** @return array<int, array<string, mixed>> */
-    private function waitingOn(User $user): array
+    private function waitingOn(User $user, ProjectScope $scope): array
     {
         $staff = $user->membershipIn(app(Tenancy::class)->currentOrFail())?->isStaff() ?? false;
 
         return Issue::query()
+            ->when($scope->current(), fn ($q, $project) => $q->where('issues.project_id', $project->getKey()))
             ->with(['project:id,key,name', 'status:id,name,category,color'])
             ->when(
                 $staff,

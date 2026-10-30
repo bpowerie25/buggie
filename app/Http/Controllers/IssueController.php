@@ -31,6 +31,7 @@ use App\Support\Issues\IssueQueryFilter;
 use App\Support\Reports\ReporterLink;
 use App\Support\Reports\SentryLinks;
 use App\Support\RichText\Mentions;
+use App\Support\Tenancy\ProjectScope;
 use App\Support\Tenancy\Tenancy;
 use App\Support\Time\Duration;
 use Illuminate\Database\Eloquent\Builder;
@@ -49,6 +50,12 @@ class IssueController extends Controller
         private IssueQueryFilter $filter,
     ) {}
 
+    /** Resolved per call: a controller may outlive the request it was built for. */
+    private function scope(): ProjectScope
+    {
+        return app(ProjectScope::class);
+    }
+
     public function index(Request $request): Response
     {
         $this->authorize('viewAny', Issue::class);
@@ -60,6 +67,9 @@ class IssueController extends Controller
             // for, so an inline edit re-runs the issue query and nothing else.
             'issues' => fn () => $this->issues($request, $query, $this->layout($request)),
             'query' => $query->toArray(),
+            // Whether the sidebar's project choice is narrowing this list, so the page
+            // can say so: a filter nobody can see is the one that reads as missing work.
+            'scopedTo' => $this->scope()->appliesTo($query) ? $this->scope()->current()->only(['name', 'slug']) : null,
             'layout' => $this->layout($request),
             'groupBy' => $this->groupBy($request),
             'facets' => fn () => $this->facets(),
@@ -79,6 +89,8 @@ class IssueController extends Controller
             $this->isStaff($request->user()),
             fn (Builder $q) => $q->visibleToClient($request->user()),
         );
+
+        $query = $this->scope()->applyTo($query);
 
         $builder = $layout === 'board'
             ? $base()->whereIn('issues.id', $this->boardIds($base, $query, $request->user()))
@@ -226,7 +238,8 @@ class IssueController extends Controller
         // theirs to be shown — nor its existence confirmed by a different error.
         $project = $request->filled('project')
             ? Project::visibleTo($request->user())->where('slug', $request->string('project'))->firstOrFail()
-            : Project::active()->visibleTo($request->user())->orderBy('name')->firstOrFail();
+            : ($this->scope()->current()
+                ?? Project::active()->visibleTo($request->user())->orderBy('name')->firstOrFail());
 
         return Inertia::render('issues/create', [
             'project' => ['id' => $project->id, 'key' => $project->key, 'name' => $project->name, 'slug' => $project->slug],

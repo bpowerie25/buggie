@@ -61,6 +61,8 @@ export interface SharedProps {
     workspaces: WorkspaceListing[];
     views: SavedView[];
     inboxCount: number;
+    /** Sidebar project choice; null when there is only one project to choose. */
+    projectScope: { current: string | null; projects: { name: string; key: string; slug: string }[] } | null;
     /** Unread in-app notifications for this person, in this workspace. */
     notificationCount: number;
     /** A client whose projects include one sharing its timeline. */

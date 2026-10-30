@@ -85,6 +85,7 @@ export function AppLayout({
         workspaces,
         views,
         inboxCount,
+        projectScope,
         notificationCount,
         accessRequests,
         clientTimeline,
@@ -166,6 +167,33 @@ export function AppLayout({
                         </div>
                     )}
                 </div>
+
+                {projectScope && (
+                    <div className="px-3 pb-2">
+                        <label className="sr-only" htmlFor="project-scope">
+                            Project
+                        </label>
+                        <select
+                            id="project-scope"
+                            value={projectScope.current ?? ''}
+                            onChange={(e) =>
+                                router.put('/project-scope', { project: e.target.value }, { preserveScroll: true })
+                            }
+                            className={`w-full rounded-lg border px-2 py-1.5 text-sm ${
+                                projectScope.current
+                                    ? 'border-accent bg-accent-soft font-medium text-accent'
+                                    : 'border-border bg-raised text-ink-muted'
+                            }`}
+                        >
+                            <option value="">All projects</option>
+                            {projectScope.projects.map((p) => (
+                                <option key={p.slug} value={p.slug}>
+                                    {p.name}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                )}
 
                 <nav className="flex-1 space-y-0.5 px-3">
                     <NavLink href="/" icon={LayoutDashboard} active={path === '/'}>
