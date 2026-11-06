@@ -287,7 +287,7 @@ class IssueController extends Controller
         // Client visibility is forced inside the action, so every entry point gets
         // it rather than only this one.
         $issue = DB::transaction(function () use ($action, $project, $request, $parent) {
-            $issue = $action->handle($project, collect($request->validated())->except('parent')->all(), $request->user());
+            $issue = $action->handle($project, collect($request->validated())->except(['parent', 'files'])->all(), $request->user());
 
             if ($parent !== null) {
                 $this->authorize('update', $parent);
@@ -296,6 +296,26 @@ class IssueController extends Controller
 
             return $issue;
         });
+
+        // The issue is the thing the person asked for; it stands even if a file is
+        // somehow refused after validation passed.
+        $failed = [];
+
+        foreach ($request->file('files', []) as $file) {
+            if ($reason = \App\Support\Attachments\AttachmentStore::refusal($file)) {
+                $failed[] = $file->getClientOriginalName().' ('.$reason.')';
+
+                continue;
+            }
+
+            $attachment = \App\Support\Attachments\AttachmentStore::store($file, $issue, $issue, $request->user());
+            $issue->recordEvent(\App\Enums\IssueEventType::AttachmentAdded, ['filename' => $attachment->filename], $request->user());
+        }
+
+        if ($failed !== []) {
+            return redirect()->route('issues.show', $issue)
+                ->with('error', "{$issue->key} created, but these files were not attached: ".implode(', ', $failed));
+        }
 
         // Added from a board column: stay on the board, where the card now is.
         if ($request->boolean('stay')) {

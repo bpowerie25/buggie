@@ -47,11 +47,31 @@ class StoreIssueRequest extends FormRequest
             // validates them against the project so the API and the form cannot
             // disagree about it.
             'custom_fields' => ['array'],
+
+            // Attached while filing, to the issue this creates. Same allowlist and
+            // size cap as attaching to an existing one.
+            'files' => ['array', 'max:10'],
+            'files.*' => [
+                'file',
+                'max:'.\App\Support\Attachments\AttachmentStore::MAX_KILOBYTES,
+                'mimetypes:'.implode(',', \App\Support\Attachments\AttachmentStore::ALLOWED_MIMES),
+            ],
         ];
     }
 
     protected function prepareForValidation(): void
     {
+        // A form carrying files is multipart, which flattens the rich-text document
+        // and nested fields into strings. The page sends the rest as one JSON field
+        // instead, and it is unpacked here so everything below sees ordinary input.
+        if (is_string($this->input('payload'))) {
+            $decoded = json_decode($this->input('payload'), true);
+
+            if (is_array($decoded)) {
+                $this->merge($decoded);
+            }
+        }
+
         $this->mergeIfMissing([
             'type' => IssueType::Bug->value,
             'priority' => IssuePriority::None->value,

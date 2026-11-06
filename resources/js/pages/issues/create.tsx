@@ -5,14 +5,14 @@ import { Popover, PopoverItem } from '@/components/popover';
 import { RichTextEditor, type Mentionable } from '@/components/rich-text';
 import { AppLayout } from '@/layouts/app-layout';
 import type { Facets, IssueStatus, IssueTypeValue, SharedProps } from '@/types';
-import { Head, useForm, usePage } from '@inertiajs/react';
+import { Head, router, useForm, usePage } from '@inertiajs/react';
 import {
     CustomFieldInput,
     type CustomFieldDefinition,
 } from '@/components/custom-field-input';
 import type { JSONContent } from '@tiptap/react';
-import { Eye, EyeOff } from 'lucide-react';
-import type { FormEvent } from 'react';
+import { Eye, EyeOff, Paperclip, X } from 'lucide-react';
+import { useState, type FormEvent } from 'react';
 
 export default function CreateIssue({
     project,
@@ -55,9 +55,25 @@ export default function CreateIssue({
         custom_fields: {},
     });
 
+    const [files, setFiles] = useState<File[]>([]);
+    const [sending, setSending] = useState(false);
+    const fileError = Object.entries(errors).find(([key]) => key.startsWith('files'))?.[1];
+
     function submit(e: FormEvent) {
         e.preventDefault();
-        post('/issues');
+
+        if (files.length === 0) {
+            post('/issues');
+            return;
+        }
+
+        // Multipart flattens the rich-text document, so everything but the files
+        // travels as one JSON field and is unpacked on the server.
+        router.post(
+            '/issues',
+            { payload: JSON.stringify(data), files },
+            { forceFormData: true, onStart: () => setSending(true), onFinish: () => setSending(false) },
+        );
     }
 
     const selectedProject =
@@ -250,8 +266,47 @@ export default function CreateIssue({
                     </Field>
                 )}
 
-                <Button type="submit" disabled={processing || !data.title}>
-                    {processing ? 'Creating…' : `Create issue in ${selectedProject.key}`}
+                <div className="space-y-1.5">
+                    <span className="text-sm font-medium text-ink">Attachments</span>
+                    <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-border-strong px-3 py-2.5 text-sm text-ink-muted transition hover:border-accent hover:text-ink">
+                        <Paperclip className="size-4" />
+                        Add screenshots or files
+                        <span className="text-xs text-ink-subtle">
+                            images, PDF, text, CSV, JSON, ZIP · up to 10 MB each
+                        </span>
+                        <input
+                            type="file"
+                            multiple
+                            className="sr-only"
+                            onChange={(e) => {
+                                setFiles((current) => [...current, ...Array.from(e.target.files ?? [])].slice(0, 10));
+                                e.target.value = '';
+                            }}
+                        />
+                    </label>
+                    {files.length > 0 && (
+                        <ul className="space-y-1">
+                            {files.map((file, index) => (
+                                <li key={`${file.name}-${index}`} className="flex items-center gap-2 text-xs text-ink-muted">
+                                    <span className="min-w-0 flex-1 truncate">{file.name}</span>
+                                    <span className="text-ink-subtle">{Math.max(1, Math.round(file.size / 1024))} KB</span>
+                                    <button
+                                        type="button"
+                                        aria-label={`Remove ${file.name}`}
+                                        onClick={() => setFiles((current) => current.filter((_, i) => i !== index))}
+                                        className="rounded p-0.5 text-ink-subtle hover:text-danger"
+                                    >
+                                        <X className="size-3.5" />
+                                    </button>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                    {fileError && <span className="text-xs text-danger">{fileError}</span>}
+                </div>
+
+                <Button type="submit" disabled={processing || sending || !data.title}>
+                    {processing || sending ? 'Creating…' : `Create issue in ${selectedProject.key}`}
                 </Button>
             </form>
         </AppLayout>
