@@ -84,6 +84,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'workspace' => EnsureWorkspaceMember::class,
             'hosted' => RequireHostedMode::class,
+            'feature' => \App\Http\Middleware\RequireFeature::class,
             'registration' => EnsureRegistrationIsOpen::class,
 
             // Sanctum ships these but registers no aliases, so the API's

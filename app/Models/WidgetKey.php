@@ -19,7 +19,7 @@ use Illuminate\Support\Str;
 #[\Illuminate\Database\Eloquent\Attributes\Hidden(['secret'])]
 class WidgetKey extends Model
 {
-    use BelongsToWorkspace, HasFactory;
+    use BelongsToWorkspace, HasFactory, \App\Models\Concerns\Audited;
 
     protected function casts(): array
     {

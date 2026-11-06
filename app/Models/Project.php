@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\BelongsToWorkspace;
+use App\Support\Tenancy\Tenancy;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -11,14 +12,15 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Str;
 
 #[Fillable([
     'name', 'key', 'slug', 'description', 'site_url', 'default_assignee_id', 'is_archived',
-    'settings', 'brand_name', 'brand_color',
+    'settings', 'brand_name', 'brand_color', 'project_category_id',
 ])]
 class Project extends Model
 {
-    use BelongsToWorkspace, HasFactory, SoftDeletes;
+    use BelongsToWorkspace, HasFactory, SoftDeletes, \App\Models\Concerns\Audited;
 
     protected function casts(): array
     {
@@ -39,7 +41,7 @@ class Project extends Model
         static::creating(function (self $project) {
             // The suffix in bugs+{token}@in.buggie.eu. Random rather than derived from
             // the slug, so guessing one project's address does not reveal another's.
-            $project->inbound_token ??= \Illuminate\Support\Str::lower(\Illuminate\Support\Str::random(16));
+            $project->inbound_token ??= Str::lower(Str::random(16));
         });
     }
 
@@ -206,6 +208,25 @@ class Project extends Model
         return is_numeric($days) && (int) $days > 0 ? (int) $days : null;
     }
 
+    public function category(): BelongsTo
+    {
+        return $this->belongsTo(ProjectCategory::class, 'project_category_id');
+    }
+
+    /**
+     * Who is emailed when a report arrives for this project.
+     *
+     * Kept in the project's settings: a short list of staff ids that belongs to the
+     * project and nowhere else. Read back through the workspace's staff, so somebody
+     * who has since left or become a client simply stops being on it.
+     *
+     * @return array<int, int>
+     */
+    public function triageRecipientIds(): array
+    {
+        return array_values(array_map('intval', $this->settings['triage_recipients'] ?? []));
+    }
+
     public function defaultAssignee(): BelongsTo
     {
         return $this->belongsTo(User::class, 'default_assignee_id');
@@ -234,7 +255,7 @@ class Project extends Model
      */
     public function scopeVisibleTo(Builder $query, User $user): Builder
     {
-        $workspace = app(\App\Support\Tenancy\Tenancy::class)->current();
+        $workspace = app(Tenancy::class)->current();
 
         if ($workspace && ($user->membershipIn($workspace)?->isStaff() ?? false)) {
             return $query;

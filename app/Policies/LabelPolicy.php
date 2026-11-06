@@ -5,6 +5,7 @@ namespace App\Policies;
 use App\Enums\WorkspaceRole;
 use App\Models\Label;
 use App\Models\User;
+use App\Support\Settings\Features;
 use App\Support\Tenancy\Tenancy;
 
 class LabelPolicy
@@ -18,9 +19,22 @@ class LabelPolicy
         return $this->role($user)?->isStaff() ?? false;
     }
 
+    /**
+     * Admins and owners always; other staff only when an admin has allowed it.
+     *
+     * The vocabulary is shared by every project, so changing it changes everybody's
+     * filters and saved views. That is an admin's call to delegate, not a default.
+     */
     public function create(User $user): bool
     {
-        return $this->role($user)?->isStaff() ?? false;
+        $role = $this->role($user);
+
+        if ($role === null || ! $role->isStaff()) {
+            return false;
+        }
+
+        return $role->canManageWorkspace()
+            || Features::membersManageLabels($this->tenancy->current());
     }
 
     public function update(User $user, Label $label): bool

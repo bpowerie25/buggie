@@ -498,7 +498,7 @@ export default function IssuesIndex({
                 <a
                     href={`/issues/export${query.query ? `?q=${encodeURIComponent(query.query)}` : ''}`}
                     title="Download these issues as CSV"
-                    className="flex items-center gap-1.5 rounded-lg border border-border px-2 py-1 text-xs text-ink-muted transition hover:text-ink"
+                    className="flex items-center gap-1.5 rounded-lg border border-border px-2 py-1 text-xs text-ink-muted transition hover:border-border-strong hover:bg-raised hover:text-ink"
                 >
                     <Download className="size-3.5" />
                     Export
@@ -509,11 +509,21 @@ export default function IssuesIndex({
                     <Link
                         href={query.include.project?.length === 1 ? `/projects/${query.include.project[0]}/import` : '/import'}
                         title="Create or update issues from a spreadsheet"
-                        className="flex items-center gap-1.5 rounded-lg border border-border px-2 py-1 text-xs text-ink-muted transition hover:text-ink"
+                        className="flex items-center gap-1.5 rounded-lg border border-border px-2 py-1 text-xs text-ink-muted transition hover:border-border-strong hover:bg-raised hover:text-ink"
                     >
                         <Upload className="size-3.5" />
                         Import
                     </Link>
+                )}
+
+                {editable && selected.size === 0 && rows.length > 1 && (
+                    <button
+                        type="button"
+                        onClick={() => setSelected(new Set(rows.map((row) => row.key)))}
+                        className="rounded-lg border border-border px-2 py-1 text-xs text-ink-muted transition hover:border-border-strong hover:bg-raised hover:text-ink"
+                    >
+                        Select all
+                    </button>
                 )}
 
                 <span className="text-xs text-ink-subtle">
@@ -573,6 +583,16 @@ export default function IssuesIndex({
                             ))
                         }
                     </BulkMenu>
+
+                    {selected.size < rows.length && (
+                        <button
+                            type="button"
+                            onClick={() => setSelected(new Set(rows.map((row) => row.key)))}
+                            className="text-accent hover:underline"
+                        >
+                            Select all {rows.length}
+                        </button>
+                    )}
 
                     <button
                         type="button"
@@ -1010,7 +1030,7 @@ function SaveViewButton({
             <button
                 type="button"
                 onClick={() => setNaming(true)}
-                className="flex items-center gap-1.5 rounded-lg border border-border px-2 py-1 text-xs text-ink-muted transition hover:text-ink"
+                className="flex items-center gap-1.5 rounded-lg border border-border px-2 py-1 text-xs text-ink-muted transition hover:border-border-strong hover:bg-raised hover:text-ink"
             >
                 <Bookmark className="size-3" />
                 Save view

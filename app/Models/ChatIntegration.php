@@ -21,7 +21,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 #[Hidden(['url'])]
 class ChatIntegration extends Model
 {
-    use BelongsToWorkspace, HasFactory;
+    use BelongsToWorkspace, HasFactory, \App\Models\Concerns\Audited;
 
     protected function casts(): array
     {

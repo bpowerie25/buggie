@@ -229,6 +229,11 @@ class MemberController extends Controller
         $user->projects()->detach(Project::whereNotIn('id', array_keys($sync))->pluck('id'));
         $user->projects()->syncWithoutDetaching($sync);
 
+        \App\Support\Audit\Audit::log('member.project_access_changed', $user, [
+            'projects' => Project::whereIn('id', array_keys($sync))->pluck('key')->all(),
+            'before' => Project::whereIn('id', $existing->keys())->pluck('key')->all(),
+        ]);
+
         foreach ($sync as $id => $pivot) {
             if (isset($existing[$id]) && $existing[$id] !== $pivot['role']) {
                 MemberEvent::tierChanged($request->user(), $user, Project::findOrFail($id), $existing[$id], $pivot['role']);
@@ -267,6 +272,11 @@ class MemberController extends Controller
             'discipline' => trim($validated['discipline'] ?? '') ?: null,
         ]);
 
+        \App\Support\Audit\Audit::log('member.capacity_changed', $user, [
+            'weekly_hours' => $validated['weekly_hours'] ?? null,
+            'discipline' => $validated['discipline'] ?? null,
+        ]);
+
         return back()->with('success', "Saved {$user->name}'s hours.");
     }
 
@@ -290,6 +300,10 @@ class MemberController extends Controller
             $user->projects()->updateExistingPivot($project->id, ['role' => $validated['tier']]);
 
             MemberEvent::tierChanged($request->user(), $user, $project, $current, $validated['tier']);
+
+            \App\Support\Audit\Audit::log('member.client_tier_changed', $user, [
+                'project' => $project->key, 'from' => $current, 'to' => $validated['tier'],
+            ]);
         }
 
         $label = ProjectRole::from($validated['tier']) === ProjectRole::ClientManager
@@ -313,6 +327,8 @@ class MemberController extends Controller
         abort_if($user->id === $workspace->owner_id, 403, 'The workspace owner cannot be removed.');
 
         $workspace->members()->detach($user->id);
+
+        \App\Support\Audit\Audit::log('member.removed', $user, ['role' => $user->membershipIn($workspace)?->value]);
 
         // This workspace's projects only, named by id. detach() with no ids deletes
         // every project_user row the person has on the install — the grants other

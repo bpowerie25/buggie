@@ -15,6 +15,8 @@ class LabelController extends Controller
         $this->authorize('viewAny', Label::class);
 
         return Inertia::render('labels/index', [
+            'can_manage' => request()->user()->can('create', Label::class),
+            'can_delete' => request()->user()->can('delete', new Label),
             'labels' => Label::withCount('issues')->orderBy('name')->get()
                 ->map(fn (Label $label) => [
                     'id' => $label->id,

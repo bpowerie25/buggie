@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 #[Fillable(['name', 'color', 'description'])]
 class Label extends Model
 {
-    use BelongsToWorkspace, HasFactory;
+    use BelongsToWorkspace, HasFactory, \App\Models\Concerns\Audited;
 
     public function issues(): BelongsToMany
     {

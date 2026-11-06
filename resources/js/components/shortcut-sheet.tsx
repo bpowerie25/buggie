@@ -12,7 +12,7 @@ const groups: { heading: string; items: [string, string][] }[] = [
         heading: 'Go to',
         items: [
             ['g i', 'Issues'],
-            ['g b', 'Board'],
+            ['g b', 'Kanban Board'],
             ['g l', 'List'],
             ['g p', 'Projects'],
             ['g t', 'Triage inbox'],

@@ -8,6 +8,7 @@ use App\Models\CustomField;
 use App\Models\Issue;
 use App\Models\User;
 use App\Support\Tenancy\Tenancy;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 
 /**
@@ -39,6 +40,9 @@ class IssueQueryFilter
         $this->person($query, $parsed, $viewer, 'reporter');
         $this->labels($query, $parsed);
         $this->type($query, $parsed);
+        $this->statusName($query, $parsed);
+        $this->between($query, $parsed, 'created', 'created_at');
+        $this->between($query, $parsed, 'closed', 'closed_at');
         $this->priority($query, $parsed);
         $this->version($query, $parsed);
         $this->phase($query, $parsed);
@@ -281,6 +285,50 @@ class IssueQueryFilter
 
         foreach ($parsed->all('type', negated: true) as $type) {
             $query->where('type', '!=', $type);
+        }
+    }
+
+    /** status:"In Progress" — by name, case-insensitively; statuses are per project. */
+    private function statusName(Builder $query, IssueQuery $parsed): void
+    {
+        foreach ([false, true] as $negated) {
+            foreach ($parsed->all('status', $negated) as $name) {
+                $constraint = fn (Builder $q) => $q->whereRaw('lower(name) = ?', [strtolower($name)]);
+
+                $negated
+                    ? $query->whereDoesntHave('status', $constraint)
+                    : $query->whereHas('status', $constraint);
+            }
+        }
+    }
+
+    /**
+     * created:2026-08-01..2026-08-31, closed:2026-08-01.. (open-ended) or a single day.
+     *
+     * Both ends are inclusive whole days. A value that is not a date matches nothing,
+     * like an unresolvable name, rather than quietly dropping the constraint.
+     */
+    private function between(Builder $query, IssueQuery $parsed, string $key, string $column): void
+    {
+        foreach ($parsed->all($key) as $value) {
+            [$from, $to] = array_pad(explode('..', $value, 2), 2, null);
+            $to = str_contains($value, '..') ? $to : $from;
+
+            try {
+                $start = $from ? CarbonImmutable::createFromFormat('!Y-m-d', $from) : null;
+                $end = $to ? CarbonImmutable::createFromFormat('!Y-m-d', $to) : null;
+            } catch (\Throwable) {
+                $start = $end = false;
+            }
+
+            if ($start === false || $end === false || ($start === null && $end === null)) {
+                $query->whereRaw('1 = 0');
+
+                continue;
+            }
+
+            $start && $query->where($column, '>=', $start->startOfDay());
+            $end && $query->where($column, '<=', $end->endOfDay());
         }
     }
 

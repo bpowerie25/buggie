@@ -38,6 +38,12 @@ class ApiTokenController extends Controller
                 : null,
         );
 
+        \App\Support\Audit\Audit::log('api_token.created', null, [
+            'name' => $validated['name'],
+            'abilities' => $validated['abilities'],
+            'expires_in_days' => $validated['expires_in_days'] ?? null,
+        ], label: $validated['name']);
+
         // Flashed, and shown once. Storing it in a readable form would make the
         // hashing pointless.
         return back()->with('token', $token->plainTextToken);
@@ -54,6 +60,8 @@ class ApiTokenController extends Controller
                 && $apiToken->tokenable_id === $request->user()->id,
             404,
         );
+
+        \App\Support\Audit\Audit::log('api_token.revoked', null, ['name' => $apiToken->name], label: $apiToken->name);
 
         $apiToken->delete();
 

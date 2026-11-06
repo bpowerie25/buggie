@@ -76,6 +76,8 @@ export default function WorkspaceSettings({
         created_at: string;
         show_staff_names: boolean;
         trust_unverified_emails: boolean;
+        features: Record<string, boolean>;
+        members_manage_labels: boolean;
     };
     domain: string;
     can_delete: boolean;
@@ -91,6 +93,8 @@ export default function WorkspaceSettings({
         name: workspace.name,
         show_staff_names: workspace.show_staff_names,
         trust_unverified_emails: workspace.trust_unverified_emails,
+        features: workspace.features,
+        members_manage_labels: workspace.members_manage_labels,
     });
     const [confirm, setConfirm] = useState('');
     // A refusal to delete comes back as a page error, not through the form above.
@@ -154,6 +158,50 @@ export default function WorkspaceSettings({
                             Off, only a verified identity links a widget report to a client, who can
                             then see it. On, a typed or identified email matching a client does too —
                             and anybody could type that client's address.
+                        </span>
+                    </span>
+                </label>
+
+                <fieldset className="space-y-3 rounded-xl border border-border p-4">
+                    <legend className="px-1 text-sm font-medium text-ink">Features</legend>
+                    <p className="text-xs text-ink-subtle">
+                        Switch off what this team doesn't use. It disappears from the sidebar and its
+                        pages stop working; nothing already recorded is deleted.
+                    </p>
+                    {[
+                        ['timeline', 'Timeline', 'Issues as bars on a date axis, and dates on the issue.'],
+                        ['time', 'Time tracking', 'Timers, logged time, estimates and the time report.'],
+                        ['workload', 'Workload', 'Capacity per person, and time off.'],
+                    ].map(([key, label, hint]) => (
+                        <label key={key} className="flex items-start gap-2 text-sm text-ink-muted">
+                            <input
+                                type="checkbox"
+                                checked={data.features[key] !== false}
+                                onChange={(e) =>
+                                    setData('features', { ...data.features, [key]: e.target.checked })
+                                }
+                                className="mt-0.5 rounded border-border-strong"
+                            />
+                            <span>
+                                {label}
+                                <span className="block text-xs text-ink-subtle">{hint}</span>
+                            </span>
+                        </label>
+                    ))}
+                </fieldset>
+
+                <label className="flex items-start gap-2 text-sm text-ink-muted">
+                    <input
+                        type="checkbox"
+                        checked={data.members_manage_labels}
+                        onChange={(e) => setData('members_manage_labels', e.target.checked)}
+                        className="mt-0.5 rounded border-border-strong"
+                    />
+                    <span>
+                        Let members create and edit labels
+                        <span className="block text-xs text-ink-subtle">
+                            Off, only owners and admins can. Labels are shared by every project, so
+                            changing one changes everybody's filters. Deleting stays with admins.
                         </span>
                     </span>
                 </label>

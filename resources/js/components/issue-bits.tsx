@@ -118,6 +118,20 @@ export function relativeTime(iso: string): string {
     });
 }
 
+/** "6 Nov 2026" — the calendar date, for when "22d ago" needs a date to go with it. */
+export function shortDate(iso: string): string {
+    return new Date(iso).toLocaleDateString(undefined, {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+    });
+}
+
+/** "6 Nov 2026 · 22d ago". */
+export function dateWithAge(iso: string): string {
+    return `${shortDate(iso)} · ${relativeTime(iso)}`;
+}
+
 /** A client has answered and nobody on the team has looked since. Staff only. */
 /**
  * Whether an issue is waiting on something, or holding something up — red when it is

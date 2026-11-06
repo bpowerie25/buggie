@@ -16,7 +16,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 #[Fillable(['user_id', 'starts_on', 'ends_on', 'part', 'note', 'created_by_id'])]
 class TimeOff extends Model
 {
-    use BelongsToWorkspace;
+    use BelongsToWorkspace, \App\Models\Concerns\Audited;
 
     protected $table = 'time_off';
 

@@ -13,7 +13,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 #[Fillable(['issue_id', 'user_id', 'minutes', 'spent_on', 'note', 'billable'])]
 class TimeEntry extends Model
 {
-    use BelongsToWorkspace, HasFactory;
+    use BelongsToWorkspace, HasFactory, \App\Models\Concerns\Audited;
 
     protected function casts(): array
     {

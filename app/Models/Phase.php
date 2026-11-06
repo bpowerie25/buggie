@@ -17,7 +17,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 #[Fillable(['project_id', 'name', 'position'])]
 class Phase extends Model
 {
-    use BelongsToWorkspace, HasFactory;
+    use BelongsToWorkspace, HasFactory, \App\Models\Concerns\Audited;
 
     public function project(): BelongsTo
     {

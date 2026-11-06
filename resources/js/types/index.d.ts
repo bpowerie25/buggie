@@ -36,6 +36,16 @@ export interface ProjectSummary {
     /** Seeds the origin allowlist of new widget keys. */
     site_url: string | null;
     is_archived?: boolean;
+    category?: ProjectCategory | null;
+    project_category_id?: number | null;
+    default_assignee_id?: number | null;
+}
+
+/** A workspace-defined kind of project, with the colour it is drawn in. */
+export interface ProjectCategory {
+    id: number;
+    name: string;
+    color: string;
 }
 
 export interface Status {
@@ -67,6 +77,8 @@ export interface SharedProps {
     notificationCount: number;
     /** A client whose projects include one sharing its timeline. */
     clientTimeline?: boolean;
+    /** Optional areas the workspace admin has left switched on. */
+    features?: { timeline: boolean; time: boolean; workload: boolean };
     /** For those who can invite: whether requests are taken, and how many wait. */
     accessRequests: { enabled: boolean; pending: number } | null;
     billing: {
@@ -186,5 +198,6 @@ export interface ReportRow {
     error: { message?: string; stack?: string } | null;
     fingerprint: string | null;
     screenshot_url: string | null;
+    default_assignee_id: number | null;
     created_at: string;
 }

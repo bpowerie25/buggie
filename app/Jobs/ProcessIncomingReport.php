@@ -8,6 +8,7 @@ use App\Models\Issue;
 use App\Models\Report;
 use App\Models\Workspace;
 use App\Support\Reports\Fingerprint;
+use App\Support\Reports\TriageAlert;
 use App\Support\Tenancy\Tenancy;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -48,40 +49,50 @@ class ProcessIncomingReport implements ShouldQueue
                 return;
             }
 
-            // Widget ingest fingerprints before it saves, because the answer decides
-            // whether the report is metered. Anything arriving another way — email,
-            // the seeder — is fingerprinted here.
-            $fingerprint = $report->fingerprint ?? Fingerprint::for(
-                $report->error,
-                $report->environment['url'] ?? null,
-            );
+            $this->group($report);
 
-            if ($fingerprint === null) {
-                // No error to group on: it goes to a human, individually.
-                return;
-            }
-
-            if ($report->fingerprint !== $fingerprint) {
-                $report->forceFill(['fingerprint' => $fingerprint])->save();
-            }
-
-            $issue = Issue::where('project_id', $report->project_id)
-                ->where('fingerprint', $fingerprint)
-                ->latest('last_seen_at')
-                ->first();
-
-            if ($issue === null) {
-                return;
-            }
-
-            if (! $issue->isOpen() && $this->tooOldToReopen($issue)) {
-                // Leave it in the inbox so a person decides whether this is a
-                // regression worth linking rather than silently reviving old history.
-                return;
-            }
-
-            $this->recordOccurrence($issue, $report);
+            // Still ungrouped after all that: it is waiting for a person, so tell them.
+            $report->refresh();
+            $report->loadMissing('project');
+            TriageAlert::send($report);
         });
+    }
+
+    private function group(Report $report): void
+    {
+        // Widget ingest fingerprints before it saves, because the answer decides
+        // whether the report is metered. Anything arriving another way — email,
+        // the seeder — is fingerprinted here.
+        $fingerprint = $report->fingerprint ?? Fingerprint::for(
+            $report->error,
+            $report->environment['url'] ?? null,
+        );
+
+        if ($fingerprint === null) {
+            // No error to group on: it goes to a human, individually.
+            return;
+        }
+
+        if ($report->fingerprint !== $fingerprint) {
+            $report->forceFill(['fingerprint' => $fingerprint])->save();
+        }
+
+        $issue = Issue::where('project_id', $report->project_id)
+            ->where('fingerprint', $fingerprint)
+            ->latest('last_seen_at')
+            ->first();
+
+        if ($issue === null) {
+            return;
+        }
+
+        if (! $issue->isOpen() && $this->tooOldToReopen($issue)) {
+            // Leave it in the inbox so a person decides whether this is a
+            // regression worth linking rather than silently reviving old history.
+            return;
+        }
+
+        $this->recordOccurrence($issue, $report);
     }
 
     private function tooOldToReopen(Issue $issue): bool

@@ -16,7 +16,7 @@ use Illuminate\Support\Facades\Storage;
 ])]
 class Attachment extends Model
 {
-    use BelongsToWorkspace, HasFactory;
+    use BelongsToWorkspace, HasFactory, \App\Models\Concerns\Audited;
 
     protected function casts(): array
     {

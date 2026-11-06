@@ -2,8 +2,10 @@ import { Button } from '@/components/button';
 import { relativeTime, TypeIcon } from '@/components/issue-bits';
 import { AppLayout } from '@/layouts/app-layout';
 import type { IssueTypeValue, ProjectSummary, SharedProps } from '@/types';
+import { CategoryLegend } from '@/components/category-legend';
 import { Head, Link, usePage } from '@inertiajs/react';
 import { FolderKanban, Plus } from 'lucide-react';
+import { useMemo, useState } from 'react';
 
 interface WaitingIssue {
     key: string;
@@ -25,6 +27,19 @@ export default function Dashboard({
 }) {
     const { auth } = usePage<SharedProps>().props;
     const isClient = auth.role === 'client';
+    const [filter, setFilter] = useState<number[]>([]);
+
+    // Only the categories the projects on screen actually use, so the legend is a key
+    // to what is drawn rather than the workspace's whole vocabulary.
+    const categories = useMemo(() => {
+        const seen = new Map<number, NonNullable<ProjectSummary['category']>>();
+        projects.forEach((p) => p.category && seen.set(p.category.id, p.category));
+
+        return [...seen.values()].sort((a, b) => a.name.localeCompare(b.name));
+    }, [projects]);
+    const shown = filter.length
+        ? projects.filter((p) => filter.includes(p.category?.id ?? 0))
+        : projects;
     return (
         <AppLayout
             title="Dashboard"
@@ -90,18 +105,38 @@ export default function Dashboard({
             )}
 
             {projects.length > 0 && (
-                <ul className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                    {projects.map((project) => (
+                <div className="mt-6">
+                    <CategoryLegend
+                        categories={categories}
+                        selected={filter}
+                        onChange={setFilter}
+                        hasUncategorised={projects.some((p) => !p.category)}
+                    />
+                </div>
+            )}
+
+            {projects.length > 0 && (
+                <ul className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    {shown.map((project) => (
                         <li key={project.slug}>
                             <Link
                                 href={`/projects/${project.slug}`}
-                                className="block h-full rounded-xl border border-border bg-raised p-4 transition hover:border-border-strong"
+                                className="block h-full rounded-xl border border-border border-l-4 bg-raised p-4 transition hover:border-border-strong"
+                                style={project.category ? { borderLeftColor: project.category.color } : undefined}
                             >
                                 <div className="flex items-center gap-2">
-                                    <FolderKanban className="size-4 text-ink-subtle" />
+                                    <FolderKanban
+                                        className="size-4 text-ink-subtle"
+                                        style={project.category ? { color: project.category.color } : undefined}
+                                    />
                                     <span className="rounded bg-surface px-1.5 py-0.5 font-mono text-[11px] font-medium text-ink-muted">
                                         {project.key}
                                     </span>
+                                    {project.category && (
+                                        <span className="ml-auto text-[11px] text-ink-subtle">
+                                            {project.category.name}
+                                        </span>
+                                    )}
                                 </div>
                                 <p className="mt-2 text-sm font-medium text-ink">
                                     {project.name}

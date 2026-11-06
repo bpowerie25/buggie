@@ -52,6 +52,27 @@ class AppServiceProvider extends ServiceProvider
                 : null,
         );
 
+        // Sign-ins are recorded in the trail of every workspace the person belongs to:
+        // they happen on the central domain, where no workspace is bound.
+        foreach ([
+            \Illuminate\Auth\Events\Login::class => 'auth.login',
+            \Illuminate\Auth\Events\Logout::class => 'auth.logout',
+            \Illuminate\Auth\Events\Failed::class => 'auth.login_failed',
+            \Illuminate\Auth\Events\PasswordReset::class => 'auth.password_reset',
+        ] as $class => $name) {
+            Event::listen($class, function ($event) use ($name) {
+                $user = $event->user ?? null;
+
+                if (! $user instanceof \App\Models\User) {
+                    return;
+                }
+
+                foreach ($user->workspaces()->pluck('workspaces.id') as $workspaceId) {
+                    \App\Support\Audit\Audit::log($name, $user, null, $workspaceId, $user, $user->email);
+                }
+            });
+        }
+
         $this->app->make(MailConfiguration::class)->apply();
 
         // Workspaces pay, not users: one person may belong to several workspaces and

@@ -16,7 +16,7 @@ use Illuminate\Support\Str;
 #[Hidden(['secret'])]
 class Webhook extends Model
 {
-    use BelongsToWorkspace, HasFactory;
+    use BelongsToWorkspace, HasFactory, \App\Models\Concerns\Audited;
 
     protected function casts(): array
     {

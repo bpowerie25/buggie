@@ -436,40 +436,59 @@ Route::domain('{workspace}.'.$host)
             ->name('issues.rank');
         // --- the optional timer ---
         Route::post('issues/{issue}/timer', [TimerController::class, 'start'])
+            ->middleware('feature:time')
             ->name('timer.start');
         Route::post('timer/stop', [TimerController::class, 'stop'])
+            ->middleware('feature:time')
             ->name('timer.stop');
         Route::delete('timer', [TimerController::class, 'discard'])
+            ->middleware('feature:time')
             ->name('timer.discard');
         // --- end ---
 
         Route::post('issues/{issue}/time', [TimeEntryController::class, 'store'])
+            ->middleware('feature:time')
             ->name('time.store');
         Route::delete('time/{entry}', [TimeEntryController::class, 'destroy'])
+            ->middleware('feature:time')
             ->name('time.destroy');
         Route::patch('issues/{issue}/estimate', [TimeEntryController::class, 'estimate'])
+            ->middleware('feature:time')
             ->name('time.estimate');
+        Route::resource('project-categories', \App\Http\Controllers\ProjectCategoryController::class)
+            ->only(['store', 'update', 'destroy']);
+        Route::get('settings/audit', \App\Http\Controllers\AuditLogController::class)
+            ->name('audit');
+        Route::get('assignments', \App\Http\Controllers\AssignmentsController::class)
+            ->name('assignments');
         Route::get('insights', InsightsController::class)
             ->name('insights');
         Route::get('workload', WorkloadController::class)
+            ->middleware('feature:workload')
             ->name('workload');
         Route::post('time-off', [TimeOffController::class, 'store'])
+            ->middleware('feature:workload')
             ->name('time-off.store');
         Route::delete('time-off/{timeOff}', [TimeOffController::class, 'destroy'])
+            ->middleware('feature:workload')
             ->name('time-off.destroy');
 
         // --- timeline ---------------------------------------------------------
         // Issues as bars on a date axis. Staff only, enforced in the controller
         // rather than by a middleware, so the check sits beside the reason for it.
         Route::get('timeline', TimelineController::class)
+            ->middleware('feature:timeline')
             ->name('timeline');
         // Dragging on the timeline. Refused if the issue changed since it was loaded.
         Route::patch('issues/{issue}/schedule', IssueScheduleController::class)
+            ->middleware('feature:timeline')
             ->name('issues.schedule');
         // --- end timeline -----------------------------------------------------
         Route::get('time', [TimeReportController::class, 'index'])
+            ->middleware('feature:time')
             ->name('time.index');
         Route::get('time/export', [TimeReportController::class, 'export'])
+            ->middleware('feature:time')
             ->name('time.export');
 
         Route::post('projects/{project}/fields', [CustomFieldController::class, 'store'])

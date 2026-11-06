@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\Issue;
 use App\Models\Project;
 use App\Support\Insights\Insights;
+use App\Support\Tenancy\ProjectScope;
+use App\Support\Tenancy\Tenancy;
 use App\Support\Time\Duration;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
@@ -32,7 +34,7 @@ class InsightsController extends Controller
 
         abort_unless(
             $request->user()->membershipIn(
-                app(\App\Support\Tenancy\Tenancy::class)->currentOrFail()
+                app(Tenancy::class)->currentOrFail()
             )?->isStaff() ?? false,
             403,
         );
@@ -43,7 +45,7 @@ class InsightsController extends Controller
         // sends, beats the sidebar's choice.
         $projectId = $request->has('project_id')
             ? ($request->integer('project_id') ?: null)
-            : app(\App\Support\Tenancy\ProjectScope::class)->current()?->getKey();
+            : app(ProjectScope::class)->current()?->getKey();
 
         $insights = new Insights($from, $to, $projectId);
 
@@ -74,7 +76,7 @@ class InsightsController extends Controller
                 'to' => $to->toDateString(),
                 'project_id' => $projectId,
             ],
-            'projects' => Project::orderBy('name')->get(['id', 'name']),
+            'projects' => Project::orderBy('name')->get(['id', 'name', 'slug']),
         ]);
     }
 

@@ -15,21 +15,39 @@ interface Headline {
 interface Row {
     name: string;
     count: number;
+    ref?: string | null;
 }
 
 function Stat({
     label,
     value,
     hint,
+    href,
     tone = 'plain',
 }: {
     label: string;
     value: ReactNode;
     hint?: ReactNode;
+    /** Where the number comes from: the issue list with the filters that produce it. */
+    href?: string;
     tone?: 'plain' | 'good' | 'bad';
 }) {
+    const Wrapper = href
+        ? ({ children }: { children: ReactNode }) => (
+              <Link
+                  href={href}
+                  title="Show these issues"
+                  className="block rounded-xl border border-border bg-raised p-4 transition hover:border-accent hover:bg-surface"
+              >
+                  {children}
+              </Link>
+          )
+        : ({ children }: { children: ReactNode }) => (
+              <div className="rounded-xl border border-border bg-raised p-4">{children}</div>
+          );
+
     return (
-        <div className="rounded-xl border border-border bg-raised p-4">
+        <Wrapper>
             <span className="text-xs text-ink-subtle">{label}</span>
             <p
                 className={`mt-1 text-2xl font-semibold ${
@@ -39,9 +57,11 @@ function Stat({
                 {value}
             </p>
             {hint && <p className="text-xs text-ink-subtle">{hint}</p>}
-        </div>
+        </Wrapper>
     );
 }
+
+const issuesUrl = (q: string) => `/issues?q=${encodeURIComponent(q)}`;
 
 function Panel({ title, children }: { title: string; children: ReactNode }) {
     return (
@@ -94,7 +114,7 @@ export default function InsightsPage({
         at: string;
     }[];
     filters: { from: string; to: string; project_id: number | null };
-    projects: { id: number; name: string }[];
+    projects: { id: number; name: string; slug: string }[];
 }) {
     function apply(changes: Record<string, string | number | null>) {
         const merged = { ...filters, ...changes };
@@ -109,6 +129,14 @@ export default function InsightsPage({
 
         router.get('/insights', next, { preserveState: true, preserveScroll: true });
     }
+
+    // The filters the numbers above were computed with, as a query the issue list
+    // understands, so a figure and the list behind it cannot disagree.
+    const slug = projects.find((p) => p.id === filters.project_id)?.slug;
+    const scope = slug ? ` project:${slug}` : '';
+    const range = `${filters.from}..${filters.to}`;
+    const rows = (list: Row[], query: (row: Row) => string): (Row & { href: string })[] =>
+        list.map((row) => ({ ...row, href: issuesUrl(query(row) + scope) }));
 
     const control = 'rounded-lg border border-border bg-surface px-2.5 py-1.5 text-sm text-ink';
 
@@ -175,12 +203,13 @@ export default function InsightsPage({
                 </div>
 
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                    <Stat label="Opened" value={headline.opened} />
-                    <Stat label="Closed" value={headline.closed} />
+                    <Stat label="Opened" value={headline.opened} href={issuesUrl(`is:any created:${range}${scope}`)} />
+                    <Stat label="Closed" value={headline.closed} href={issuesUrl(`closed:${range}${scope}`)} />
                     <Stat
                         label="Backlog change"
                         value={headline.net > 0 ? `+${headline.net}` : headline.net}
                         hint={`${headline.open_now} open now`}
+                        href={issuesUrl(`is:open${scope}`)}
                         // Growing is the thing worth noticing; shrinking or level is
                         // not worth colouring.
                         tone={headline.net > 0 ? 'bad' : headline.net < 0 ? 'good' : 'plain'}
@@ -217,13 +246,13 @@ export default function InsightsPage({
 
                 <div className="grid gap-4 lg:grid-cols-3">
                     <Panel title="Opened, by project">
-                        <BarList rows={byProject} empty="Nothing opened in this period." />
+                        <BarList rows={rows(byProject, (r) => `is:any project:${r.ref} created:${range}`)} empty="Nothing opened in this period." />
                     </Panel>
                     <Panel title="Open, by assignee">
-                        <BarList rows={byAssignee} empty="Nothing open." />
+                        <BarList rows={rows(byAssignee, (r) => (r.ref ? `assignee:${r.ref}` : 'no:assignee'))} empty="Nothing open." />
                     </Panel>
                     <Panel title="Open, by status">
-                        <BarList rows={byStatus} empty="Nothing open." />
+                        <BarList rows={rows(byStatus, (r) => `status:"${r.ref}"`)} empty="Nothing open." />
                     </Panel>
                 </div>
 

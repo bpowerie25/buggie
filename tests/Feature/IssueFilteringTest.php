@@ -260,4 +260,27 @@ class IssueFilteringTest extends TestCase
             app(Tenancy::class)->run($globex, fn () => $theirs->fresh()->priority),
         );
     }
+
+    #[Test]
+    public function created_and_closed_take_a_date_range_and_status_a_name(): void
+    {
+        [$workspace, $owner] = $this->workspaceWithMember(slug: 'acme');
+
+        app(Tenancy::class)->run($workspace, function () use ($owner) {
+            $project = Project::factory()->create(['key' => 'WEB', 'slug' => 'web', 'name' => 'Web']);
+            $old = Issue::factory()->create(['project_id' => $project->id, 'created_at' => '2026-01-10 12:00:00']);
+            $new = Issue::factory()->create(['project_id' => $project->id, 'created_at' => '2026-03-05 23:59:00']);
+            $filter = fn (string $q) => app(\App\Support\Issues\IssueQueryFilter::class)
+                ->apply(Issue::query(), \App\Support\Issues\IssueQuery::parse($q), $owner)
+                ->pluck('id')->all();
+
+            // created: alone means "ever", not "still open".
+            $this->assertSame([$new->id], $filter('created:2026-03-01..2026-03-05'));
+            $this->assertEqualsCanonicalizing([$old->id, $new->id], $filter('created:2026-01-01..'));
+            $this->assertSame([$old->id], $filter('created:2026-01-10'));
+            // Not a date: matches nothing rather than everything.
+            $this->assertSame([], $filter('created:soon'));
+            $this->assertSame([], $filter('status:"No Such Status"'));
+        });
+    }
 }

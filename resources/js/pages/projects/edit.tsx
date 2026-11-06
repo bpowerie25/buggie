@@ -72,6 +72,9 @@ export default function EditProject({
     revealedSecret = null,
     clientTimeline = 'off',
     sentryUrl = null,
+    projectCategories = [],
+    staff = [],
+    triageRecipients = [],
 }: {
     project: ProjectSummary;
     widgetKeys: WidgetKeyRow[];
@@ -92,6 +95,9 @@ export default function EditProject({
     clientTimeline?: 'off' | 'issues' | 'phases';
     /** Where this project's Sentry organisation lives, so report ids become links. */
     sentryUrl?: string | null;
+    projectCategories?: { id: number; name: string; color: string }[];
+    staff?: { id: number; name: string }[];
+    triageRecipients?: number[];
 }) {
     const { data, setData, put, processing, errors } = useForm({
         name: project.name,
@@ -102,6 +108,9 @@ export default function EditProject({
         awaiting_close_days: clientWait.close_days === null ? '' : String(clientWait.close_days),
         client_timeline: clientTimeline,
         sentry_url: sentryUrl ?? '',
+        project_category_id: project.project_category_id ? String(project.project_category_id) : '',
+        default_assignee_id: project.default_assignee_id ? String(project.default_assignee_id) : '',
+        triage_recipients: triageRecipients,
     });
     const [confirmingDelete, setConfirmingDelete] = useState(false);
 
@@ -122,6 +131,70 @@ export default function EditProject({
                         onChange={(e) => setData('name', e.target.value)}
                     />
                 </Field>
+
+                <Field
+                    label="Category"
+                    hint="Colours this project on the dashboard. Categories are set up on the Projects page."
+                    error={errors.project_category_id}
+                >
+                    <select
+                        value={data.project_category_id}
+                        onChange={(e) => setData('project_category_id', e.target.value)}
+                        className="block w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink transition hover:border-border-strong"
+                    >
+                        <option value="">No category</option>
+                        {projectCategories.map((c) => (
+                            <option key={c.id} value={c.id}>
+                                {c.name}
+                            </option>
+                        ))}
+                    </select>
+                </Field>
+
+                <Field
+                    label="Default assignee"
+                    hint="New issues and accepted reports go to this person unless somebody chooses otherwise."
+                    error={errors.default_assignee_id}
+                >
+                    <select
+                        value={data.default_assignee_id}
+                        onChange={(e) => setData('default_assignee_id', e.target.value)}
+                        className="block w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-ink transition hover:border-border-strong"
+                    >
+                        <option value="">Nobody</option>
+                        {staff.map((m) => (
+                            <option key={m.id} value={m.id}>
+                                {m.name}
+                            </option>
+                        ))}
+                    </select>
+                </Field>
+
+                <fieldset className="space-y-2">
+                    <legend className="text-sm text-ink">Triage emails</legend>
+                    <p className="text-xs text-ink-subtle">
+                        These people are emailed when a new report arrives for this project. Nobody
+                        ticked means nobody is emailed; the report still waits in Triage.
+                    </p>
+                    {staff.map((m) => (
+                        <label key={m.id} className="flex items-center gap-2 text-sm text-ink-muted">
+                            <input
+                                type="checkbox"
+                                checked={data.triage_recipients.includes(m.id)}
+                                onChange={(e) =>
+                                    setData(
+                                        'triage_recipients',
+                                        e.target.checked
+                                            ? [...data.triage_recipients, m.id]
+                                            : data.triage_recipients.filter((id) => id !== m.id),
+                                    )
+                                }
+                                className="rounded border-border-strong"
+                            />
+                            {m.name}
+                        </label>
+                    ))}
+                </fieldset>
 
                 <Field
                     label="Issue key"

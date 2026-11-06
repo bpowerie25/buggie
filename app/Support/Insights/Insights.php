@@ -2,12 +2,16 @@
 
 namespace App\Support\Insights;
 
-use App\Models\Issue;
-use App\Support\Issues\Blockage;
+use App\Enums\IssueEventType;
 use App\Enums\RelationType;
+use App\Models\Issue;
+use App\Models\IssueEvent;
+use App\Models\IssueRelation;
 use App\Models\Report;
+use App\Support\Issues\Blockage;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -149,8 +153,8 @@ class Insights
         return $this->breakdown(
             $this->scoped()->whereBetween('issues.created_at', $this->window())
                 ->join('projects', 'projects.id', '=', 'issues.project_id')
-                ->groupBy('projects.name')
-                ->selectRaw('projects.name as name, count(*) as total'),
+                ->groupBy('projects.name', 'projects.slug')
+                ->selectRaw('projects.name as name, projects.slug as ref, count(*) as total'),
         );
     }
 
@@ -160,8 +164,8 @@ class Insights
         return $this->breakdown(
             $this->scoped()->open()
                 ->leftJoin('users', 'users.id', '=', 'issues.assignee_id')
-                ->groupBy('users.name')
-                ->selectRaw("coalesce(users.name, 'Unassigned') as name, count(*) as total"),
+                ->groupBy('users.name', 'users.id')
+                ->selectRaw("coalesce(users.name, 'Unassigned') as name, users.id as ref, count(*) as total"),
         );
     }
 
@@ -172,7 +176,7 @@ class Insights
             $this->scoped()->open()
                 ->join('statuses', 'statuses.id', '=', 'issues.status_id')
                 ->groupBy('statuses.name')
-                ->selectRaw('statuses.name as name, count(*) as total'),
+                ->selectRaw('statuses.name as name, statuses.name as ref, count(*) as total'),
         );
     }
 
@@ -229,7 +233,7 @@ class Insights
         // Every open-to-open "blocks" link in the workspace, walked in memory: a chain
         // can leave the project being looked at, and the work at the end of it is
         // still waiting.
-        $edges = \App\Models\IssueRelation::where('type', $blocks)
+        $edges = IssueRelation::where('type', $blocks)
             ->whereHas('issue', fn (Builder $q) => $q->open())
             ->whereHas('relatedIssue', fn (Builder $q) => $q->open())
             ->get(['issue_id', 'related_issue_id'])
@@ -271,8 +275,8 @@ class Insights
     {
         [$from, $to] = $this->window();
 
-        return \App\Models\IssueEvent::query()
-            ->where('type', \App\Enums\IssueEventType::DatesChanged->value)
+        return IssueEvent::query()
+            ->where('type', IssueEventType::DatesChanged->value)
             ->whereNotNull('data->because')
             ->whereBetween('created_at', [$from, $to])
             ->whereHas('issue', fn (Builder $q) => $q->when($this->projectId, fn (Builder $q, $id) => $q->where('issues.project_id', $id)))
@@ -280,7 +284,7 @@ class Insights
             ->latest('created_at')
             ->limit($limit)
             ->get()
-            ->map(function (\App\Models\IssueEvent $event) {
+            ->map(function (IssueEvent $event) {
                 $was = $event->data['from']['start_on'] ?? $event->data['from']['due_on'] ?? null;
                 $now = $event->data['to']['start_on'] ?? $event->data['to']['due_on'] ?? null;
 
@@ -296,14 +300,14 @@ class Insights
             ->all();
     }
 
-        // ------------------------------------------------------------------ internals
+    // ------------------------------------------------------------------ internals
 
     /**
      * How many distinct issues wait on this one, directly or down a chain.
      *
-     * @param  \Illuminate\Support\Collection<int, array<int, int>>  $edges
+     * @param  Collection<int, array<int, int>>  $edges
      */
-    private function downstream(int $id, \Illuminate\Support\Collection $edges): int
+    private function downstream(int $id, Collection $edges): int
     {
         $seen = [];
         $stack = $edges->get($id, []);
@@ -419,7 +423,7 @@ class Insights
     private function breakdown(Builder $query): array
     {
         return $query->get()
-            ->map(fn ($row) => ['name' => (string) $row->name, 'count' => (int) $row->total])
+            ->map(fn ($row) => ['name' => (string) $row->name, 'count' => (int) $row->total, 'ref' => $row->ref === null ? null : (string) $row->ref])
             ->sortByDesc('count')
             ->take(10)
             ->values()

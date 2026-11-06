@@ -99,6 +99,24 @@ second and the order becomes arbitrary. Serialise with `format('Y-m-d\TH:i:s.uP'
 Events are typed, not diffed. Add a case to `IssueEventType`, write it from
 `UpdateIssue`, and render it in `eventSentence()` in `pages/issues/show.tsx`.
 
+## Audit trail, feature switches, categories
+
+- **Audit.** Put `Audited` on a model and created/updated/deleted are written to
+  `audit_logs` by `App\Support\Audit\Audit`. Non-model actions call `Audit::log()`
+  directly (sign-ins, membership, tokens, exports). List what must not be copied in
+  `$auditExclude`; hidden and secret-shaped attributes are always dropped. `Audit::log`
+  never throws into the request. `AuditLog` is append-only. Read it only through the
+  tenant scope, `owner`/`admin` only.
+- **Feature switches** live in `workspaces.settings.features` (`App\Support\Settings\Features`,
+  default on). Gate routes with `->middleware('feature:time')`, never a condition around
+  the route. `members_can_manage_labels` is the one delegated permission, default off.
+- **Project categories** (`project_categories`, admin-defined name + colour) are a view
+  aid. Props sent to a client carry only categories of projects they can already see.
+- **Triage mail** recipients are `projects.settings.triage_recipients` (staff ids); empty
+  means owners and admins. Sent from `ProcessIncomingReport` once a report is known to be
+  ungrouped, via `TriageAlert`.
+- **Query language** gained `status`, `created`, `closed` — keep `issue-query.ts` in step.
+
 ## The sidebar's project scope
 
 `App\Support\Tenancy\ProjectScope` holds the "which site am I on" choice, in the session

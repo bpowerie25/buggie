@@ -1,6 +1,6 @@
 import { Button } from '@/components/button';
 import { Diagnostics } from '@/components/diagnostics';
-import { Avatar, ClientRepliedBadge, relativeTime } from '@/components/issue-bits';
+import { ClientRepliedBadge, dateWithAge, relativeTime } from '@/components/issue-bits';
 import { Popover, PopoverItem } from '@/components/popover';
 import { useHotkeys } from '@/hooks/use-hotkeys';
 import { IssuePicker } from '@/components/issue-picker';
@@ -30,6 +30,10 @@ type ClientIssue = {
     replied_at: string | null;
 };
 type Type = { value: string; label: string };
+type AcceptChoice = { type: string; priority: number; assignee_id: number | null };
+
+const selectClass =
+    'mt-1 block w-full rounded-lg border border-border bg-surface px-2 py-1.5 text-sm text-ink transition hover:border-border-strong';
 
 /**
  * The triage inbox — the airlock between raw intake and the backlog.
@@ -63,6 +67,21 @@ export default function ReportsIndex({
 
     const report = reports[active];
 
+    // What the accept form will send, per report. Left unset until somebody touches
+    // it, so the defaults (a bug, normal priority, the project's usual assignee) are
+    // computed from the report rather than stored.
+    const [choices, setChoices] = useState<Record<number, Partial<AcceptChoice>>>({});
+    const choice: AcceptChoice | null = report
+        ? {
+              type: 'bug',
+              priority: priorities.find((p) => p.label === 'Medium')?.value ?? 2,
+              assignee_id: report.default_assignee_id,
+              ...choices[report.id],
+          }
+        : null;
+    const choose = (changes: Partial<AcceptChoice>) =>
+        report && setChoices((all) => ({ ...all, [report.id]: { ...all[report.id], ...changes } }));
+
     const move = (delta: number) => {
         setActive((current) => Math.max(0, Math.min(reports.length - 1, current + delta)));
         setExpanded(false);
@@ -93,7 +112,7 @@ export default function ReportsIndex({
         k: () => move(-1),
         ArrowUp: () => move(-1),
         Enter: () => setExpanded((e) => !e),
-        a: () => act('accept'),
+        a: () => act('accept', choice ?? {}),
         m: () => {
             setMerging(true);
         },
@@ -214,7 +233,7 @@ export default function ReportsIndex({
                                                 {row.reporter.name ?? row.reporter.email ?? 'Anonymous'}
                                             </span>
                                             <span>·</span>
-                                            <span>{relativeTime(row.created_at)}</span>
+                                            <span title={row.created_at}>{dateWithAge(row.created_at)}</span>
                                         </span>
                                     </span>
                                 </button>
@@ -256,60 +275,66 @@ export default function ReportsIndex({
                                 onExpandedChange={setExpanded}
                             />
 
-                            <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-border pt-4">
-                                <Button size="sm" onClick={() => act('accept')}>
+                            <p className="mt-3 text-xs text-ink-subtle">
+                                Reported {dateWithAge(report.created_at)}
+                            </p>
+
+                            {choice && (
+                                <div className="mt-5 grid gap-3 border-t border-border pt-4 sm:grid-cols-3">
+                                    <label className="text-xs text-ink-subtle">
+                                        Accept as
+                                        <select
+                                            value={choice.type}
+                                            onChange={(e) => choose({ type: e.target.value })}
+                                            className={selectClass}
+                                        >
+                                            {types.map((type) => (
+                                                <option key={type.value} value={type.value}>
+                                                    {type.label}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </label>
+                                    <label className="text-xs text-ink-subtle">
+                                        Assign to
+                                        <select
+                                            value={choice.assignee_id ?? ''}
+                                            onChange={(e) =>
+                                                choose({ assignee_id: e.target.value ? Number(e.target.value) : null })
+                                            }
+                                            className={selectClass}
+                                        >
+                                            <option value="">Unassigned</option>
+                                            {members.map((member) => (
+                                                <option key={member.id} value={member.id}>
+                                                    {member.name}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </label>
+                                    <label className="text-xs text-ink-subtle">
+                                        Priority
+                                        <select
+                                            value={choice.priority}
+                                            onChange={(e) => choose({ priority: Number(e.target.value) })}
+                                            className={selectClass}
+                                        >
+                                            {priorities.map((priority) => (
+                                                <option key={priority.value} value={priority.value}>
+                                                    {priority.label}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </label>
+                                </div>
+                            )}
+
+                            <div className="mt-4 flex flex-wrap items-center gap-2">
+                                <Button size="sm" onClick={() => act('accept', choice ?? {})}>
                                     <Check className="size-4" />
                                     Accept
                                     <Key>a</Key>
                                 </Button>
-
-                                <Popover
-                                    label="Accept with priority"
-                                    trigger={() => (
-                                        <span className="rounded-lg border border-border px-2 py-1.5 text-xs text-ink-muted">
-                                            Accept as…
-                                        </span>
-                                    )}
-                                >
-                                    {(close) => (
-                                        <>
-                                            {priorities.map((priority) => (
-                                                <PopoverItem
-                                                    key={priority.value}
-                                                    onSelect={() => {
-                                                        close();
-                                                        act('accept', { priority: priority.value });
-                                                    }}
-                                                >
-                                                    {priority.label}
-                                                </PopoverItem>
-                                            ))}
-                                            {types.map((type) => (
-                                                <PopoverItem
-                                                    key={type.value}
-                                                    onSelect={() => {
-                                                        close();
-                                                        act('accept', { type: type.value });
-                                                    }}
-                                                >
-                                                    As {type.label.toLowerCase()}
-                                                </PopoverItem>
-                                            ))}
-                                            {members.map((member) => (
-                                                <PopoverItem
-                                                    key={member.id}
-                                                    onSelect={() => {
-                                                        close();
-                                                        act('accept', { assignee_id: member.id });
-                                                    }}
-                                                >
-                                                    <Avatar name={member.name} />
-                                                    Assign to {member.name}
-                                                </PopoverItem>
-                                            ))}
-                                        </>
-                                    )}
-                                </Popover>
 
                                 <Button size="sm" variant="secondary" onClick={() => setMerging(true)}>
                                     <Merge className="size-4" />

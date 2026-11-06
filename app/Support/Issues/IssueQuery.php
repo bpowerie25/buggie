@@ -21,7 +21,7 @@ final class IssueQuery implements Stringable
     /** Keys that accept a value, with the ones that may repeat. */
     public const KEYS = [
         'is', 'project', 'assignee', 'reporter', 'label', 'type', 'priority', 'version', 'phase', 'no',
-        'field', 'parent',
+        'field', 'parent', 'status', 'created', 'closed',
     ];
 
     /**
@@ -95,7 +95,10 @@ final class IssueQuery implements Stringable
     /** open | closed | any — defaults to open, because that is what you meant. */
     public function state(): string
     {
-        $value = strtolower($this->include['is'][0] ?? 'open');
+        // A date on when it was opened or closed is a question about history, so it
+        // must not be silently narrowed to what is open now.
+        $fallback = isset($this->include['created']) || isset($this->include['closed']) ? 'any' : 'open';
+        $value = strtolower($this->include['is'][0] ?? $fallback);
 
         return in_array($value, ['open', 'closed', 'any'], true) ? $value : 'open';
     }

@@ -18,7 +18,15 @@ const palette = [
     '#8b5cf6', '#ec4899', '#64748b', '#0ea5e9',
 ];
 
-export default function LabelsIndex({ labels }: { labels: Label[] }) {
+export default function LabelsIndex({
+    labels,
+    can_manage,
+    can_delete,
+}: {
+    labels: Label[];
+    can_manage: boolean;
+    can_delete: boolean;
+}) {
     const { data, setData, post, processing, errors, reset } = useForm({
         name: '',
         color: palette[0],
@@ -39,6 +47,13 @@ export default function LabelsIndex({ labels }: { labels: Label[] }) {
                 &ldquo;regression&rdquo; means the same thing everywhere.
             </p>
 
+            {!can_manage && (
+                <p className="mt-3 max-w-xl text-xs text-ink-subtle">
+                    Only workspace admins can add or change labels. Ask an admin if you need one.
+                </p>
+            )}
+
+            {can_manage && (
             <form onSubmit={submit} className="mt-6 flex max-w-2xl flex-wrap items-end gap-3">
                 <div className="min-w-40 flex-1">
                     <Field label="Name" error={errors.name}>
@@ -84,6 +99,7 @@ export default function LabelsIndex({ labels }: { labels: Label[] }) {
                     Add label
                 </Button>
             </form>
+            )}
 
             {labels.length > 0 && (
                 <ul className="mt-8 max-w-2xl divide-y divide-border overflow-hidden rounded-xl border border-border bg-raised">
@@ -102,6 +118,7 @@ export default function LabelsIndex({ labels }: { labels: Label[] }) {
                                 {label.issues_count} issue
                                 {label.issues_count === 1 ? '' : 's'}
                             </span>
+                            {can_delete && (
                             <button
                                 type="button"
                                 aria-label={`Delete ${label.name}`}
@@ -114,6 +131,7 @@ export default function LabelsIndex({ labels }: { labels: Label[] }) {
                             >
                                 <Trash2 className="size-3.5" />
                             </button>
+                            )}
                         </li>
                     ))}
                 </ul>

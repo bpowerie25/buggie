@@ -25,6 +25,7 @@ class DashboardController extends Controller
             ],
             'projects' => Project::active()->visibleTo($request->user())
                 ->when($scope->current(), fn ($q, $project) => $q->whereKey($project->getKey()))
+                ->with('category')
                 ->withCount('statuses')
                 ->orderBy('name')
                 ->get()
@@ -33,6 +34,7 @@ class DashboardController extends Controller
                     'key' => $p->key,
                     'slug' => $p->slug,
                     'description' => $p->description,
+                    'category' => $p->category?->summary(),
                 ]),
 
             // What is waiting on whoever is looking. For staff, what they hold; for a

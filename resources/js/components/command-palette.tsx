@@ -178,7 +178,7 @@ export function CommandPalette({
                         </Item>
                         <Item value="board layout kanban" onSelect={() => go('/issues?layout=board')}>
                             <LayoutGrid className="size-4 text-ink-subtle" />
-                            Switch to board
+                            Switch to Kanban Board
                             <Shortcut keys="g b" />
                         </Item>
                         <Item value="triage inbox reports" onSelect={() => go('/inbox')}>

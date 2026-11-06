@@ -26,7 +26,10 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 #[\Illuminate\Database\Eloquent\Attributes\ScopedBy([\App\Models\Scopes\LiveProjectScope::class])]
 class Issue extends Model
 {
-    use BelongsToWorkspace, HasFactory, SoftDeletes;
+    use BelongsToWorkspace, HasFactory, SoftDeletes, \App\Models\Concerns\Audited;
+
+    /** Not copied into the audit trail. */
+    public array $auditExclude = ['description', 'environment'];
 
     protected function casts(): array
     {

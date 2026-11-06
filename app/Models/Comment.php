@@ -17,7 +17,10 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 ])]
 class Comment extends Model
 {
-    use BelongsToWorkspace, HasFactory, SoftDeletes;
+    use BelongsToWorkspace, HasFactory, SoftDeletes, \App\Models\Concerns\Audited;
+
+    /** Not copied into the audit trail. */
+    public array $auditExclude = ['body', 'body_text', 'body_html'];
 
     // The column is timestamp(6), but Eloquent's default date format writes whole
     // seconds. Both are needed for the activity feed to sort deterministically.

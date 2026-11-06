@@ -17,7 +17,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 ])]
 class Report extends Model
 {
-    use BelongsToWorkspace, HasFactory;
+    use BelongsToWorkspace, HasFactory, \App\Models\Concerns\Audited;
+
+    /** Not copied into the audit trail. */
+    public array $auditExclude = ['body', 'console', 'network', 'environment', 'error', 'ip_hash'];
 
     protected function casts(): array
     {

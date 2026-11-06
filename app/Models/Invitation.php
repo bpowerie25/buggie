@@ -14,7 +14,7 @@ use Illuminate\Support\Str;
 #[Fillable(['email', 'role', 'project_ids', 'project_roles', 'invited_by_id', 'expires_at'])]
 class Invitation extends Model
 {
-    use BelongsToWorkspace, HasFactory;
+    use BelongsToWorkspace, HasFactory, \App\Models\Concerns\Audited;
 
     public const LIFETIME_DAYS = 14;
 

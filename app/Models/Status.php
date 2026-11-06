@@ -13,7 +13,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 #[Fillable(['project_id', 'name', 'category', 'color', 'position', 'is_default', 'is_triage', 'is_awaiting_client', 'wip_limit'])]
 class Status extends Model
 {
-    use BelongsToWorkspace, HasFactory;
+    use BelongsToWorkspace, HasFactory, \App\Models\Concerns\Audited;
 
     /**
      * Where an issue raised by a client starts, until somebody on the team looks at it.

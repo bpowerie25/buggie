@@ -2,6 +2,8 @@
 
 namespace App\Http\Requests;
 
+use App\Support\Issues\Assignable;
+use App\Support\Tenancy\Tenancy;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -23,7 +25,7 @@ class UpdateProjectRequest extends FormRequest
             'awaiting_reminder_days' => ['nullable', 'integer', 'min:1', 'max:365'],
             // Whether clients who hold the project may see its timeline.
             // off, issues or phases; true and false still mean issues and off.
-            'client_timeline' => ['sometimes', \Illuminate\Validation\Rule::in([true, false, 1, 0, '1', '0', 'off', 'issues', 'phases'])],
+            'client_timeline' => ['sometimes', Rule::in([true, false, 1, 0, '1', '0', 'off', 'issues', 'phases'])],
             'awaiting_close_days' => ['nullable', 'integer', 'min:1', 'max:365', function ($attribute, $value, $fail) {
                 $reminder = $this->input('awaiting_reminder_days');
 
@@ -33,9 +35,16 @@ class UpdateProjectRequest extends FormRequest
             }],
             // Staff only. A client here would be handed every new issue silently,
             // with no activity entry to say so.
+            'project_category_id' => [
+                'nullable',
+                Rule::exists('project_categories', 'id')->where('workspace_id', app(Tenancy::class)->id()),
+            ],
+            // Staff who are emailed when a report lands in this project's Triage.
+            'triage_recipients' => ['sometimes', 'array'],
+            'triage_recipients.*' => ['integer', Assignable::rule(app(Tenancy::class)->id())],
             'default_assignee_id' => [
                 'nullable',
-                \App\Support\Issues\Assignable::rule(app(\App\Support\Tenancy\Tenancy::class)->id()),
+                Assignable::rule(app(Tenancy::class)->id()),
             ],
         ];
     }

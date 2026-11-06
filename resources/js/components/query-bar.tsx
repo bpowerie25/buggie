@@ -280,7 +280,7 @@ function Chip({
                         className={`flex max-w-48 items-center gap-1.5 truncate rounded-lg border px-2 py-1 text-xs transition ${
                             value
                                 ? 'border-accent/40 bg-accent-soft text-accent'
-                                : 'border-border text-ink-muted hover:text-ink'
+                                : 'cursor-pointer border-border text-ink-muted hover:border-border-strong hover:bg-raised hover:text-ink'
                         }`}
                     >
                         {label}

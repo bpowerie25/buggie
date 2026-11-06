@@ -11,9 +11,11 @@ use App\Http\Requests\UpdateProjectRequest;
 use App\Models\CustomField;
 use App\Models\Phase;
 use App\Models\Project;
+use App\Models\ProjectCategory;
 use App\Models\Status;
 use App\Models\User;
 use App\Models\Version;
+use App\Support\Issues\Assignable;
 use App\Support\Mail\InboundMail;
 use App\Support\Templates\ProjectTemplates;
 use App\Support\Tenancy\Tenancy;
@@ -36,7 +38,10 @@ class ProjectController extends Controller
         }
 
         return Inertia::render('projects/index', [
+            'categories' => ProjectCategory::orderBy('position')->get()->map->summary(),
+            'can_manage' => $request->user()->can('create', Project::class),
             'projects' => Project::query()
+                ->with('category')
                 ->visibleTo($request->user())
                 ->orderBy('is_archived')
                 ->orderBy('name')
@@ -130,7 +135,13 @@ class ProjectController extends Controller
         $this->authorize('update', $project);
 
         return Inertia::render('projects/edit', [
-            'project' => $this->summary($project),
+            'project' => $this->summary($project->loadMissing('category')),
+            'projectCategories' => ProjectCategory::orderBy('position')->get()->map->summary(),
+            'staff' => app(Tenancy::class)->currentOrFail()->members()
+                ->wherePivotIn('role', Assignable::roles())
+                ->orderBy('name')->get(['users.id', 'users.name'])
+                ->map(fn ($u) => ['id' => $u->id, 'name' => $u->name]),
+            'triageRecipients' => $project->triageRecipientIds(),
             'clientWait' => [
                 'reminder_days' => $project->clientWaitDays('awaiting_reminder_days'),
                 'close_days' => $project->clientWaitDays('awaiting_close_days'),
@@ -229,7 +240,7 @@ class ProjectController extends Controller
         $this->authorize('update', $project);
 
         $validated = $request->validated();
-        $wait = array_intersect_key($validated, array_flip(['awaiting_reminder_days', 'awaiting_close_days', 'client_timeline', 'sentry_url']));
+        $wait = array_intersect_key($validated, array_flip(['awaiting_reminder_days', 'awaiting_close_days', 'client_timeline', 'sentry_url', 'triage_recipients']));
 
         if (array_key_exists('client_timeline', $wait)) {
             $wait['client_timeline'] = match ($wait['client_timeline']) {
@@ -271,6 +282,9 @@ class ProjectController extends Controller
             'description' => $project->description,
             'site_url' => $project->site_url,
             'is_archived' => $project->is_archived,
+            'category' => $project->category?->summary(),
+            'project_category_id' => $project->project_category_id,
+            'default_assignee_id' => $project->default_assignee_id,
         ];
     }
 

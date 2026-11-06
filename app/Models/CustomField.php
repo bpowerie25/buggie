@@ -15,7 +15,7 @@ use Illuminate\Support\Str;
 #[Fillable(['project_id', 'name', 'key', 'type', 'options', 'required', 'visible_to_client', 'position'])]
 class CustomField extends Model
 {
-    use BelongsToWorkspace, HasFactory;
+    use BelongsToWorkspace, HasFactory, \App\Models\Concerns\Audited;
 
     protected function casts(): array
     {

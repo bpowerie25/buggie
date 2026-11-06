@@ -46,6 +46,8 @@ class IssueExportController extends Controller
 
         $query = IssueQuery::parse($request->string('q')->toString());
 
+        \App\Support\Audit\Audit::log('issue.exported', null, ['query' => (string) $query], label: (string) $query);
+
         // Built from the same query the list uses, filtered the same way. An export
         // that assembles its own query is an export that quietly disagrees with the
         // screen, and the disagreement is always in the unsafe direction.

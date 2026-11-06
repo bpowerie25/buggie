@@ -2,7 +2,17 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\ChatProvider;
+use App\Enums\WebhookEvent;
+use App\Models\ApiToken;
+use App\Models\ChatDelivery;
+use App\Models\ChatIntegration;
+use App\Models\Project;
+use App\Models\Webhook;
 use App\Models\Workspace;
+use App\Support\Issues\AuthorLabel;
+use App\Support\Reports\ReporterLink;
+use App\Support\Settings\Features;
 use App\Support\Tenancy\Tenancy;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -25,8 +35,10 @@ class WorkspaceSettingsController extends Controller
             'workspace' => [
                 'name' => $workspace->name,
                 'slug' => $workspace->slug,
-                'show_staff_names' => \App\Support\Issues\AuthorLabel::showsStaffNames($workspace),
-                'trust_unverified_emails' => \App\Support\Reports\ReporterLink::trustsUnverified($workspace),
+                'show_staff_names' => AuthorLabel::showsStaffNames($workspace),
+                'trust_unverified_emails' => ReporterLink::trustsUnverified($workspace),
+                'features' => Features::all($workspace),
+                'members_manage_labels' => Features::membersManageLabels($workspace),
                 'created_at' => $workspace->created_at->toDateString(),
             ],
             'domain' => config('buggie.domain'),
@@ -34,12 +46,12 @@ class WorkspaceSettingsController extends Controller
 
             // Only this person's own tokens. An admin seeing a colleague's token
             // names is a small thing, but there is no reason for it.
-            'tokens' => \App\Models\ApiToken::query()
+            'tokens' => ApiToken::query()
                 ->where('workspace_id', $workspace->id)
                 ->where('tokenable_id', request()->user()->id)
                 ->latest()
                 ->get()
-                ->map(fn (\App\Models\ApiToken $token) => [
+                ->map(fn (ApiToken $token) => [
                     'id' => $token->id,
                     'name' => $token->name,
                     'abilities' => $token->abilities,
@@ -47,13 +59,13 @@ class WorkspaceSettingsController extends Controller
                     'expires_at' => $token->expires_at?->toDateString(),
                     'created_at' => $token->created_at->toDateString(),
                 ]),
-            'abilities' => \App\Http\Controllers\ApiTokenController::ABILITIES,
+            'abilities' => ApiTokenController::ABILITIES,
 
-            'webhooks' => \App\Models\Webhook::with(['project:id,name'])
+            'webhooks' => Webhook::with(['project:id,name'])
                 ->withCount('deliveries')
                 ->latest()
                 ->get()
-                ->map(fn (\App\Models\Webhook $webhook) => [
+                ->map(fn (Webhook $webhook) => [
                     'id' => $webhook->id,
                     'name' => $webhook->name,
                     'url' => $webhook->url,
@@ -72,12 +84,12 @@ class WorkspaceSettingsController extends Controller
                             'at' => $delivery->created_at?->toIso8601String(),
                         ]),
                 ]),
-            'webhookEvents' => \App\Enums\WebhookEvent::options(),
+            'webhookEvents' => WebhookEvent::options(),
 
-            'chatIntegrations' => \App\Models\ChatIntegration::with(['project:id,name'])
+            'chatIntegrations' => ChatIntegration::with(['project:id,name'])
                 ->latest()
                 ->get()
-                ->map(fn (\App\Models\ChatIntegration $integration) => [
+                ->map(fn (ChatIntegration $integration) => [
                     'id' => $integration->id,
                     'name' => $integration->name,
                     'provider' => $integration->provider->value,
@@ -94,7 +106,7 @@ class WorkspaceSettingsController extends Controller
                     'has_url' => $integration->hasUrl(),
 
                     'deliveries' => $integration->deliveries()->limit(5)->get()
-                        ->map(fn (\App\Models\ChatDelivery $delivery) => [
+                        ->map(fn (ChatDelivery $delivery) => [
                             'event' => $delivery->event,
                             'status' => $delivery->status,
                             'error' => $delivery->error,
@@ -102,9 +114,9 @@ class WorkspaceSettingsController extends Controller
                             'at' => $delivery->created_at?->toIso8601String(),
                         ]),
                 ]),
-            'chatProviders' => \App\Enums\ChatProvider::options(),
+            'chatProviders' => ChatProvider::options(),
 
-            'projects' => \App\Models\Project::active()->orderBy('name')->get(['id', 'name']),
+            'projects' => Project::active()->orderBy('name')->get(['id', 'name']),
         ]);
     }
 
@@ -117,6 +129,9 @@ class WorkspaceSettingsController extends Controller
             'name' => ['required', 'string', 'max:120'],
             'show_staff_names' => ['sometimes', 'boolean'],
             'trust_unverified_emails' => ['sometimes', 'boolean'],
+            'features' => ['sometimes', 'array'],
+            'features.*' => ['boolean'],
+            'members_manage_labels' => ['sometimes', 'boolean'],
         ]);
 
         // The slug is deliberately not editable: it is in every widget snippet, every
@@ -124,11 +139,27 @@ class WorkspaceSettingsController extends Controller
         $workspace->update(['name' => $validated['name']]);
 
         $settings = collect([
-            \App\Support\Issues\AuthorLabel::SHOW_STAFF_NAMES => 'show_staff_names',
-            \App\Support\Reports\ReporterLink::TRUST_UNVERIFIED => 'trust_unverified_emails',
+            AuthorLabel::SHOW_STAFF_NAMES => 'show_staff_names',
+            ReporterLink::TRUST_UNVERIFIED => 'trust_unverified_emails',
         ])->filter(fn ($field) => array_key_exists($field, $validated))
             ->map(fn ($field) => (bool) $validated[$field])
             ->all();
+
+        if (array_key_exists('members_manage_labels', $validated)) {
+            $settings[Features::MEMBERS_MANAGE_LABELS] = (bool) $validated['members_manage_labels'];
+        }
+
+        if (isset($validated['features'])) {
+            // Only the known areas, merged over what is stored: a stale key from an
+            // old form cannot invent a setting.
+            $settings['features'] = [
+                ...($workspace->settings['features'] ?? []),
+                ...array_map('boolval', array_intersect_key(
+                    $validated['features'],
+                    Features::OPTIONAL,
+                )),
+            ];
+        }
 
         if ($settings !== []) {
             $workspace->forceFill(['settings' => [...($workspace->settings ?? []), ...$settings]])->save();
@@ -137,8 +168,8 @@ class WorkspaceSettingsController extends Controller
         // Trusting typed addresses applies to what is already here as well as to what
         // arrives next: the widget issues accepted earlier are linked now, by the same
         // rule, rather than staying invisible to the clients who reported them.
-        if (\App\Support\Reports\ReporterLink::trustsUnverified($workspace)) {
-            $linked = \App\Support\Reports\ReporterLink::backfill($workspace)['linked'];
+        if (ReporterLink::trustsUnverified($workspace)) {
+            $linked = ReporterLink::backfill($workspace)['linked'];
 
             if ($linked > 0) {
                 return back()->with('success', $linked === 1

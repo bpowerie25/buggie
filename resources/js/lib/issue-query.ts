@@ -20,7 +20,7 @@ export interface ParsedQuery {
 // here is dropped from the query whenever a chip rebuilds it.
 export const KEYS = [
     'is', 'project', 'assignee', 'reporter', 'label', 'type', 'priority', 'version', 'phase', 'no',
-    'field', 'parent',
+    'field', 'parent', 'status', 'created', 'closed',
 ];
 const MULTI = ['label', 'field'];
 

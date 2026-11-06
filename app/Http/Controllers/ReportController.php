@@ -9,11 +9,13 @@ use App\Enums\ReportState;
 use App\Models\Issue;
 use App\Models\Project;
 use App\Models\Report;
+use App\Support\Issues\Assignable;
 use App\Support\Reports\SentryLinks;
 use App\Support\Tenancy\ProjectScope;
 use App\Support\Tenancy\Tenancy;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
@@ -42,7 +44,7 @@ class ReportController extends Controller
         $slug = $slug === 'all' ? null : $slug;
 
         $reports = Report::awaitingTriage()
-            ->with('project:id,key,name,slug,settings')
+            ->with('project:id,key,name,slug,settings,default_assignee_id')
             ->when(
                 $slug,
                 fn ($q) => $q->whereHas('project', fn ($p) => $p->where('slug', $slug)),
@@ -100,7 +102,7 @@ class ReportController extends Controller
             'title' => ['nullable', 'string', 'max:255'],
             'priority' => ['nullable', Rule::in(array_column(IssuePriority::cases(), 'value'))],
             'type' => ['nullable', Rule::in(array_column(IssueType::cases(), 'value'))],
-            'assignee_id' => ['nullable', \App\Support\Issues\Assignable::rule($this->tenancy->id())],
+            'assignee_id' => ['nullable', Assignable::rule($this->tenancy->id())],
             'also' => ['array'],          // sibling reports in the same fingerprint group
             'also.*' => ['integer'],
         ]);
@@ -178,7 +180,7 @@ class ReportController extends Controller
      * crafted payload cannot reach reports outside the group or the workspace.
      *
      * @param  array<int, int>  $ids
-     * @return \Illuminate\Support\Collection<int, Report>
+     * @return Collection<int, Report>
      */
     private function siblings(Report $report, array $ids)
     {
@@ -204,6 +206,8 @@ class ReportController extends Controller
             'title' => $report->title,
             'body' => $report->body,
             'project' => $report->project->only(['key', 'name', 'slug']),
+            // Pre-selects the assignee on the accept form.
+            'default_assignee_id' => $report->project->default_assignee_id,
             'reporter' => [
                 'name' => $report->reporter_name,
                 'email' => $report->reporter_email,

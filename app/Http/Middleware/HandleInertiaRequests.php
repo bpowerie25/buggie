@@ -2,13 +2,23 @@
 
 namespace App\Http\Middleware;
 
+use App\Enums\WorkspaceRole;
+use App\Models\AccessRequest;
 use App\Models\InAppNotification;
+use App\Models\Issue;
+use App\Models\Project;
 use App\Models\Report;
+use App\Models\RunningTimer;
 use App\Models\SavedView;
+use App\Models\User;
+use App\Support\Backups\BackupStatus;
 use App\Support\Mail\Deliverability;
+use App\Support\Registration\Registration;
+use App\Support\Settings\Features;
 use App\Support\Tenancy\ProjectScope;
 use App\Support\Tenancy\Tenancy;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 use Inertia\Middleware;
 use Tighten\Ziggy\Ziggy;
 
@@ -46,7 +56,7 @@ class HandleInertiaRequests extends Middleware
 
                 // Operates the install, as opposed to owning a workspace in it. Used
                 // only to decide whether to show the link; the gate does the real work.
-                'operator' => $user ? \Illuminate\Support\Facades\Gate::forUser($user)->allows('operate') : false,
+                'operator' => $user ? Gate::forUser($user)->allows('operate') : false,
             ],
 
             // The help guide lives on the central domain, so the app needs the whole
@@ -96,16 +106,17 @@ class HandleInertiaRequests extends Middleware
 
             // A client's Timeline link, shown only when a project they hold shares one.
             'clientTimeline' => fn () => $user && $workspace
-                && $user->membershipIn($workspace) === \App\Enums\WorkspaceRole::Client
-                && \App\Models\Project::active()->visibleTo($user)->get(['id', 'settings'])
-                    ->contains(fn (\App\Models\Project $p) => $p->showsTimelineToClients()),
+                && Features::enabled($workspace, 'timeline')
+                && $user->membershipIn($workspace) === WorkspaceRole::Client
+                && Project::active()->visibleTo($user)->get(['id', 'settings'])
+                    ->contains(fn (Project $p) => $p->showsTimelineToClients()),
 
             // Only for the people who can decide them, and only this workspace's.
             'accessRequests' => fn () => $user && $workspace
                 && ($user->membershipIn($workspace)?->canManageWorkspace() ?? false)
                 ? [
-                    'enabled' => app(\App\Support\Registration\Registration::class)->mode()->acceptsAccessRequests(),
-                    'pending' => \App\Models\AccessRequest::pending()->count(),
+                    'enabled' => app(Registration::class)->mode()->acceptsAccessRequests(),
+                    'pending' => AccessRequest::pending()->count(),
                 ]
                 : null,
 
@@ -154,7 +165,7 @@ class HandleInertiaRequests extends Middleware
             'mail' => fn () => $user && ! app(Deliverability::class)->isConfigured()
                 ? [
                     'deliverable' => false,
-                    'can_fix' => \Illuminate\Support\Facades\Gate::forUser($user)->allows('operate'),
+                    'can_fix' => Gate::forUser($user)->allows('operate'),
                 ]
                 : null,
 
@@ -168,11 +179,11 @@ class HandleInertiaRequests extends Middleware
              * who needs to know.
              */
             'backups' => fn () => $user
-                && \Illuminate\Support\Facades\Gate::forUser($user)->allows('operate')
-                && ($warning = app(\App\Support\Backups\BackupStatus::class)->warning()) !== null
+                && Gate::forUser($user)->allows('operate')
+                && ($warning = app(BackupStatus::class)->warning()) !== null
                     ? [
                         'warning' => $warning,
-                        'severe' => app(\App\Support\Backups\BackupStatus::class)->isSevere(),
+                        'severe' => app(BackupStatus::class)->isSevere(),
                     ]
                     : null,
 
@@ -184,7 +195,12 @@ class HandleInertiaRequests extends Middleware
              * only see by navigating back to what you were doing is one you will not
              * see. It follows you across workspaces for the same reason.
              */
+            // Which optional areas the admin has left on, so the sidebar and the
+            // pages that offer a timer or an estimate can leave them out.
+            'features' => fn () => Features::all($workspace),
+
             'timer' => fn () => $user && $workspace
+                && Features::enabled($workspace, 'time')
                 && ($user->membershipIn($workspace)?->isStaff() ?? false)
                 ? $this->runningTimer($user)
                 : null,
@@ -204,9 +220,9 @@ class HandleInertiaRequests extends Middleware
     /**
      * @return array<string, mixed>|null
      */
-    private function runningTimer(\App\Models\User $user): ?array
+    private function runningTimer(User $user): ?array
     {
-        $timer = \App\Models\RunningTimer::withoutGlobalScopes()
+        $timer = RunningTimer::withoutGlobalScopes()
             ->where('user_id', $user->id)
             ->with('issue:id,key,title')
             ->first();
@@ -236,13 +252,13 @@ class HandleInertiaRequests extends Middleware
         $inProject = fn ($q) => $q->whereHas('project', fn ($p) => $p->where('slug', $slug));
 
         return Report::awaitingTriage()->when($slug, $inProject)->count()
-            + \App\Models\Issue::forTriage()->when($slug, $inProject)->count();
+            + Issue::forTriage()->when($slug, $inProject)->count();
     }
 
     /** @return array{current: ?string, projects: array<int, array{name: string, key: string, slug: string}>}|null */
-    private function projectScope(\App\Models\User $user): ?array
+    private function projectScope(User $user): ?array
     {
-        $projects = \App\Models\Project::active()->visibleTo($user)->orderBy('name')->get(['name', 'key', 'slug']);
+        $projects = Project::active()->visibleTo($user)->orderBy('name')->get(['name', 'key', 'slug']);
 
         return $projects->count() < 2 ? null : [
             'current' => app(ProjectScope::class)->current()?->slug,

@@ -12,7 +12,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 #[Fillable(['name', 'query', 'layout', 'group_by', 'position', 'user_id', 'created_by_id'])]
 class SavedView extends Model
 {
-    use BelongsToWorkspace, HasFactory;
+    use BelongsToWorkspace, HasFactory, \App\Models\Concerns\Audited;
 
     public function owner(): BelongsTo
     {

@@ -20,7 +20,7 @@ use Laravel\Cashier\Billable;
 #[Fillable(['name', 'slug', 'owner_id', 'settings', 'trial_ends_at'])]
 class Workspace extends Model
 {
-    use Billable, HasFactory, SoftDeletes;
+    use Billable, HasFactory, SoftDeletes, \App\Models\Concerns\Audited;
 
     /**
      * Subdomains that can never belong to a customer, because we need them

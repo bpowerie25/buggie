@@ -16,6 +16,8 @@ import {
     FolderKanban,
     Inbox,
     Keyboard,
+    ListChecks,
+    ScrollText,
     LayoutGrid,
     LayoutDashboard,
     LogOut,
@@ -102,6 +104,7 @@ export function AppLayout({
     // Following a link closes the menu on a phone, or it would sit over the page
     // somebody just asked to see.
     useEffect(() => router.on('navigate', () => setNavOpen(false)), []);
+    const features = usePage<SharedProps>().props.features ?? { timeline: true, time: true, workload: true };
     const [paletteOpen, setPaletteOpen] = useState(false);
     const [shortcutsOpen, setShortcutsOpen] = useState(false);
 
@@ -179,10 +182,10 @@ export function AppLayout({
                             onChange={(e) =>
                                 router.put('/project-scope', { project: e.target.value }, { preserveScroll: true })
                             }
-                            className={`w-full rounded-lg border px-2 py-1.5 text-sm ${
+                            className={`w-full cursor-pointer rounded-lg border px-2 py-1.5 text-sm transition ${
                                 projectScope.current
                                     ? 'border-accent bg-accent-soft font-medium text-accent'
-                                    : 'border-border bg-raised text-ink-muted'
+                                    : 'border-border bg-raised text-ink-muted hover:border-accent hover:bg-surface hover:text-ink'
                             }`}
                         >
                             <option value="">All projects</option>
@@ -213,7 +216,7 @@ export function AppLayout({
                         icon={LayoutGrid}
                         active={path === '/issues' && onBoard}
                     >
-                        Board
+                        Kanban Board
                     </NavLink>
                     {/* A client's view of the plan, where a project they hold shares one.
                         Staff reach the Timeline from their own section below. */}
@@ -275,6 +278,13 @@ export function AppLayout({
                             >
                                 Labels
                             </NavLink>
+                            <NavLink
+                                href="/assignments"
+                                icon={ListChecks}
+                                active={path.startsWith('/assignments')}
+                            >
+                                Assignments
+                            </NavLink>
                             {/* Staff only, like everything in this block: how long
                                 something took is not a client's business. */}
                             <NavLink
@@ -287,13 +297,15 @@ export function AppLayout({
                             {/* Inside the staff block for the same reason: a plan
                                 across the workspace is a plan across every client
                                 in it. */}
-                            <NavLink
-                                href="/timeline"
-                                icon={ChartGantt}
-                                active={path.startsWith('/timeline')}
-                            >
-                                Timeline
-                            </NavLink>
+                            {features.timeline && (
+                                <NavLink
+                                    href="/timeline"
+                                    icon={ChartGantt}
+                                    active={path.startsWith('/timeline')}
+                                >
+                                    Timeline
+                                </NavLink>
+                            )}
                             {/* Owners and admins only — the server refuses anybody
                                 else, and a link to a 403 is worse than no link. */}
                             {(auth.role === 'owner' || auth.role === 'admin') && (
@@ -305,12 +317,16 @@ export function AppLayout({
                                     Deleted
                                 </NavLink>
                             )}
-                            <NavLink href="/time" icon={Clock} active={path.startsWith('/time')}>
-                                Time
-                            </NavLink>
-                            <NavLink href="/workload" icon={Gauge} active={path.startsWith('/workload')}>
-                                Workload
-                            </NavLink>
+                            {features.time && (
+                                <NavLink href="/time" icon={Clock} active={path.startsWith('/time')}>
+                                    Time
+                                </NavLink>
+                            )}
+                            {features.workload && (
+                                <NavLink href="/workload" icon={Gauge} active={path.startsWith('/workload')}>
+                                    Workload
+                                </NavLink>
+                            )}
                             <NavLink
                                 href="/settings/members"
                                 icon={Users}
@@ -342,6 +358,15 @@ export function AppLayout({
                                     active={path.startsWith('/settings/instance')}
                                 >
                                     Instance
+                                </NavLink>
+                            )}
+                            {(auth.role === 'owner' || auth.role === 'admin') && (
+                                <NavLink
+                                    href="/settings/audit"
+                                    icon={ScrollText}
+                                    active={path.startsWith('/settings/audit')}
+                                >
+                                    Audit log
                                 </NavLink>
                             )}
                             {billing?.can_manage && (

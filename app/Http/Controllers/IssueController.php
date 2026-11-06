@@ -31,6 +31,7 @@ use App\Support\Issues\IssueQueryFilter;
 use App\Support\Reports\ReporterLink;
 use App\Support\Reports\SentryLinks;
 use App\Support\RichText\Mentions;
+use App\Support\Settings\Features;
 use App\Support\Tenancy\ProjectScope;
 use App\Support\Tenancy\Tenancy;
 use App\Support\Time\Duration;
@@ -378,7 +379,7 @@ class IssueController extends Controller
              * hours at all. How long something took is an input to an invoice, not
              * a status update.
              */
-            'time' => $staff ? [
+            'time' => $staff && Features::enabled($workspace ?? app(Tenancy::class)->current(), 'time') ? [
                 'entries' => $issue->timeEntries()->with('user:id,name')->orderByDesc('spent_on')
                     ->orderByDesc('id')->get()
                     ->map(fn (TimeEntry $entry) => [

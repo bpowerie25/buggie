@@ -12,6 +12,30 @@ today you are running `main`, which is honest rather than ideal — see
 
 ### Added
 
+- **Audit log** (Settings → Audit log, owners and admins). Every create, change and
+  delete on projects, issues, comments, labels, statuses, webhooks, keys and the rest is
+  recorded with who did it and what it was before and after, plus sign-ins, membership
+  changes, API token use and CSV exports. Append-only: the model refuses to update or
+  delete a row. Comment text and secrets are never copied in.
+- **Triage emails.** Each project has a "Triage emails" list in its settings; those
+  people are emailed when a report arrives that nothing could group. Nobody named means
+  the workspace's owners and admins. Repeats of a report already waiting send nothing.
+- **Project categories**, defined by an admin on the Projects page (Design, Development,
+  Consultancy…) with a colour each. They colour the dashboard cards, with a legend that
+  doubles as a filter.
+- **Assignments** screen: every member against every project in open issues, each number
+  a link to exactly those issues, where bulk edit reassigns. The issue list gained
+  "Select all".
+- **Feature switches.** An admin can turn off Timeline, Time tracking and Workload; the
+  links disappear and the pages answer 404. Nothing recorded is deleted.
+- **Label editing is admin-only** by default; an admin can delegate it to members.
+- **Query language:** `created:`, `closed:` (dates or `from..to`) and `status:"Name"`.
+  Insights figures now link to the list they count.
+- **Triage accept form:** type, assignee (the project's default) and priority (Medium)
+  are chosen before accepting, and the reported date shows beside "22d ago".
+- "Board" is now **Kanban Board**; filter chips and the project selector have a clearer
+  hover.
+
 - **buggie.eu runs this repository, and nothing else.** The private repository the
   hosted service used to deploy from is retired; its one addition, the read-only
   operator console at `/operator`, is now here behind the `hosted` middleware and the
@@ -246,6 +270,10 @@ today you are running `main`, which is honest rather than ideal — see
 
 ### Changed
 
+- **A self-hosted install no longer shows Buggie's marketing page.** A signed-out
+  visitor to the root is sent to sign in, and every page carries
+  `X-Robots-Tag: noindex, nofollow`, so your install is not in search results as a
+  copy of buggie.eu. The hosted service is unchanged.
 - **Only staff can be assigned an issue.** A client could be made the assignee as a way
   of asking them a question, which made the agency's work say it belonged to the
   client — "Matrix assigned this to Brian Power". Every way in now refuses a client:

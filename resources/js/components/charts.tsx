@@ -1,3 +1,4 @@
+import { Link } from '@inertiajs/react';
 import { useId } from 'react';
 
 /**
@@ -145,7 +146,7 @@ export function BarList({
     rows,
     empty = 'Nothing yet.',
 }: {
-    rows: { name: string; count: number }[];
+    rows: { name: string; count: number; href?: string }[];
     empty?: string;
 }) {
     if (rows.length === 0) {
@@ -159,7 +160,13 @@ export function BarList({
             {rows.map((row) => (
                 <li key={row.name}>
                     <div className="flex items-baseline justify-between gap-3 text-sm">
-                        <span className="truncate text-ink">{row.name}</span>
+                        {row.href ? (
+                            <Link href={row.href} className="truncate text-ink hover:text-accent hover:underline">
+                                {row.name}
+                            </Link>
+                        ) : (
+                            <span className="truncate text-ink">{row.name}</span>
+                        )}
                         <span className="shrink-0 tabular-nums text-ink-muted">{row.count}</span>
                     </div>
                     <div className="mt-1 h-1.5 rounded-full bg-border">
