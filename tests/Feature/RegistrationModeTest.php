@@ -177,8 +177,13 @@ class RegistrationModeTest extends TestCase
         $this->get($this->centralUrl('/login'))
             ->assertInertia(fn ($page) => $page->where('canRegister', false));
 
+        // The marketing page is the other place that offers it, and exists only on
+        // the hosted service. Closed explicitly: hosted defaults to open.
+        config(['buggie.hosted' => true]);
+        $this->setMode('invite');
         $this->get($this->centralUrl('/'))
             ->assertInertia(fn ($page) => $page->where('canRegister', false));
+        config(['buggie.hosted' => false]);
 
         $this->setMode('open');
 

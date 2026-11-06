@@ -19,6 +19,9 @@ use Symfony\Component\HttpFoundation\Response;
  *   first, so it is not guessed at.
  * - nosniff and a referrer policy that sends only the origin elsewhere, so an
  *   issue URL is not handed to every site a link in it points at.
+ * - noindex on a self-hosted install. It is somebody's private tool, and the only
+ *   public pages it has — sign-in and the docs — would otherwise sit in search
+ *   results as copies of buggie.eu's.
  *
  * A response that already set a policy of its own — an attachment, a brand logo —
  * keeps it.
@@ -44,6 +47,10 @@ class SecurityHeaders
 
         if (! $headers->has('Referrer-Policy')) {
             $headers->set('Referrer-Policy', 'strict-origin-when-cross-origin');
+        }
+
+        if (! config('buggie.hosted') && ! $headers->has('X-Robots-Tag')) {
+            $headers->set('X-Robots-Tag', 'noindex, nofollow');
         }
 
         return $response;

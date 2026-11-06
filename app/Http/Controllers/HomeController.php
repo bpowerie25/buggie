@@ -13,14 +13,22 @@ use Inertia\Response;
 use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
 
 /**
- * Central-domain root. Signed-out visitors get the marketing page; signed-in users
- * are dropped back into their last workspace, or the picker if they have none.
+ * Central-domain root. Signed-out visitors get the marketing page on the hosted
+ * service and the sign-in page on a self-hosted install; signed-in users are dropped
+ * back into their last workspace, or the picker if they have none.
  */
 class HomeController extends Controller
 {
     public function __invoke(Request $request): Response|SymfonyResponse
     {
         $user = $request->user();
+
+        // A self-hosted install belongs to whoever runs it. Its clients should land on
+        // a way in, not on a pitch for Buggie with a "Get started" that leads nowhere
+        // on an invite-only install.
+        if ($user === null && ! config('buggie.hosted')) {
+            return redirect()->route('login');
+        }
 
         if ($user === null) {
             $currency = Currency::resolve($request);

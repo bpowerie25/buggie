@@ -166,7 +166,7 @@ class MailDeliverabilityTest extends TestCase
     #[Test]
     public function a_guest_is_told_nothing(): void
     {
-        config(['mail.default' => 'log']);
+        config(['mail.default' => 'log', 'buggie.hosted' => true]);
 
         // Signed out, on the marketing page, the state of somebody else's mail server
         // is none of a visitor's business.

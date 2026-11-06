@@ -108,4 +108,31 @@ class SelfHostedTest extends TestCase
         $this->assertEmpty(config('sentry.dsn'));
         $this->assertEmpty(config('cashier.secret'));
     }
+
+    #[Test]
+    public function a_visitor_is_shown_the_way_in_rather_than_a_sales_page(): void
+    {
+        // The install belongs to whoever runs it. Their clients should not land on a
+        // pitch for Buggie, and the hosted service's marketing copy should not appear
+        // on every self-hosted domain.
+        $this->get($this->centralUrl('/'))->assertRedirect(route('login'));
+
+        // The paired control: the hosted service still shows the marketing page.
+        config(['buggie.hosted' => true]);
+
+        $this->get($this->centralUrl('/'))
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page->component('welcome'));
+    }
+
+    #[Test]
+    public function search_engines_are_asked_to_stay_out(): void
+    {
+        $this->get($this->centralUrl('/login'))
+            ->assertHeader('X-Robots-Tag', 'noindex, nofollow');
+
+        config(['buggie.hosted' => true]);
+
+        $this->get($this->centralUrl('/login'))->assertHeaderMissing('X-Robots-Tag');
+    }
 }

@@ -14,7 +14,7 @@ class WorkspaceResolutionTest extends TestCase
     #[Test]
     public function the_central_domain_binds_no_workspace(): void
     {
-        $this->get($this->centralUrl('/'))->assertOk();
+        $this->get($this->centralUrl('/login'))->assertOk();
 
         $this->assertFalse(app(Tenancy::class)->check());
     }
