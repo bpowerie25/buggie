@@ -237,6 +237,62 @@ class IssueFilteringTest extends TestCase
     }
 
     #[Test]
+    public function a_bulk_status_change_lands_on_each_issues_own_project_status(): void
+    {
+        [$workspace, $owner] = $this->seedWorkspace();
+
+        [$keys, $webDone] = app(Tenancy::class)->run($workspace, function () {
+            $web = Project::where('slug', 'web')->firstOrFail();
+            $app = Project::where('slug', 'app')->firstOrFail();
+
+            $keys = Issue::open()->whereIn('project_id', [$web->id, $app->id])->pluck('key')->all();
+            $this->assertSame(2, Issue::whereIn('key', $keys)->pluck('project_id')->unique()->count());
+
+            return [$keys, $web->statuses()->where('name', 'Done')->firstOrFail()];
+        });
+
+        // The id the list sends is one project's; the other project has its own.
+        $this->actingAs($owner)
+            ->patch($this->workspaceUrl($workspace, '/issues/bulk'), [
+                'keys' => $keys,
+                'changes' => ['status_id' => $webDone->id],
+            ])
+            ->assertRedirect();
+
+        app(Tenancy::class)->run($workspace, function () use ($keys) {
+            foreach (Issue::with('status')->whereIn('key', $keys)->get() as $issue) {
+                $this->assertSame('Done', $issue->status->name);
+                $this->assertSame($issue->project_id, $issue->status->project_id);
+            }
+        });
+    }
+
+    #[Test]
+    public function a_bulk_status_change_is_refused_whole_when_a_project_has_no_such_status(): void
+    {
+        [$workspace, $owner] = $this->seedWorkspace();
+
+        [$keys, $webDone, $before] = app(Tenancy::class)->run($workspace, function () {
+            $web = Project::where('slug', 'web')->firstOrFail();
+            $app = Project::where('slug', 'app')->firstOrFail();
+            $app->statuses()->where('name', 'Done')->update(['name' => 'Shipped']);
+
+            $keys = Issue::open()->whereIn('project_id', [$web->id, $app->id])->pluck('key')->all();
+
+            return [$keys, $web->statuses()->where('name', 'Done')->firstOrFail(), Issue::whereIn('key', $keys)->pluck('status_id', 'key')->all()];
+        });
+
+        $this->actingAs($owner)
+            ->patch($this->workspaceUrl($workspace, '/issues/bulk'), [
+                'keys' => $keys,
+                'changes' => ['status_id' => $webDone->id],
+            ])
+            ->assertSessionHasErrors('changes.status_id');
+
+        $this->assertSame($before, app(Tenancy::class)->run($workspace, fn () => Issue::whereIn('key', $keys)->pluck('status_id', 'key')->all()));
+    }
+
+    #[Test]
     public function bulk_updates_cannot_reach_another_workspace(): void
     {
         [$workspace, $owner] = $this->seedWorkspace();

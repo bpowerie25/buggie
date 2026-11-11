@@ -625,12 +625,42 @@ class IssueController extends Controller
 
         abort_if($changes === [], 422, 'No supported changes given.');
 
-        DB::transaction(function () use ($issues, $changes, $action, $request) {
+        // Statuses belong to one project, but the list offers one entry per *name*, so a
+        // selection that spans projects arrives with a single project's status id. Aim
+        // at the status of that name in each issue's own project instead, and refuse the
+        // whole batch up front, naming the projects, if one has none.
+        $statusByProject = null;
+
+        if (isset($changes['status_id'])) {
+            $chosen = Status::findOrFail((int) $changes['status_id']);
+            $issues->loadMissing('project');
+
+            $statusByProject = Status::query()
+                ->whereIn('project_id', $issues->pluck('project_id')->unique())
+                ->where('name', $chosen->name)
+                ->pluck('id', 'project_id');
+
+            $missing = $issues->pluck('project')->unique('id')
+                ->filter(fn ($project) => ! $statusByProject->has($project->id))
+                ->pluck('name');
+
+            if ($missing->isNotEmpty()) {
+                throw ValidationException::withMessages([
+                    'changes.status_id' => "No “{$chosen->name}” status in ".$missing->join(', ', ' or ').'. Nothing was changed.',
+                ]);
+            }
+        }
+
+        DB::transaction(function () use ($issues, $changes, $action, $request, $statusByProject) {
             foreach ($issues as $issue) {
                 // Authorised per issue: a bulk action is not a way around a policy.
                 $this->authorize('update', $issue);
 
-                $action->handle($issue, $changes, $request->user());
+                $own = $statusByProject
+                    ? [...$changes, 'status_id' => $statusByProject[$issue->project_id]]
+                    : $changes;
+
+                $action->handle($issue, $own, $request->user());
             }
         });
 
